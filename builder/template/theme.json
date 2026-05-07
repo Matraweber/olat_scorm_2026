@@ -1,0 +1,12 @@
+{
+  "primaryColor": "#003b5c",
+  "primaryLight": "#0f567d",
+  "accentColor": "#a1d884",
+  "accentDarkColor": "#84bf66",
+  "fontFamily": "Verdana, Arial, sans-serif",
+  "kicker": "Umwelt-Campus Birkenfeld | Hochschule Trier",
+  "footerText": "Dr.-Ing. Lukas Lentz",
+  "footerLink": "https://www.umwelt-campus.de/dr-lukas-lentz",
+  "logoUrl": "default-logo.svg",
+  "logoDataUrl": null
+}

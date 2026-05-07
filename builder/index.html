@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCORM Builder - Umwelt-Campus Birkenfeld</title>
+  <link rel="stylesheet" href="builder.css" />
+</head>
+<body>
+  <div class="builder-shell">
+    <header class="builder-header">
+      <div class="builder-brand">
+        <span class="builder-kicker">SCORM Builder</span>
+        <h1>OLAT-Lerneinheiten erstellen</h1>
+        <p class="builder-subtitle">Aufgaben zusammenstellen und als SCORM-1.2-Paket exportieren.</p>
+      </div>
+      <div class="builder-actions">
+        <button id="btnNew" class="btn btn-secondary" type="button">Neu</button>
+        <label class="btn btn-secondary" for="fileLoadZip">SCORM laden</label>
+        <input id="fileLoadZip" type="file" accept=".zip" hidden />
+        <label class="btn btn-secondary" for="fileLoadJson">JSON laden</label>
+        <input id="fileLoadJson" type="file" accept=".json" hidden />
+        <button id="btnExportJson" class="btn btn-secondary" type="button">JSON exportieren</button>
+        <button id="btnPreview" class="btn btn-secondary" type="button">Vorschau</button>
+        <button id="btnDownload" class="btn btn-primary" type="button">SCORM-ZIP erzeugen</button>
+      </div>
+    </header>
+
+    <main class="builder-main">
+      <aside class="builder-sidebar">
+        <section class="sidebar-section">
+          <div class="section-head">
+            <h2>Aufgaben</h2>
+            <button id="btnAddTask" class="btn btn-primary btn-sm" type="button">+ Aufgabe</button>
+          </div>
+          <ol id="taskList" class="task-list"></ol>
+        </section>
+
+        <section class="sidebar-section">
+          <h2>Allgemein</h2>
+          <button class="sidebar-link" data-target="course" type="button">Kopfdaten</button>
+          <button class="sidebar-link" data-target="theme" type="button">Branding / Theme</button>
+        </section>
+
+        <section class="sidebar-section">
+          <h2>Modus</h2>
+          <label class="toggle"><input id="jsonModeToggle" type="checkbox" /> JSON-Editor</label>
+        </section>
+      </aside>
+
+      <section class="builder-pane">
+        <div id="formPane"></div>
+        <div id="jsonPane" class="hidden">
+          <h2>JSON-Editor</h2>
+          <p class="hint">Bearbeite das gesamte Paket als JSON. Gültiges JSON wird sofort übernommen.</p>
+          <textarea id="jsonEditor" class="json-editor" spellcheck="false"></textarea>
+          <div class="json-status" id="jsonStatus"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="builder-footer">
+      <span>SCORM 1.2 · Browser-only · läuft offline · Stand 2026</span>
+    </footer>
+  </div>
+
+  <div id="taskTypeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <h2 id="modalTitle">Aufgabentyp auswählen</h2>
+      <div id="taskTypeList" class="task-type-grid"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-modal-close>Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card preview-card">
+      <div class="preview-head">
+        <h2>Vorschau</h2>
+        <button class="btn btn-secondary" type="button" data-modal-close>Schließen</button>
+      </div>
+      <iframe id="previewFrame" title="SCORM-Vorschau"></iframe>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="lib/jszip.min.js"></script>
+  <script src="template/task-types/_registry.js"></script>
+  <script src="template/task-types/complex-numbers.js"></script>
+  <script src="template/task-types/function-plot.js"></script>
+  <script src="template/task-types/vector-2d.js"></script>
+  <script src="template/task-types/number-base.js"></script>
+  <script src="template/task-types/truth-table.js"></script>
+  <script src="template/task-types/multiple-choice.js"></script>
+  <script src="template/task-types/numeric-input.js"></script>
+  <script src="builder.js"></script>
+</body>
+</html>
