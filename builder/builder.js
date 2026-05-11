@@ -349,9 +349,9 @@
     const get = () => c;
     const set = (k, v) => { c[k] = v; if(k === 'courseTitle') renderTaskList(); };
     [
-      { key:'courseTitle', label:'Kurstitel', type:'text', placeholder:'z. B. Maschinendynamik - Komplexe Zahlen' },
+      { key:'courseTitle', label:'Kurstitel', type:'text', placeholder:'z. B. Maschinendynamik: Komplexe Zahlen' },
       { key:'courseSubtitle', label:'Untertitel', type:'text' },
-      { key:'passThreshold', label:'Bestehensschwelle (0-1)', type:'number', step:'any', min:0, max:1 }
+      { key:'passThreshold', label:'Bestehensschwelle (0 bis 1)', type:'number', step:'any', min:0, max:1 }
     ].forEach(spec => host.appendChild(renderField(spec, get, set)));
   }
 
@@ -401,24 +401,24 @@
   const SNAP_PX = 6;
   const GRID = 8;
   const BLOCK_DEFAULT_SIZES = {
-    'heading':           {w: 900, h: 56},
-    'rich-text':         {w: 900, h: 140},
-    'note-box':          {w: 900, h: 140},
-    'image':             {w: 500, h: 360},
+    'heading':           {w: 900, h: 72},
+    'rich-text':         {w: 900, h: 160},
+    'note-box':          {w: 900, h: 160},
+    'image':             {w: 500, h: 380},
     'divider':           {w: 900, h: 24},
-    'code':              {w: 800, h: 260},
-    'multiple-choice':   {w: 600, h: 320},
-    'numeric-input':     {w: 600, h: 280},
-    'text-input':        {w: 600, h: 220},
-    'cloze':             {w: 900, h: 220},
-    'match-pairs':       {w: 900, h: 460},
-    'sort-list':         {w: 700, h: 360},
-    'complex-question':  {w: 1080, h: 660},
-    'function-question': {w: 1080, h: 580},
-    'vector-question':   {w: 1080, h: 660},
-    'number-base':       {w: 700, h: 280},
-    'truth-table':       {w: 700, h: 460},
-    'function-sandbox':  {w: 1080, h: 540}
+    'code':              {w: 800, h: 280},
+    'multiple-choice':   {w: 600, h: 520},
+    'numeric-input':     {w: 600, h: 380},
+    'text-input':        {w: 600, h: 340},
+    'cloze':             {w: 900, h: 320},
+    'match-pairs':       {w: 900, h: 540},
+    'sort-list':         {w: 700, h: 420},
+    'complex-question':  {w: 1080, h: 720},
+    'function-question': {w: 1080, h: 640},
+    'vector-question':   {w: 1080, h: 720},
+    'number-base':       {w: 700, h: 360},
+    'truth-table':       {w: 700, h: 520},
+    'function-sandbox':  {w: 1080, h: 580}
   };
   function defaultSizeFor(type){ return BLOCK_DEFAULT_SIZES[type] || {w: 500, h: 200}; }
   function ensurePos(block, allBlocks){
@@ -430,9 +430,76 @@
   }
   function ensureAllPos(blocks){ blocks.forEach(b => ensurePos(b, blocks)); }
   function stripHtmlText(html){ const d = document.createElement('div'); d.innerHTML = String(html || ''); return (d.textContent || '').trim(); }
+
+  // Cache the template stylesheet text for shadow-DOM injection in canvas previews.
+  let _runtimeStylesText = null;
+  let _runtimeStylesPromise = null;
+  function loadRuntimeStyles(){
+    if(_runtimeStylesText != null) return Promise.resolve(_runtimeStylesText);
+    if(_runtimeStylesPromise) return _runtimeStylesPromise;
+    _runtimeStylesPromise = fetchTextRel('styles.css').then(txt => { _runtimeStylesText = txt; return txt; }).catch(() => '');
+    return _runtimeStylesPromise;
+  }
+  // Preload on first use so the canvas paints with runtime styling on initial render.
+  loadRuntimeStyles().then(() => { try { renderCanvasAll(); } catch(e){} });
+  function renderCanvasAll(){
+    // Re-render every canvas-block-body that has a [data-block-id] in the document.
+    document.querySelectorAll('.canvas-block-card').forEach(card => {
+      const id = card.dataset.blockId;
+      const body = card.querySelector('.canvas-block-body');
+      if(!body || !id) return;
+      // Find the block in state by id
+      const task = state.course.tasks[state.selected && state.selected.idx];
+      if(!task) return;
+      const b = (task.blocks || []).find(x => x.id === id);
+      if(b) renderBlockPreview(body, b);
+    });
+  }
+
+  function makeStubApi(block){
+    return {
+      utils: window.BlockUtils,
+      blockId: 'preview_' + String(block.id || '').replace(/[^A-Za-z0-9_]/g, ''),
+      initScore(){ /* no-op in builder preview */ },
+      reportScore(){ /* no-op in builder preview */ }
+    };
+  }
+
   function renderBlockPreview(host, block){
     host.innerHTML = '';
     const def = window.Blocks.get(block.type);
+
+    // Preferred: render the REAL runtime mount() inside an isolated shadow DOM so
+    // canvas matches preview exactly. Falls back to the lightweight preview() helper
+    // (or text summary) if mount fails or runtime utils/styles aren't ready.
+    if(def && typeof def.mount === 'function' && window.BlockUtils){
+      try {
+        const shadowHost = document.createElement('div');
+        shadowHost.className = 'canvas-mount-host';
+        shadowHost.style.cssText = 'width:100%; min-height:0; pointer-events:none;';
+        host.appendChild(shadowHost);
+        const shadow = shadowHost.attachShadow({mode: 'open'});
+
+        // Inject runtime stylesheet (uses cached text or sync fetch fallback).
+        const styleEl = document.createElement('style');
+        styleEl.textContent = (_runtimeStylesText || '') +
+          '\n:host { display:block; }\n' +
+          '.scorm-shell, .scorm-header, .scorm-footer { display:none; }\n' +
+          '.canvas-mount-wrap { padding: 0.55rem 0.7rem; }\n';
+        shadow.appendChild(styleEl);
+
+        const mountHost = document.createElement('div');
+        mountHost.className = 'canvas-mount-wrap';
+        shadow.appendChild(mountHost);
+
+        def.mount(mountHost, block.config || {}, makeStubApi(block));
+        return;
+      } catch(e){
+        // Fall through to legacy preview()
+        host.innerHTML = '';
+      }
+    }
+
     if(def && typeof def.preview === 'function'){
       try { def.preview(host, block.config || {}); return; }
       catch(e){ /* fall through to summary text */ }
@@ -1093,7 +1160,7 @@
   }
   async function gatherTemplateFiles(usedBlocks){
     const files = {};
-    const list = ['scorm12.js', 'styles.css', 'runtime.js', 'index.html', 'blocks/_registry.js'];
+    const list = ['scorm12.js', 'utils.js', 'styles.css', 'runtime.js', 'index.html', 'blocks/_registry.js'];
     for(const f of list) files[f] = await fetchTextRel(f);
     for(const b of usedBlocks){
       const rel = BLOCK_FILES[b]; if(!rel) continue;
@@ -1128,7 +1195,7 @@
     }
 
     const fileList = [
-      'index.html', 'styles.css', 'scorm12.js', 'runtime.js',
+      'index.html', 'styles.css', 'scorm12.js', 'utils.js', 'runtime.js',
       'theme.json', 'tasks.json', 'blocks/_registry.js',
       ...blockFiles, ...(logoFilename ? [logoFilename] : [])
     ];
@@ -1138,6 +1205,7 @@
     zip.file('index.html', indexHtml);
     zip.file('styles.css', tmpl['styles.css']);
     zip.file('scorm12.js', tmpl['scorm12.js']);
+    zip.file('utils.js', tmpl['utils.js']);
     zip.file('runtime.js', tmpl['runtime.js']);
     zip.file('theme.json', themeJson);
     zip.file('tasks.json', tasksJson);
@@ -1255,6 +1323,7 @@
         '</head><body>', bodyInner,
         '<script>window.__SCORM_THEME__=', themeJson, ';window.__SCORM_TASKS__=', tasksJson, ';<\/script>',
         '<script>', tmpl['scorm12.js'], '<\/script>',
+        '<script>', tmpl['utils.js'], '<\/script>',
         '<script>', tmpl['blocks/_registry.js'], '<\/script>',
         '<script>', blockScripts, '<\/script>',
         '<script>', tmpl['runtime.js'], '<\/script>',

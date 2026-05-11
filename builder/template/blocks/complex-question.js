@@ -108,23 +108,29 @@
         renderPlot();
       }
       function grade(){
-        const parts = []; let allOk = true;
+        const parts = []; let okCount = 0, totalActive = 0;
         function check(key, parser, expected, tolerance, label){
           if(!fields[key]) return;
+          totalActive++;
           const v = parser(inputs[key].value);
-          if(v == null || !Number.isFinite(v)){ allOk = false; parts.push(label + ' fehlt.'); return; }
+          if(v == null || !Number.isFinite(v)){ parts.push(label + ' fehlt.'); return; }
           let ok;
           if(key === 'arg') ok = u.angleEqual(v, expected, tolerance);
           else ok = u.nearlyEqual(v, expected, tolerance);
           parts.push(ok ? (label + ' richtig.') : (label + ' noch nicht richtig.'));
-          if(!ok) allOk = false;
+          if(ok) okCount++;
         }
         check('real', u.parseNum,   current.a,   tol.real, 'Re(z)');
         check('imag', u.parseNum,   current.b,   tol.imag, 'Im(z)');
         check('abs',  u.parseNum,   current.r,   tol.abs,  '|z|');
         check('arg',  u.parseAngle, current.phi, tol.arg,  'φ');
-        if(allOk){ fb.ok('Korrekt.'); api.reportScore(config.maxPoints || 1); }
-        else { fb.bad(parts.join(' ')); api.reportScore(0); }
+        const maxPoints = config.maxPoints || 1;
+        const ratio = totalActive > 0 ? okCount / totalActive : 0;
+        const pts = Math.round(ratio * maxPoints * 100) / 100;
+        api.reportScore(pts);
+        if(okCount === totalActive) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte.');
+        else if(okCount > 0) fb.neutral('Teilweise richtig (' + okCount + ' von ' + totalActive + '): ' + pts + ' / ' + maxPoints + ' Punkte. ' + parts.join(' '));
+        else fb.bad('0 / ' + maxPoints + ' Punkte. ' + parts.join(' '));
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);

@@ -169,10 +169,18 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .canvas-block-body {
   flex: 1; padding: 0;
   font-size: 0.85rem; color: var(--text);
-  overflow: hidden;
+  overflow: auto;
   display: flex; flex-direction: column; min-height: 0;
 }
-.canvas-block-body > * { width: 100%; box-sizing: border-box; }
+.canvas-block-body > * { width: 100%; box-sizing: border-box; flex: 0 0 auto; }
+.canvas-block-card.overflow-warning { border-color: #e8a100; box-shadow: 0 0 0 1px #e8a100, 0 2px 6px rgba(0,0,0,0.05); }
+.canvas-block-card.overflow-warning .canvas-block-head { background: #fff5d6; }
+.canvas-block-card .overflow-badge { display:none; }
+.canvas-block-card.overflow-warning .overflow-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: #e8a100; color: #fff; font-size: 0.65rem; font-weight: 700;
+  padding: 0.1rem 0.4rem; border-radius: 999px; margin-left: 0.3rem;
+}
 .canvas-block-summary { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .canvas-block-resize {
   position: absolute; right: 0; bottom: 0;

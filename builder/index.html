@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SCORM Builder - Umwelt-Campus Birkenfeld</title>
-  <link rel="stylesheet" href="builder.css?v=7" />
+  <title>SCORM Builder, Umwelt-Campus Birkenfeld</title>
+  <link rel="stylesheet" href="builder.css?v=9" />
 </head>
 <body>
   <div class="builder-shell">
@@ -53,7 +53,7 @@
         <div id="formPane"></div>
         <div id="jsonPane" class="hidden">
           <h2>JSON-Editor</h2>
-          <p class="hint">Bearbeite das gesamte Paket als JSON. Gültiges JSON wird sofort übernommen.</p>
+          <p class="hint">Bearbeiten Sie das gesamte Paket als JSON. Gültiges JSON wird sofort übernommen.</p>
           <textarea id="jsonEditor" class="json-editor" spellcheck="false"></textarea>
           <div class="json-status" id="jsonStatus"></div>
         </div>
@@ -68,7 +68,7 @@
   <div id="blockTypeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card">
       <h2 id="modalTitle">Block hinzufügen</h2>
-      <p class="hint">Wähle einen Block-Typ aus. Du kannst beliebig viele Blöcke pro Aufgabe kombinieren.</p>
+      <p class="hint">Wählen Sie einen Block-Typ aus. Sie können beliebig viele Blöcke pro Aufgabe kombinieren.</p>
       <div id="blockTypeList" class="task-type-grid"></div>
       <div class="modal-actions">
         <button class="btn btn-secondary" type="button" data-modal-close>Abbrechen</button>
@@ -84,11 +84,11 @@
         <button class="modal-tab" type="button" data-tab="templates" role="tab">Vorlagen</button>
       </div>
       <div id="taskCreatePanelEmpty" class="modal-panel">
-        <p>Erstelle eine Aufgabe und füge dann beliebige Blöcke hinzu - Texte, Bilder, Hinweisboxen, Fragen, Plots, Zuordnungen.</p>
+        <p>Erstellen Sie eine Aufgabe und fügen Sie dann beliebige Blöcke hinzu: Texte, Bilder, Hinweisboxen, Fragen, Plots, Zuordnungen.</p>
         <button id="btnCreateEmpty" class="btn btn-primary" type="button">Leere Aufgabe erstellen</button>
       </div>
       <div id="taskCreatePanelTemplates" class="modal-panel hidden">
-        <p class="hint">Wähle eine vorgefertigte Aufgabe - du kannst sie nach dem Einfügen frei anpassen.</p>
+        <p class="hint">Wählen Sie eine vorgefertigte Aufgabe. Sie können sie nach dem Einfügen frei anpassen.</p>
         <div id="builtinTemplateList" class="template-grid"></div>
         <h3 style="margin-top:1.4rem">Eigene Vorlagen</h3>
         <div id="userTemplateList" class="template-grid"></div>
@@ -126,26 +126,27 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="lib/jszip.min.js"></script>
-  <script src="template/blocks/_registry.js?v=7"></script>
-  <script src="template/blocks/heading.js?v=7"></script>
-  <script src="template/blocks/rich-text.js?v=7"></script>
-  <script src="template/blocks/note-box.js?v=7"></script>
-  <script src="template/blocks/image.js?v=7"></script>
-  <script src="template/blocks/divider.js?v=7"></script>
-  <script src="template/blocks/code.js?v=7"></script>
-  <script src="template/blocks/multiple-choice.js?v=7"></script>
-  <script src="template/blocks/numeric-input.js?v=7"></script>
-  <script src="template/blocks/text-input.js?v=7"></script>
-  <script src="template/blocks/cloze.js?v=7"></script>
-  <script src="template/blocks/match-pairs.js?v=7"></script>
-  <script src="template/blocks/sort-list.js?v=7"></script>
-  <script src="template/blocks/complex-question.js?v=7"></script>
-  <script src="template/blocks/function-question.js?v=7"></script>
-  <script src="template/blocks/vector-question.js?v=7"></script>
-  <script src="template/blocks/number-base.js?v=7"></script>
-  <script src="template/blocks/truth-table.js?v=7"></script>
-  <script src="template/blocks/function-sandbox.js?v=7"></script>
-  <script src="templates.js?v=7"></script>
-  <script src="builder.js?v=7"></script>
+  <script src="template/utils.js?v=9"></script>
+  <script src="template/blocks/_registry.js?v=9"></script>
+  <script src="template/blocks/heading.js?v=9"></script>
+  <script src="template/blocks/rich-text.js?v=9"></script>
+  <script src="template/blocks/note-box.js?v=9"></script>
+  <script src="template/blocks/image.js?v=9"></script>
+  <script src="template/blocks/divider.js?v=9"></script>
+  <script src="template/blocks/code.js?v=9"></script>
+  <script src="template/blocks/multiple-choice.js?v=9"></script>
+  <script src="template/blocks/numeric-input.js?v=9"></script>
+  <script src="template/blocks/text-input.js?v=9"></script>
+  <script src="template/blocks/cloze.js?v=9"></script>
+  <script src="template/blocks/match-pairs.js?v=9"></script>
+  <script src="template/blocks/sort-list.js?v=9"></script>
+  <script src="template/blocks/complex-question.js?v=9"></script>
+  <script src="template/blocks/function-question.js?v=9"></script>
+  <script src="template/blocks/vector-question.js?v=9"></script>
+  <script src="template/blocks/number-base.js?v=9"></script>
+  <script src="template/blocks/truth-table.js?v=9"></script>
+  <script src="template/blocks/function-sandbox.js?v=9"></script>
+  <script src="templates.js?v=9"></script>
+  <script src="builder.js?v=9"></script>
 </body>
 </html>

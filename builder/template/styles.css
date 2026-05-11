@@ -28,7 +28,7 @@ body { font-family: var(--font); color: var(--text); background: linear-gradient
 .nav-link { color: #ffffff; border: 1px solid rgba(255,255,255,0.24); background: rgba(255,255,255,0.08); padding: 0.5rem 0.9rem; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
 .nav-link.active { background: rgba(161,216,132,0.75); border-color: rgba(161,216,132,0.95); color: var(--primary); }
 .nav-link.done::before { content: "\2713 "; color: var(--accent-dark); }
-.scorm-main { max-width: 1200px; width: 100%; margin: -1.3rem auto 0; padding: 0 1.2rem 1.5rem; }
+.scorm-main { max-width: 1200px; width: 100%; margin: 1.4rem auto 0; padding: 0 1.2rem 1.5rem; }
 .hero-card, .section-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .hero-card { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.2rem; padding: 1.4rem; margin-bottom: 1.4rem; }
 .hero-card h2, .section-card h3, .note-title, .formula-title { color: var(--primary); }

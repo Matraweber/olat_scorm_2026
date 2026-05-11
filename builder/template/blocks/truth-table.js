@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('truth-table', {
     label: 'Wahrheitstabelle',
-    description: 'Boolesche Ausdrücke (AND, OR, NOT, XOR) auswerten - pro Zeile 0/1.',
+    description: 'Boolesche Ausdrücke (AND, OR, NOT, XOR) auswerten, pro Zeile 0/1.',
     category: 'Frage',
     icon: '01',
     graded: true,
@@ -109,19 +109,23 @@
         fb.neutral('Tragen Sie für jede Zeile 0 oder 1 ein.');
       }
       function grade(){
-        let allOk = true, any = false;
+        let correctRows = 0, totalRows = current.rows.length, any = false;
         current.rows.forEach((vars, i) => {
           const expected = evalBool(current.expr, vars);
-          if(expected == null){ allOk = false; return; }
           const v = current.inputs[i].value;
-          if(v === '?'){ allOk = false; return; }
+          if(v === '?' || expected == null) return;
           any = true;
           const got = v === '1';
-          if(got !== expected) allOk = false;
+          if(got === expected) correctRows++;
         });
         if(!any){ fb.bad('Bitte alle Zeilen ausfüllen.'); return; }
-        if(allOk){ fb.ok('Korrekt.'); api.reportScore(config.maxPoints || 1); }
-        else { fb.bad('Mindestens eine Zeile ist falsch oder leer.'); api.reportScore(0); }
+        const maxPoints = config.maxPoints || 1;
+        const ratio = totalRows > 0 ? correctRows / totalRows : 0;
+        const pts = Math.round(ratio * maxPoints * 100) / 100;
+        api.reportScore(pts);
+        if(correctRows === totalRows) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte.');
+        else if(correctRows > 0) fb.neutral('Teilweise richtig: ' + correctRows + ' von ' + totalRows + ' Zeilen (' + pts + ' / ' + maxPoints + ' Punkte).');
+        else fb.bad('Keine Zeile korrekt. 0 / ' + maxPoints + ' Punkte.');
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);

@@ -8,19 +8,19 @@
       id: 'tpl-empty-content',
       label: 'Inhaltsseite',
       category: 'Inhalt',
-      description: 'Überschrift + Text + Bild - gut zum Erklären ohne Frage.',
+      description: 'Überschrift + Text + Bild, gut zum Erklären ohne Frage.',
       task: {
         title: 'Erklärung',
         blocks: [
           { type: 'heading',   config: { text: 'Worum geht es?', level: 2 } },
-          { type: 'rich-text', config: { html: '<p>Hier kannst du den Lerninhalt einführen. <strong>Fett</strong>, <em>kursiv</em> und <code>Code</code> sind erlaubt.</p>' } },
+          { type: 'rich-text', config: { html: '<p>Hier können Sie den Lerninhalt einführen. <strong>Fett</strong>, <em>kursiv</em> und <code>Code</code> sind erlaubt.</p>' } },
           { type: 'image',     config: { src:'', alt:'', caption:'(optional) Bildunterschrift' } }
         ]
       }
     },
     {
       id: 'tpl-mc-simple',
-      label: 'Multiple Choice - kurz',
+      label: 'Multiple Choice, kurz',
       category: 'Frage',
       description: 'Eine Frage mit mehreren Antwortoptionen.',
       task: {
@@ -83,7 +83,7 @@
       id: 'tpl-match',
       label: 'Begriffe zuordnen',
       category: 'Frage',
-      description: 'Drag & Drop oder Klick - linke Begriffe zu rechten Antworten verbinden.',
+      description: 'Drag &amp; Drop oder Klick, linke Begriffe zu rechten Antworten verbinden.',
       task: {
         title: 'Zuordnung',
         blocks: [
@@ -122,7 +122,7 @@
     },
     {
       id: 'tpl-complex',
-      label: 'Komplexe Zahlen - Aufgabe',
+      label: 'Komplexe Zahlen: Aufgabe',
       category: 'Mathematik',
       description: 'Intro + Hinweis + Re/Im/|z|/φ aus dem Plot ablesen.',
       task: {
@@ -168,7 +168,7 @@
       id: 'tpl-truth-table',
       label: 'Wahrheitstabelle',
       category: 'Informatik',
-      description: 'Booleschen Ausdruck - Wahrheitstabelle ausfüllen.',
+      description: 'Booleschen Ausdruck, Wahrheitstabelle ausfüllen.',
       task: {
         title: 'Boolesche Logik',
         blocks: [

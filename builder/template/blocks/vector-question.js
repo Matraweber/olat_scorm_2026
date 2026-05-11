@@ -105,24 +105,30 @@
         renderPlot();
       }
       function grade(){
-        const parts = []; let allOk = true;
+        const parts = []; let okCount = 0, totalActive = 0;
         function check(key, parser, expected, tolerance, label){
           if(!fields[key]) return;
+          totalActive++;
           const v = parser(inputs[key].value);
-          if(v == null || !Number.isFinite(v)){ allOk = false; parts.push(label + ' fehlt.'); return; }
+          if(v == null || !Number.isFinite(v)){ parts.push(label + ' fehlt.'); return; }
           let ok;
           if(key === 'angle' && config.angleUnit !== 'deg') ok = u.angleEqual(v, expected, tolerance);
           else if(key === 'angle') ok = Math.abs(((v - expected + 540) % 360) - 180) <= tolerance;
           else ok = u.nearlyEqual(v, expected, tolerance);
           parts.push(ok ? (label + ' richtig.') : (label + ' noch nicht richtig.'));
-          if(!ok) allOk = false;
+          if(ok) okCount++;
         }
         check('x', u.parseNum, current.x, tol.x, 'x');
         check('y', u.parseNum, current.y, tol.y, 'y');
         check('mag', u.parseNum, current.mag, tol.mag, '|v|');
         check('angle', config.angleUnit === 'deg' ? u.parseNum : u.parseAngle, current.angle, tol.angle, 'Winkel');
-        if(allOk){ fb.ok('Korrekt.'); api.reportScore(config.maxPoints || 1); }
-        else { fb.bad(parts.join(' ')); api.reportScore(0); }
+        const maxPoints = config.maxPoints || 1;
+        const ratio = totalActive > 0 ? okCount / totalActive : 0;
+        const pts = Math.round(ratio * maxPoints * 100) / 100;
+        api.reportScore(pts);
+        if(okCount === totalActive) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte.');
+        else if(okCount > 0) fb.neutral('Teilweise richtig (' + okCount + ' von ' + totalActive + '): ' + pts + ' / ' + maxPoints + ' Punkte. ' + parts.join(' '));
+        else fb.bad('0 / ' + maxPoints + ' Punkte. ' + parts.join(' '));
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);

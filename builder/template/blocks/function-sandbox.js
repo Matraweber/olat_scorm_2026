@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('function-sandbox', {
     label: 'Funktionsplot-Sandbox',
-    description: 'Funktion mit Schiebereglern für Parameter - interaktive Visualisierung, nicht gewertet.',
+    description: 'Funktion mit Schiebereglern für Parameter, interaktive Visualisierung, nicht gewertet.',
     category: 'Visualisierung',
     icon: 'ƒ',
     graded: false,
@@ -21,7 +21,7 @@
     builderSchema(){
       return [
         { key:'title', label:'Titel (optional)', type:'text' },
-        { key:'expr', label:'Funktion f(x) - Schieberegler-Variablen wie a, b, c sind erlaubt', type:'text', placeholder:'a*sin(b*x + c)' },
+        { key:'expr', label:'Funktion f(x), Schieberegler-Variablen wie a, b, c sind erlaubt', type:'text', placeholder:'a*sin(b*x + c)' },
         { key:'xMin', label:'x min', type:'number', step:'any' },
         { key:'xMax', label:'x max', type:'number', step:'any' },
         { key:'yMin', label:'y min', type:'number', step:'any' },

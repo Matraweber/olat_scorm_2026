@@ -113,7 +113,7 @@
       wrap.appendChild(ex);
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872; margin-top:0.3rem;';
-      hint.textContent = (config.directions || []).length + ' Richtung(en) im Pool, Werte ' + min + '-' + max;
+      hint.textContent = (config.directions || []).length + ' Richtung(en) im Pool, Werte ' + min + ' bis ' + max;
       wrap.appendChild(hint);
       host.appendChild(wrap);
     }
