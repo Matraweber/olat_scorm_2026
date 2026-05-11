@@ -283,7 +283,7 @@
     const threshold = (courseConfig.passThreshold == null) ? 0.5 : courseConfig.passThreshold;
     const ratio = max > 0 ? pts / max : 0;
     const passed = ratio >= threshold;
-    container.innerHTML = '<section class="hero-card"><div><h2>Test beendet</h2><p>Erreichte Punktzahl: <strong>' + (Math.round(pts*100)/100) + ' / ' + max + '</strong> (' + Math.round(ratio*100) + '%)</p><p>' + (passed ? '<strong style="color:var(--accent-dark)">Bestanden.</strong>' : '<strong style="color:var(--danger)">Nicht bestanden.</strong>') + '</p><p>Sie können dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></div></section>';
+    container.innerHTML = '<div class="task-page"><section class="section-card" style="padding:2rem 2.2rem"><h2 style="color:var(--primary);margin-top:0">Test beendet</h2><p>Erreichte Punktzahl: <strong>' + (Math.round(pts*100)/100) + ' / ' + max + '</strong> (' + Math.round(ratio*100) + '%)</p><p>' + (passed ? '<strong style="color:var(--accent-dark)">Bestanden ✓</strong>' : '<strong style="color:var(--danger)">Nicht bestanden.</strong>') + '</p><p style="color:var(--muted)">Sie können dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></section></div>';
   }
 
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

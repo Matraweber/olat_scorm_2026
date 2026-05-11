@@ -1273,6 +1273,24 @@
       task.blocks.push(block);
       selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
       renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
+      // After the shadow DOM mounts, shrink/grow the card to fit the actual rendered content.
+      requestAnimationFrame(() => {
+        const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
+        if(!card) return;
+        const body = card.querySelector('.canvas-block-body');
+        const head = card.querySelector('.canvas-block-head');
+        const shadowHost = body && body.querySelector('.canvas-mount-host');
+        let contentH = 0;
+        if(shadowHost && shadowHost.shadowRoot){
+          const wrap = shadowHost.shadowRoot.querySelector('.canvas-mount-wrap');
+          if(wrap) contentH = wrap.scrollHeight;
+        } else if(body) contentH = body.scrollHeight;
+        if(contentH > 10){
+          const headH = head ? head.offsetHeight : 32;
+          const newH = Math.max(60, Math.round(contentH + headH + 8));
+          if(Math.abs(newH - block.pos.h) > 10){ block.pos.h = newH; card.style.height = newH + 'px'; adjustCanvasHeight(); }
+        }
+      });
     }
 
     // Helpers exposed to global keyboard handler via activeTaskCtx

@@ -41,7 +41,7 @@
       exprBox.appendChild(exprText); card.appendChild(exprBox);
       const tableHost = document.createElement('div'); card.appendChild(tableHost);
 
-      const btnRow = document.createElement('div'); btnRow.className='button-cluster'; btnRow.style.marginTop='1rem';
+      const btnRow = document.createElement('div'); btnRow.className='button-cluster'; 
       const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
       const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);

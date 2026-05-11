@@ -48,7 +48,7 @@
       controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Antwort'}));
       const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'text-input'; inp.placeholder = 'Antwort eingeben';
       controls.appendChild(inp);
-      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster'; btnRow.style.marginTop = '0.7rem';
+      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster'; 
       const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
       const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);

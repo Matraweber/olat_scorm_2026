@@ -62,7 +62,7 @@
       const fb = u.feedbackBox(card);
       host.appendChild(card);
 
-      function chooseNew(){
+      function chooseNew(showMsg){
         const directions = config.directions && config.directions.length ? config.directions : [{from:'dec', to:'bin'}];
         const dir = config.randomize !== false ? directions[Math.floor(Math.random()*directions.length)] : directions[0];
         const min = Math.max(0, Number((config.valueRange && config.valueRange.min) ?? 0));
@@ -72,8 +72,8 @@
         const toStr   = valueDec.toString(baseRadix[dir.to]).toUpperCase();
         current = { dir, valueDec, fromStr, toStr };
         inp.value = '';
-        fb.neutral('Neue Aufgabe generiert.');
         qText.innerHTML = 'Wandeln Sie <strong>' + fromStr + '</strong> aus <em>' + baseLabels[dir.from] + '</em> nach <em>' + baseLabels[dir.to] + '</em> um.';
+        if(showMsg) fb.neutral('Neue Aufgabe generiert.');
       }
       function grade(){
         const cleaned = String(inp.value || '').trim().toUpperCase().replace(/^0X/, '').replace(/^0B/, '').replace(/\s+/g, '');
@@ -85,8 +85,8 @@
         else { fb.bad('Nicht korrekt. Richtige Antwort: ' + current.toStr); api.reportScore(0); }
       }
       checkBtn.addEventListener('click', grade);
-      newBtn.addEventListener('click', chooseNew);
-      chooseNew();
+      newBtn.addEventListener('click', () => chooseNew(true));
+      chooseNew(false);
       api.initScore(config.maxPoints || 1);
       return {};
     },

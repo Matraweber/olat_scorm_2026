@@ -84,13 +84,13 @@
           return m;
         });
       }
-      function chooseNew(){
+      function chooseNew(showMsg){
         const vars = genVars();
         const expected = u.safeMathExpr(config.formula || '0', vars);
         current = { vars, expected };
         inp.value = '';
-        fb.neutral('Neue Aufgabe generiert.');
         qText.textContent = fillTemplate(config.questionTemplate, vars);
+        if(showMsg) fb.neutral('Neue Aufgabe generiert.');
       }
       function grade(){
         if(current.expected == null){ fb.bad('Lösung konnte nicht berechnet werden (Formel prüfen).'); return; }
@@ -105,9 +105,9 @@
         }
       }
       checkBtn.addEventListener('click', grade);
-      newBtn.addEventListener('click', chooseNew);
+      newBtn.addEventListener('click', () => chooseNew(true));
 
-      chooseNew();
+      chooseNew(false);
       api.initScore(config.maxPoints || 1);
       return {};
     },

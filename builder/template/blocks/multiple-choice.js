@@ -71,7 +71,7 @@
       card.appendChild(list);
 
       const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
-      btnRow.style.marginTop = '0.7rem';
+      
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
       btnRow.appendChild(checkBtn);
@@ -145,7 +145,7 @@
       });
       card.appendChild(list);
       const btnRow = document.createElement('div');
-      btnRow.style.cssText = 'margin-top:0.7rem;';
+      
       const btn = document.createElement('span');
       btn.textContent = 'Korrektur';
       btn.style.cssText = 'display:inline-block; background:#003b5c; color:#fff; padding:0.55rem 1.1rem; border-radius:999px; font-weight:700; font-size:0.88rem;';

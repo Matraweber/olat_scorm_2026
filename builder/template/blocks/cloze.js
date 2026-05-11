@@ -51,7 +51,7 @@
 
       const btnRow = document.createElement('div');
       btnRow.className = 'button-cluster';
-      btnRow.style.marginTop = '0.7rem';
+      
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
       checkBtn.textContent = 'Korrektur';
