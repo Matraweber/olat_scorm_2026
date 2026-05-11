@@ -1,187 +1,16 @@
 (function(){
   'use strict';
 
-  // ---- Built-in helper utilities exposed to task-type modules via api.utils ----
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-  const utils = {
-    SVG_NS,
-    svg(name, attrs){
-      const el = document.createElementNS(SVG_NS, name);
-      if(attrs) Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, String(v)));
-      return el;
-    },
-    el(tag, opts){
-      const e = document.createElement(tag);
-      if(!opts) return e;
-      if(opts.className) e.className = opts.className;
-      if(opts.id) e.id = opts.id;
-      if(opts.text != null) e.textContent = opts.text;
-      if(opts.html != null) e.innerHTML = opts.html;
-      if(opts.attrs) Object.entries(opts.attrs).forEach(([k,v]) => e.setAttribute(k, String(v)));
-      if(opts.style) Object.assign(e.style, opts.style);
-      if(opts.children) opts.children.forEach(c => c && e.appendChild(c));
-      return e;
-    },
-    sanitizeZero(value, eps){
-      eps = eps == null ? 5e-3 : eps;
-      return Math.abs(value) < eps ? 0 : value;
-    },
-    fmt(num, digits){
-      digits = digits == null ? 2 : digits;
-      const clean = utils.sanitizeZero(Number(num), 0.5 * Math.pow(10, -digits));
-      return clean.toFixed(digits);
-    },
-    parseNum(value){
-      const s = String(value == null ? '' : value).trim().replace(',', '.');
-      if(!s) return null;
-      const n = Number(s);
-      return Number.isFinite(n) ? n : null;
-    },
-    parseAngle(value){
-      const s0 = String(value == null ? '' : value).trim().toLowerCase().replace(/,/g, '.').replace(/\s+/g, '');
-      if(!s0) return null;
-      const s = s0
-        .replace(/π/g, 'pi')
-        .replace(/([0-9)])pi/g, '$1*pi')
-        .replace(/pi(?=[0-9(])/g, 'pi*')
-        .replace(/\)(?=[0-9a-z])/g, ')*');
-      if(!/^[0-9pi+\-*/().]+$/i.test(s)) return null;
-      const jsExpr = s.replace(/pi/g, '(' + Math.PI + ')');
-      try {
-        const result = Function('"use strict"; return (' + jsExpr + ');')();
-        return Number.isFinite(result) ? result : null;
-      } catch(e) {
-        return null;
-      }
-    },
-    nearlyEqual(a, b, tol){ return Math.abs(a - b) <= (tol == null ? 0.05 : tol); },
-    normalizeAngle(phi){
-      let x = phi;
-      while(x <= -Math.PI) x += 2 * Math.PI;
-      while(x > Math.PI) x -= 2 * Math.PI;
-      return utils.sanitizeZero(x, 1e-9);
-    },
-    angleEqual(a, b, tol){
-      return Math.abs(utils.normalizeAngle(a - b)) <= (tol == null ? 0.06 : tol);
-    },
-    safeMathExpr(expr, vars){
-      // Evaluate a math expression like "x^2 + 2*x" with given vars {x: 1.5}.
-      // Allowed: digits, vars, pi, e, + - * / ^ % ( ) , and Math.* functions.
-      const allowedFns = ['sin','cos','tan','asin','acos','atan','atan2','sinh','cosh','tanh','exp','log','log2','log10','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
-      let s = String(expr || '').replace(/\s+/g, '').replace(/,/g, '.');
-      if(!s) return null;
-      s = s.replace(/\^/g, '**');
-      const varNames = Object.keys(vars || {});
-      // Whitelist token check: identifiers must be allowed fn / var / pi / e
-      const tokens = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
-      for(const t of tokens){
-        if(!(allowedFns.includes(t) || varNames.includes(t) || t === 'pi' || t === 'e' || t === 'PI' || t === 'E')) return null;
-      }
-      // Replace pi/e with Math values; prefix functions with Math.
-      let body = s.replace(/\bpi\b/g, '(Math.PI)').replace(/\bPI\b/g, '(Math.PI)')
-                  .replace(/\be\b/g, '(Math.E)').replace(/\bE\b/g, '(Math.E)');
-      allowedFns.forEach(fn => {
-        body = body.replace(new RegExp('\\b' + fn + '\\b', 'g'), 'Math.' + fn);
-      });
-      try {
-        const fn = new Function(...varNames, '"use strict"; return (' + body + ');');
-        const r = fn(...varNames.map(v => vars[v]));
-        return Number.isFinite(r) ? r : null;
-      } catch(e) {
-        return null;
-      }
-    },
-    feedbackBox(host){
-      const box = utils.el('div', {className: 'formula-box feedback-box'});
-      const title = utils.el('div', {className: 'formula-title', text: 'Rückmeldung'});
-      const text = utils.el('div', {className: 'formula-text', text: 'Noch keine Korrektur durchgeführt.'});
-      box.appendChild(title); box.appendChild(text);
-      host.appendChild(box);
-      return {
-        ok(msg){ box.classList.remove('feedback-bad'); box.classList.add('feedback-good'); text.textContent = msg; },
-        bad(msg){ box.classList.remove('feedback-good'); box.classList.add('feedback-bad'); text.textContent = msg; },
-        neutral(msg){ box.classList.remove('feedback-good','feedback-bad'); text.textContent = msg; }
-      };
-    }
-  };
-
-  // ---- Coordinate-plane plot helper (used by complex / vector / function tasks) ----
-  utils.renderPlane = function(host, options){
-    const opts = Object.assign({
-      width: 640, height: 640, pad: 54,
-      xMin: -5.5, xMax: 5.5, yMin: -5.5, yMax: 5.5,
-      xLabel: 'x', yLabel: 'y',
-      showGrid: true, gridStep: 1,
-      paths: [],   // {points:[[x,y],..], stroke, strokeWidth, dash}
-      lines: [],   // {x1,y1,x2,y2, stroke, strokeWidth, dash}
-      circles: [], // {cx, cy, r, stroke, fill, strokeWidth, dash}
-      points: [],  // {x, y, label, color, size}
-      arcs: []     // {cx,cy,r, a0,a1, stroke, dash}
-    }, options || {});
-    const W = opts.width, H = opts.height, P = opts.pad;
-    const sx = (x) => P + ((x - opts.xMin)/(opts.xMax - opts.xMin)) * (W - 2*P);
-    const sy = (y) => H - P - ((y - opts.yMin)/(opts.yMax - opts.yMin)) * (H - 2*P);
-    host.innerHTML = '';
-    const svg = utils.svg('svg', {viewBox: '0 0 ' + W + ' ' + H, width: '100%', height: '100%'});
-    svg.appendChild(utils.svg('rect', {x:0, y:0, width:W, height:H, fill:'#ffffff'}));
-    // grid
-    if(opts.showGrid){
-      const step = opts.gridStep;
-      for(let xv = Math.ceil(opts.xMin/step)*step; xv <= opts.xMax; xv += step){
-        if(Math.abs(xv) < 1e-9) continue;
-        const x = sx(xv);
-        svg.appendChild(utils.svg('line', {x1:x, y1:P, x2:x, y2:H-P, stroke:'#e2e8ed', 'stroke-width':1}));
-        const t = utils.svg('text', {x:x, y:sy(0)+18, 'font-size':14, 'text-anchor':'middle', fill:'#5d6872'});
-        t.textContent = (Math.round(xv*100)/100); svg.appendChild(t);
-      }
-      for(let yv = Math.ceil(opts.yMin/step)*step; yv <= opts.yMax; yv += step){
-        if(Math.abs(yv) < 1e-9) continue;
-        const y = sy(yv);
-        svg.appendChild(utils.svg('line', {x1:P, y1:y, x2:W-P, y2:y, stroke:'#e2e8ed', 'stroke-width':1}));
-        const t = utils.svg('text', {x:sx(0)-10, y:y+5, 'font-size':14, 'text-anchor':'end', fill:'#5d6872'});
-        t.textContent = (Math.round(yv*100)/100); svg.appendChild(t);
-      }
-    }
-    // axes
-    svg.appendChild(utils.svg('line', {x1:P, y1:sy(0), x2:W-P, y2:sy(0), stroke:'#003b5c', 'stroke-width':2}));
-    svg.appendChild(utils.svg('line', {x1:sx(0), y1:P, x2:sx(0), y2:H-P, stroke:'#003b5c', 'stroke-width':2}));
-    const xl = utils.svg('text', {x:W-P+6, y:sy(0)-8, 'font-size':16, fill:'#003b5c'}); xl.textContent = opts.xLabel; svg.appendChild(xl);
-    const yl = utils.svg('text', {x:sx(0)+10, y:P+16, 'font-size':16, fill:'#003b5c'}); yl.textContent = opts.yLabel; svg.appendChild(yl);
-    // user shapes
-    (opts.paths || []).forEach(p => {
-      if(!p.points || !p.points.length) return;
-      const d = p.points.map((pt,i) => (i===0?'M':'L') + sx(pt[0]) + ' ' + sy(pt[1])).join(' ');
-      const path = utils.svg('path', {d, stroke: p.stroke || '#1565ff', fill:'none', 'stroke-width': p.strokeWidth || 3});
-      if(p.dash) path.setAttribute('stroke-dasharray', p.dash);
-      svg.appendChild(path);
-    });
-    (opts.circles || []).forEach(c => {
-      const radiusPx = Math.abs(sx(c.cx + c.r) - sx(c.cx));
-      const el = utils.svg('circle', {cx: sx(c.cx), cy: sy(c.cy), r: radiusPx, fill: c.fill || 'none', stroke: c.stroke || '#888', 'stroke-width': c.strokeWidth || 2});
-      if(c.dash) el.setAttribute('stroke-dasharray', c.dash);
-      svg.appendChild(el);
-    });
-    (opts.lines || []).forEach(l => {
-      const el = utils.svg('line', {x1:sx(l.x1), y1:sy(l.y1), x2:sx(l.x2), y2:sy(l.y2), stroke: l.stroke || '#1565ff', 'stroke-width': l.strokeWidth || 3});
-      if(l.dash) el.setAttribute('stroke-dasharray', l.dash);
-      svg.appendChild(el);
-    });
-    (opts.points || []).forEach(p => {
-      svg.appendChild(utils.svg('circle', {cx:sx(p.x), cy:sy(p.y), r: p.size || 7, fill: p.color || '#1565ff'}));
-      if(p.label){
-        const t = utils.svg('text', {x:sx(p.x)+10, y:sy(p.y)-10, 'font-size':16, fill:'#003b5c', 'font-weight':'700'});
-        t.textContent = p.label; svg.appendChild(t);
-      }
-    });
-    host.appendChild(svg);
-  };
+  // ---- Block utilities loaded from utils.js, exposed to block modules via api.utils ----
+  const utils = window.BlockUtils;
+  if(!utils) throw new Error('runtime.js: window.BlockUtils not loaded. Make sure utils.js is loaded before runtime.js.');
 
   // ---- Runtime state ----
   let theme = null;
   let courseConfig = null;
   let currentPageIdx = -1;
-  const taskScores = []; // [{points, max, completed}]
-  const taskInstances = []; // {destroy?}
+  // perTask[i] = { blockScores: { blockId: {points, max, completed} }, blockInstances: [] }
+  const perTask = [];
 
   function applyTheme(t){
     const root = document.documentElement;
@@ -197,7 +26,6 @@
       img.src = logoSrc;
       img.alt = t.kicker || '';
       img.classList.remove('hidden');
-      // If file missing, hide the broken image gracefully
       img.onerror = () => img.classList.add('hidden');
     }
     const link = document.getElementById('footerLink');
@@ -209,9 +37,72 @@
     }
   }
 
+  // Default canvas size + per-block default sizes
+  const CANVAS_WIDTH = 1100;
+  const BLOCK_DEFAULT_SIZES = {
+    'heading':           {w: 900, h: 72},
+    'rich-text':         {w: 900, h: 160},
+    'note-box':          {w: 900, h: 160},
+    'image':             {w: 500, h: 380},
+    'divider':           {w: 900, h: 24},
+    'code':              {w: 800, h: 280},
+    'multiple-choice':   {w: 600, h: 520},
+    'numeric-input':     {w: 600, h: 380},
+    'text-input':        {w: 600, h: 340},
+    'cloze':             {w: 900, h: 320},
+    'match-pairs':       {w: 900, h: 540},
+    'sort-list':         {w: 700, h: 420},
+    'complex-question':  {w: 1080, h: 720},
+    'function-question': {w: 1080, h: 640},
+    'vector-question':   {w: 1080, h: 720},
+    'number-base':       {w: 700, h: 360},
+    'truth-table':       {w: 700, h: 520},
+    'function-sandbox':  {w: 1080, h: 580}
+  };
+  function defaultSize(type){ return BLOCK_DEFAULT_SIZES[type] || {w: 500, h: 200}; }
+  function ensurePositions(blocks){
+    let stackY = 20;
+    blocks.forEach(b => {
+      if(!b.pos){
+        const sz = defaultSize(b.type);
+        b.pos = { x: 20, y: stackY, w: sz.w, h: sz.h };
+        stackY += sz.h + 16;
+      }
+    });
+  }
+
+  function migrateLegacyTask(task){
+    // Backward compat: old monolithic task types that now live as blocks
+    if(task.blocks){
+      ensurePositions(task.blocks);
+      return task;
+    }
+    const legacyMap = {
+      'complex-numbers': 'complex-question',
+      'function-plot':   'function-question',
+      'vector-2d':       'vector-question'
+    };
+    const blockType = legacyMap[task.type] || task.type;
+    const blocks = [];
+    if(task.config && task.config.intro){
+      blocks.push({id: 'b_legacy_intro_' + Math.random().toString(36).slice(2,7), type: 'rich-text', config: { html: '<p>' + task.config.intro + '</p>' }});
+    }
+    if(task.config && task.config.noteHtml){
+      blocks.push({id: 'b_legacy_note_' + Math.random().toString(36).slice(2,7), type: 'note-box', config: { title: task.config.noteTitle || 'Hinweis', html: task.config.noteHtml, variant: 'info' }});
+    }
+    const cleanCfg = Object.assign({}, task.config || {});
+    delete cleanCfg.intro; delete cleanCfg.noteTitle; delete cleanCfg.noteHtml;
+    blocks.push({id: 'b_legacy_main_' + Math.random().toString(36).slice(2,7), type: blockType, config: cleanCfg});
+    ensurePositions(blocks);
+    return { id: task.id, title: task.title, blocks };
+  }
+
   function totalScore(){
     let pts = 0, max = 0;
-    taskScores.forEach(s => { if(s){ pts += s.points; max += s.max; } });
+    perTask.forEach(t => {
+      if(!t || !t.blockScores) return;
+      Object.values(t.blockScores).forEach(s => { pts += s.points; max += s.max; });
+    });
     return {pts, max};
   }
 
@@ -235,15 +126,28 @@
     const pill = document.getElementById('scorePill');
     if(!pill) return;
     const {pts, max} = totalScore();
-    pill.textContent = 'Punkte: ' + pts + ' / ' + max;
+    pill.textContent = 'Punkte: ' + (Math.round(pts*100)/100) + ' / ' + max;
+  }
+
+  function isTaskDone(idx){
+    const t = perTask[idx];
+    if(!t || !t.blockScores) return false;
+    const blocks = courseConfig.tasks[idx].blocks || [];
+    const graded = blocks.filter(b => {
+      const def = window.Blocks.get(b.type);
+      return def && def.graded;
+    });
+    if(graded.length === 0) return true; // content-only tasks count as done after view
+    return graded.every(b => {
+      const s = t.blockScores[b.id];
+      return s && s.points >= s.max && s.max > 0;
+    });
   }
 
   function updateNavStates(){
-    const buttons = document.querySelectorAll('#topNav .nav-link');
-    buttons.forEach((btn, i) => {
+    document.querySelectorAll('#topNav .nav-link').forEach((btn, i) => {
       btn.classList.toggle('active', i === currentPageIdx);
-      const score = taskScores[i];
-      btn.classList.toggle('done', !!(score && score.points >= score.max && score.max > 0));
+      btn.classList.toggle('done', isTaskDone(i));
     });
   }
 
@@ -264,61 +168,111 @@
     nav.appendChild(pill);
   }
 
+  function tearDownTask(idx){
+    const t = perTask[idx];
+    if(t && t.blockInstances){
+      t.blockInstances.forEach(inst => { try { inst && inst.destroy && inst.destroy(); } catch(e) {} });
+      t.blockInstances = [];
+    }
+  }
+
   function showPage(idx){
     if(idx < 0 || idx >= courseConfig.tasks.length) return;
-    // tear down previous
-    const prev = taskInstances[currentPageIdx];
-    if(prev && typeof prev.destroy === 'function'){
-      try { prev.destroy(); } catch(e) {}
-    }
-    taskInstances[currentPageIdx] = null;
+    if(currentPageIdx >= 0) tearDownTask(currentPageIdx);
     currentPageIdx = idx;
     const task = courseConfig.tasks[idx];
     const container = document.getElementById('taskContainer');
     container.innerHTML = '';
+
     const page = document.createElement('div');
     page.className = 'task-page';
     container.appendChild(page);
 
-    const def = window.TaskTypes.get(task.type);
-    if(!def){
-      page.innerHTML = '<section class="hero-card"><div><h2>Unbekannter Aufgabentyp</h2><p>Aufgabentyp <code>' + escapeHtml(task.type) + '</code> ist in diesem Paket nicht enthalten.</p></div></section>';
-      updateNavStates();
-      return;
+    if(task.title){
+      const h = document.createElement('h2'); h.className='task-page-title';
+      h.textContent = task.title;
+      page.appendChild(h);
     }
 
-    const api = {
-      utils,
-      initScore(max){
-        // Called once on mount to register the task's max points without overwriting prior answers.
-        const existing = taskScores[idx];
-        if(!existing) taskScores[idx] = {points: 0, max: Math.max(1, max), completed: false};
-        else taskScores[idx] = {points: existing.points, max: Math.max(1, max), completed: existing.completed};
-        pushScoreToLMS(false);
-        updateScorePill();
-        updateNavStates();
-      },
-      reportScore(points, max){
-        const existing = taskScores[idx];
-        const m = max != null ? Math.max(1, max) : (existing ? existing.max : 1);
-        taskScores[idx] = {points: Math.max(0, Math.min(points, m)), max: m, completed: true};
-        pushScoreToLMS(false);
-        updateScorePill();
-        updateNavStates();
-      },
-      goToNext(){ if(idx + 1 < courseConfig.tasks.length) showPage(idx + 1); else finishCourse(); },
-      goToPrev(){ if(idx - 1 >= 0) showPage(idx - 1); },
-      isLast(){ return idx + 1 >= courseConfig.tasks.length; }
-    };
+    // Canvas: blocks are absolutely positioned per their pos.{x,y,w,h}
+    const canvas = document.createElement('div');
+    canvas.className = 'task-canvas';
+    canvas.style.width = CANVAS_WIDTH + 'px';
+    page.appendChild(canvas);
 
-    try {
-      taskInstances[idx] = def.mount(page, task.config || {}, task, api) || {};
-    } catch(err) {
-      console.error('Aufgabentyp ' + task.type + ' Mount-Fehler:', err);
-      page.innerHTML = '<section class="hero-card"><div><h2>Fehler beim Laden</h2><pre>' + escapeHtml(String(err && err.stack || err)) + '</pre></div></section>';
+    const slot = perTask[idx] = perTask[idx] || { blockScores: {}, blockInstances: [] };
+    slot.blockInstances = [];
+
+    let maxBottom = 200;
+    (task.blocks || []).forEach((block, bIdx) => {
+      const def = window.Blocks.get(block.type);
+      const cell = document.createElement('div');
+      cell.className = 'canvas-block';
+      cell.dataset.blockId = block.id;
+      const pos = block.pos || (function(){
+        const sz = defaultSize(block.type);
+        return {x: 20, y: 20 + bIdx * (sz.h + 16), w: sz.w, h: sz.h};
+      })();
+      cell.style.left = pos.x + 'px';
+      cell.style.top  = pos.y + 'px';
+      cell.style.width  = pos.w + 'px';
+      cell.style.height = pos.h + 'px';
+      canvas.appendChild(cell);
+      if(pos.y + pos.h + 80 > maxBottom) maxBottom = pos.y + pos.h + 80;
+
+      if(!def){
+        cell.innerHTML = '<div class="block-error">Unbekannter Block-Typ: <code>' + escapeHtml(block.type) + '</code></div>';
+        return;
+      }
+      const blockApi = {
+        utils,
+        blockId: 'bl_' + idx + '_' + bIdx + '_' + (block.id || bIdx).toString().replace(/[^A-Za-z0-9_]/g, ''),
+        initScore(max){
+          const existing = slot.blockScores[block.id];
+          if(!existing) slot.blockScores[block.id] = {points: 0, max: Math.max(1, max), completed: false};
+          else slot.blockScores[block.id] = {points: existing.points, max: Math.max(1, max), completed: existing.completed};
+          pushScoreToLMS(false); updateScorePill(); updateNavStates();
+        },
+        reportScore(points, max){
+          const existing = slot.blockScores[block.id];
+          const m = max != null ? Math.max(1, max) : (existing ? existing.max : 1);
+          slot.blockScores[block.id] = {points: Math.max(0, Math.min(points, m)), max: m, completed: true};
+          pushScoreToLMS(false); updateScorePill(); updateNavStates();
+        }
+      };
+      try {
+        slot.blockInstances.push(def.mount(cell, block.config || {}, blockApi) || {});
+        // Render LaTeX inside this block, if KaTeX is loaded.
+        utils.renderMath(cell);
+      } catch(err){
+        console.error('Block ' + block.type + ' mount error:', err);
+        cell.innerHTML = '<div class="block-error">Fehler beim Block <code>' + escapeHtml(block.type) + '</code>: ' + escapeHtml(String(err)) + '</div>';
+      }
+    });
+    canvas.style.height = maxBottom + 'px';
+
+    // Footer navigation
+    const foot = document.createElement('footer'); foot.className = 'task-page-foot';
+    if(idx > 0){
+      const prev = document.createElement('button'); prev.type='button'; prev.className='btn btn-secondary'; prev.textContent='← Zurück';
+      prev.addEventListener('click', () => showPage(idx - 1));
+      foot.appendChild(prev);
     }
+    const spacer = document.createElement('span'); spacer.style.flex='1'; foot.appendChild(spacer);
+    if(idx + 1 < courseConfig.tasks.length){
+      const next = document.createElement('button'); next.type='button'; next.className='btn btn-primary'; next.textContent='Weiter →';
+      next.addEventListener('click', () => showPage(idx + 1));
+      foot.appendChild(next);
+    } else {
+      const finish = document.createElement('button'); finish.type='button'; finish.className='btn btn-primary'; finish.textContent='Test beenden';
+      finish.addEventListener('click', () => finishCourse());
+      foot.appendChild(finish);
+    }
+    page.appendChild(foot);
+
     updateNavStates();
     updateScorePill();
+    window.scrollTo(0, 0);
   }
 
   function finishCourse(){
@@ -326,12 +280,14 @@
     try { Scorm12.finish(); } catch(e) {}
     const container = document.getElementById('taskContainer');
     const {pts, max} = totalScore();
-    container.innerHTML = '<section class="hero-card"><div><h2>Test beendet</h2><p>Erreichte Punktzahl: <strong>' + pts + ' / ' + max + '</strong></p><p>Du kannst dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></div></section>';
+    const threshold = (courseConfig.passThreshold == null) ? 0.5 : courseConfig.passThreshold;
+    const ratio = max > 0 ? pts / max : 0;
+    const passed = ratio >= threshold;
+    container.innerHTML = '<div class="task-page"><section class="section-card" style="padding:2rem 2.2rem"><h2 style="color:var(--primary);margin-top:0">Test beendet</h2><p>Erreichte Punktzahl: <strong>' + (Math.round(pts*100)/100) + ' / ' + max + '</strong> (' + Math.round(ratio*100) + '%)</p><p>' + (passed ? '<strong style="color:var(--accent-dark)">Bestanden ✓</strong>' : '<strong style="color:var(--danger)">Nicht bestanden.</strong>') + '</p><p style="color:var(--muted)">Sie können dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></section></div>';
   }
 
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  // expose to allow task types to call programmatically
   window.ScormRuntime = { finishCourse, totalScore, getCourseConfig: () => courseConfig };
 
   function loadJson(globalKey, filename){
@@ -342,11 +298,13 @@
   function bootstrap(){
     loadJson('__SCORM_THEME__', 'theme.json').then(t => { theme = t; applyTheme(t); }).catch(() => {});
     loadJson('__SCORM_TASKS__', 'tasks.json').then(cfg => {
+      // Migrate legacy tasks (old monolithic task type) into block-based form
+      cfg.tasks = (cfg.tasks || []).map(migrateLegacyTask);
       courseConfig = cfg;
       document.title = cfg.courseTitle || 'SCORM Lerneinheit';
       document.getElementById('courseTitle').textContent = cfg.courseTitle || '';
       document.getElementById('courseSubtitle').textContent = cfg.courseSubtitle || '';
-      cfg.tasks.forEach(() => taskScores.push(null));
+      cfg.tasks.forEach(() => perTask.push({blockScores: {}, blockInstances: []}));
       buildNav();
       try { window.Scorm12 && Scorm12.init(); } catch(e) {}
       if(cfg.tasks.length > 0) showPage(0);

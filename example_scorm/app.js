@@ -279,7 +279,7 @@
     } catch(e) {}
     try { window.close(); } catch(e) {}
     try {
-      document.body.innerHTML = "<main style='max-width:900px;margin:40px auto;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;padding:0 16px;'><h1>Test beendet</h1><p>Du kannst dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></main>";
+      document.body.innerHTML = "<main style='max-width:900px;margin:40px auto;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;padding:0 16px;'><h1>Test beendet</h1><p>Sie können dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></main>";
     } catch(e) {}
   }
 

@@ -8,7 +8,7 @@
       return {
         intro: 'Im Diagramm ist ein Vektor dargestellt. Lesen Sie die geforderten Größen ab.',
         noteTitle: 'Hinweis',
-        noteHtml: 'Der Winkel wird relativ zur positiven x-Achse gemessen. Eingabe in Grad oder Radiant - bitte unten auswählen.',
+        noteHtml: 'Der Winkel wird relativ zur positiven x-Achse gemessen. Bitte unten die Einheit auswählen (Grad oder Radiant).',
         pool: [
           {x:3, y:2}, {x:-1, y:3}, {x:-2, y:-2}, {x:4, y:-1}, {x:0, y:3}, {x:-3, y:0}
         ],

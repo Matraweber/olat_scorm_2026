@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCORM Lerneinheit</title>
   <link rel="stylesheet" href="styles.css" />
+  <!-- KaTeX for math rendering. Replace these URLs with local files for fully-offline SCORM. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
   <div class="scorm-shell">
@@ -30,8 +34,9 @@
   </div>
 
   <script src="scorm12.js"></script>
-  <script src="task-types/_registry.js"></script>
-  <!-- TASK_TYPE_SCRIPTS -->
+  <script src="utils.js"></script>
+  <script src="blocks/_registry.js"></script>
+  <!-- BLOCK_SCRIPTS -->
   <script src="runtime.js"></script>
 </body>
 </html>
