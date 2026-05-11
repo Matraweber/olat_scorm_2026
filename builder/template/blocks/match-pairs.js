@@ -4,7 +4,7 @@
     label: 'Zuordnung (Drag & Drop)',
     description: 'Linke Begriffe per Drag & Drop oder Klick mit den richtigen rechten Antworten verbinden.',
     category: 'Frage',
-    icon: '🔗',
+    icon: '↔',
     graded: true,
     defaultConfig(){
       return {
@@ -173,7 +173,7 @@
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.5rem 0.7rem; font-size:0.8rem; height:100%; overflow:hidden; display:flex; flex-direction:column;';
       const tag = document.createElement('div');
-      tag.textContent = '🔗  Drag & Drop-Zuordnung';
+      tag.textContent = 'Drag & Drop-Zuordnung';
       tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.3rem;';
       wrap.appendChild(tag);
       const q = document.createElement('div'); q.textContent = config.question || '';

@@ -156,5 +156,41 @@
     host.appendChild(svg);
   };
 
+  // Auto-render LaTeX math inside an element using KaTeX (loaded via <script> in index.html).
+  // Recognised delimiters: $...$, $$...$$, \(...\), \[...\]. No-op if KaTeX isn't loaded yet
+  // (will be re-rendered once it does load - see retryQueue below).
+  const _mathRetryQueue = [];
+  let _katexWatcher = null;
+  function _runMathRenderOn(root){
+    try {
+      window.renderMathInElement(root, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '\\[', right: '\\]', display: true},
+          {left: '$',  right: '$',  display: false},
+          {left: '\\(', right: '\\)', display: false}
+        ],
+        throwOnError: false,
+        ignoredTags: ['script','noscript','style','textarea','pre','code']
+      });
+    } catch(e){ /* swallow render errors */ }
+  }
+  utils.renderMath = function(root){
+    if(!root) return;
+    if(typeof window.renderMathInElement === 'function'){
+      _runMathRenderOn(root);
+      return;
+    }
+    // KaTeX not loaded yet - queue and re-attempt every 100ms until it arrives.
+    _mathRetryQueue.push(root);
+    if(_katexWatcher) return;
+    _katexWatcher = setInterval(() => {
+      if(typeof window.renderMathInElement !== 'function') return;
+      clearInterval(_katexWatcher); _katexWatcher = null;
+      const queue = _mathRetryQueue.splice(0);
+      queue.forEach(el => { if(el.isConnected) _runMathRenderOn(el); });
+    }, 100);
+  };
+
   window.BlockUtils = utils;
 })();

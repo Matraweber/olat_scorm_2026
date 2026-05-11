@@ -4,7 +4,7 @@
     label: 'Bild',
     description: 'Bild mit optionaler Bildunterschrift. Quelle: hochladen oder URL.',
     category: 'Inhalt',
-    icon: '🖼',
+    icon: 'IMG',
     graded: false,
     defaultConfig(){ return { src: '', caption: '', width: 'auto', alt: '' }; },
     builderSchema(){
@@ -48,7 +48,7 @@
       if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:120px; color:#888; font-style:italic; gap:0.4rem;';
-        ph.innerHTML = '<span style="font-size:2.5rem; opacity:0.5;">🖼</span><span>(noch kein Bild gesetzt)</span>';
+        ph.innerHTML = '<span style="font-size:1.2rem; font-weight:700; color:#5d6872; letter-spacing:0.05em;">BILD</span><span>(noch kein Bild gesetzt)</span>';
         host.appendChild(ph); return;
       }
       const wrap = document.createElement('div');

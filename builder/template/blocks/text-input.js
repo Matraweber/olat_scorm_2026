@@ -10,7 +10,8 @@
       return {
         question: 'Frage hier eingeben.',
         answers: [{ value: 'Antwort', mode: 'iexact' }],
-        maxPoints: 1
+        maxPoints: 1,
+        partialKeywords: false
       };
     },
     builderSchema(){
@@ -25,7 +26,9 @@
               {value:'regex',  label:'Regex'}
             ]}
           ]},
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
+        { key:'partialKeywords', label:'Schlüsselwort-Modus (Teilpunkte)', type:'boolean',
+          help:'Statt einer Volltreffer-Prüfung wird der Eingabetext nach jedem Antworteintrag durchsucht. Pro gefundenes Schlüsselwort gibt es anteilige Punkte.' }
       ];
     },
     mount(host, config, api){
@@ -54,7 +57,33 @@
       function check(){
         const got = String(inp.value || '');
         if(!got.trim()){ fb.bad('Bitte eine Antwort eingeben.'); return; }
-        const answers = config.answers || [];
+        const answers = (config.answers || []).filter(a => a && a.value);
+        const maxPoints = config.maxPoints || 1;
+
+        if(config.partialKeywords && answers.length > 0){
+          // Each answer is a keyword. Count how many appear in the input.
+          let hits = 0;
+          answers.forEach(a => {
+            const v = String(a.value || '');
+            let found;
+            if(a.mode === 'regex'){
+              try { found = new RegExp(v).test(got); } catch(e){ found = false; }
+            } else if(a.mode === 'exact'){
+              found = got.indexOf(v) >= 0;
+            } else {
+              found = got.toLowerCase().indexOf(v.toLowerCase()) >= 0;
+            }
+            if(found) hits++;
+          });
+          const ratio = hits / answers.length;
+          const pts = Math.round(ratio * maxPoints * 100) / 100;
+          api.reportScore(pts);
+          if(hits === answers.length) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte (' + hits + ' von ' + answers.length + ' Schlüsselwörtern).');
+          else if(hits > 0) fb.neutral('Teilweise richtig: ' + pts + ' / ' + maxPoints + ' Punkte (' + hits + ' von ' + answers.length + ' Schlüsselwörtern gefunden).');
+          else fb.bad('Kein Schlüsselwort gefunden. 0 / ' + maxPoints + ' Punkte.');
+          return;
+        }
+
         const ok = answers.some(a => {
           const v = String(a.value || '');
           if(a.mode === 'regex'){
@@ -63,8 +92,8 @@
           if(a.mode === 'exact') return got === v;
           return got.trim().toLowerCase() === v.trim().toLowerCase();
         });
-        if(ok){ fb.ok('Korrekt.'); api.reportScore(config.maxPoints || 1); }
-        else { fb.bad('Nicht korrekt.'); api.reportScore(0); }
+        if(ok){ fb.ok('Korrekt. ' + maxPoints + ' / ' + maxPoints + ' Punkte.'); api.reportScore(maxPoints); }
+        else { fb.bad('Nicht korrekt. 0 / ' + maxPoints + ' Punkte.'); api.reportScore(0); }
       }
       checkBtn.addEventListener('click', check);
       inp.addEventListener('keydown', e => { if(e.key === 'Enter') check(); });

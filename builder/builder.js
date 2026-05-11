@@ -49,6 +49,181 @@
 
   function uid(prefix){ return (prefix || 'id_') + Math.random().toString(36).slice(2, 8); }
 
+  // ===== Undo/Redo history =====
+  const history = { past: [], future: [] };
+  const HISTORY_LIMIT = 50;
+  function snapshotState(){ return JSON.stringify({course: state.course, theme: state.theme}); }
+  function applySnapshot(snap){
+    try {
+      const o = JSON.parse(snap);
+      if(o.course) state.course = o.course;
+      if(o.theme) state.theme = o.theme;
+      // Keep selection valid
+      if(state.selected.kind === 'task' && state.selected.idx >= state.course.tasks.length){
+        state.selected = state.course.tasks.length > 0 ? {kind:'task', idx:0} : {kind:'course'};
+      }
+      render();
+    } catch(e){ toast('Rückgängig fehlgeschlagen: ' + e.message, 'error'); }
+  }
+  function pushHistory(){
+    history.past.push(snapshotState());
+    if(history.past.length > HISTORY_LIMIT) history.past.shift();
+    history.future = [];
+  }
+  // Two-phase push for actions where the change happens later (drag, resize, text typing).
+  // Call takeHistorySnap() *before* the mutation begins, then commitHistorySnap() once you know
+  // the user actually committed a change. discardHistorySnap() throws the pending snap away.
+  let _pendingHistorySnap = null;
+  function takeHistorySnap(){ _pendingHistorySnap = snapshotState(); }
+  function commitHistorySnap(){
+    if(_pendingHistorySnap == null) return;
+    history.past.push(_pendingHistorySnap);
+    if(history.past.length > HISTORY_LIMIT) history.past.shift();
+    history.future = [];
+    _pendingHistorySnap = null;
+  }
+  function discardHistorySnap(){ _pendingHistorySnap = null; }
+  // Debounced commit for fast-typed text fields - call on every keystroke; pushes once after 700ms idle.
+  let _debounceTimer = null;
+  function pushHistoryDebounced(){
+    if(_pendingHistorySnap == null) takeHistorySnap();
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(() => { commitHistorySnap(); _debounceTimer = null; }, 700);
+  }
+  // Legacy alias used by drag/resize handlers - pushes the current state as if before the operation.
+  // (Drag mutates state directly; we want to record the *pre-drag* state, but we already lost it.
+  // For now, this just records the post-drag state which means undo will jump to even earlier.)
+  function pushHistoryDeferred(){ /* superseded by takeHistorySnap/commitHistorySnap */ commitHistorySnap(); }
+  function undo(){
+    if(history.past.length === 0){ toast('Nichts zum Rückgängigmachen.'); return; }
+    history.future.push(snapshotState());
+    applySnapshot(history.past.pop());
+    toast('Rückgängig');
+  }
+  function redo(){
+    if(history.future.length === 0){ toast('Nichts zum Wiederherstellen.'); return; }
+    history.past.push(snapshotState());
+    applySnapshot(history.future.pop());
+    toast('Wiederherstellen');
+  }
+
+  // ===== Clipboard for blocks (per-tab via localStorage so it survives reloads) =====
+  const CLIPBOARD_KEY = 'scorm-builder-clipboard';
+  function clipboardPut(payload){
+    try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(payload)); } catch(e){}
+  }
+  function clipboardGet(){
+    try { const raw = localStorage.getItem(CLIPBOARD_KEY); return raw ? JSON.parse(raw) : null; }
+    catch(e){ return null; }
+  }
+  function copySelectedBlocks(){
+    if(state.selected.kind !== 'task') return false;
+    const task = state.course.tasks[state.selected.idx];
+    if(!task) return false;
+    const selectedIds = Array.isArray(task._uiSelectedBlockIds) ? task._uiSelectedBlockIds : [];
+    const blocks = (task.blocks || []).filter(b => selectedIds.includes(b.id));
+    if(blocks.length === 0) return false;
+    const payload = { kind: 'blocks', data: blocks.map(b => JSON.parse(JSON.stringify(b))) };
+    clipboardPut(payload);
+    toast(blocks.length + ' Block' + (blocks.length === 1 ? '' : 'e') + ' kopiert.');
+    return true;
+  }
+  function pasteBlocks(){
+    if(state.selected.kind !== 'task') return false;
+    const task = state.course.tasks[state.selected.idx];
+    if(!task) return false;
+    const payload = clipboardGet();
+    if(!payload || payload.kind !== 'blocks' || !Array.isArray(payload.data)) {
+      toast('Zwischenablage ist leer.'); return false;
+    }
+    pushHistory();
+    const newIds = [];
+    payload.data.forEach(b => {
+      const copy = JSON.parse(JSON.stringify(b));
+      copy.id = uid('b_');
+      if(copy.pos){ copy.pos = Object.assign({}, copy.pos, { x: (copy.pos.x || 20) + 24, y: (copy.pos.y || 20) + 24 }); }
+      task.blocks.push(copy);
+      newIds.push(copy.id);
+    });
+    task._uiSelectedBlockIds = newIds;
+    render();
+    toast(payload.data.length + ' Block' + (payload.data.length === 1 ? '' : 'e') + ' eingefügt.');
+    return true;
+  }
+
+  // ===== Auto-fit block height to its rendered content =====
+  function autoFitBlock(block){
+    const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscapeSafe(block.id) + '"]');
+    if(!card) return;
+    const body = card.querySelector('.canvas-block-body');
+    const head = card.querySelector('.canvas-block-head');
+    const shadowHost = body && body.querySelector('.canvas-mount-host');
+    let contentHeight = 0;
+    if(shadowHost && shadowHost.shadowRoot){
+      const wrap = shadowHost.shadowRoot.querySelector('.canvas-mount-wrap');
+      if(wrap) contentHeight = wrap.scrollHeight;
+    } else if(body){
+      contentHeight = body.scrollHeight;
+    }
+    if(contentHeight <= 0) return;
+    const headHeight = head ? head.offsetHeight : 32;
+    const totalHeight = contentHeight + headHeight + 8;
+    pushHistory();
+    block.pos.h = Math.max(60, Math.round(totalHeight));
+    // Trigger re-render of just the canvas
+    render();
+  }
+  function cssEscapeSafe(s){
+    if(window.CSS && window.CSS.escape) return CSS.escape(s);
+    return String(s).replace(/[^A-Za-z0-9_-]/g, '\\$&');
+  }
+
+  // ===== Validation =====
+  function validateBlock(block){
+    const warnings = [];
+    const cfg = block.config || {};
+    switch(block.type){
+      case 'multiple-choice':
+        if(!cfg.question || !String(cfg.question).trim()) warnings.push('Frage ist leer.');
+        if(!Array.isArray(cfg.choices) || cfg.choices.length < 2) warnings.push('Mindestens zwei Antwortmöglichkeiten erforderlich.');
+        else if(!cfg.choices.some(c => c.correct)) warnings.push('Keine richtige Antwort markiert.');
+        else if(cfg.choices.every(c => c.correct)) warnings.push('Alle Antworten als richtig markiert.');
+        break;
+      case 'match-pairs':
+        if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) warnings.push('Mindestens zwei Paare erforderlich.');
+        else if(cfg.pairs.some(p => !p.left || !p.right)) warnings.push('Mindestens ein Paar hat eine leere Seite.');
+        break;
+      case 'numeric-input':
+        if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) warnings.push('Frage-Vorlage fehlt.');
+        if(!cfg.formula || !String(cfg.formula).trim()) warnings.push('Lösungsformel fehlt.');
+        break;
+      case 'text-input':
+        if(!cfg.question || !String(cfg.question).trim()) warnings.push('Frage ist leer.');
+        if(!Array.isArray(cfg.answers) || cfg.answers.length === 0 || cfg.answers.every(a => !a.value)) warnings.push('Keine akzeptierten Antworten definiert.');
+        break;
+      case 'image':
+        if(!cfg.src) warnings.push('Kein Bild gesetzt.');
+        if(cfg.src && !cfg.alt) warnings.push('Alt-Text fehlt (Barrierefreiheit).');
+        break;
+      case 'cloze':
+        if(!cfg.text || !String(cfg.text).includes('{{')) warnings.push('Keine Lücken im Text ({{Antwort}}).');
+        break;
+      case 'truth-table':
+        if(!Array.isArray(cfg.expressions) || cfg.expressions.length === 0 || cfg.expressions.every(e => !e.expr)) warnings.push('Keine booleschen Ausdrücke definiert.');
+        break;
+    }
+    return warnings;
+  }
+  function validateTask(task){
+    const out = [];
+    (task.blocks || []).forEach((b, i) => {
+      const def = window.Blocks && window.Blocks.get(b.type);
+      const label = (def && def.label) || b.type;
+      validateBlock(b).forEach(w => out.push({blockId: b.id, blockLabel: label + ' #' + (i+1), message: w}));
+    });
+    return out;
+  }
+
   // ===== Templates (built-in + user) =====
   const USER_TEMPLATES_KEY = 'scorm-builder-user-templates';
   function loadUserTemplates(){
@@ -290,7 +465,13 @@
     state.course.tasks.forEach((task, idx) => {
       const li = el('li');
       const btn = el('button', {className: 'task-btn' + (state.selected.kind === 'task' && state.selected.idx === idx ? ' active' : ''), attrs:{type:'button'}});
-      btn.appendChild(el('span', {text: task.title || 'Aufgabe ' + (idx+1)}));
+      const titleSpan = el('span', {text: task.title || 'Aufgabe ' + (idx+1)});
+      const warnings = validateTask(task);
+      if(warnings.length > 0){
+        const badge = el('span', {className:'task-warning-badge', text: String(warnings.length), attrs:{title: warnings.map(w => w.message).join('\n')}});
+        titleSpan.appendChild(badge);
+      }
+      btn.appendChild(titleSpan);
       const blockCount = (task.blocks || []).length;
       btn.appendChild(el('span', {className:'task-meta', text: blockCount + ' Block' + (blockCount === 1 ? '' : 'e')}));
       btn.addEventListener('click', () => { state.selected = {kind:'task', idx}; render(); });
@@ -304,6 +485,7 @@
       dn.addEventListener('click', () => swapTasks(idx, idx+1));
       rm.addEventListener('click', () => {
         if(!confirm('Aufgabe "' + (task.title || '') + '" entfernen?')) return;
+        pushHistory();
         state.course.tasks.splice(idx, 1);
         if(state.selected.kind === 'task'){
           if(state.course.tasks.length === 0) state.selected = {kind:'course'};
@@ -488,11 +670,25 @@
           '.canvas-mount-wrap { padding: 0.55rem 0.7rem; }\n';
         shadow.appendChild(styleEl);
 
+        // Mirror the page's KaTeX stylesheet inside the shadow root so math renders correctly.
+        document.querySelectorAll('link[rel="stylesheet"][href*="katex"]').forEach(l => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet'; link.href = l.href; link.crossOrigin = 'anonymous';
+          shadow.appendChild(link);
+        });
+
         const mountHost = document.createElement('div');
         mountHost.className = 'canvas-mount-wrap';
         shadow.appendChild(mountHost);
 
-        def.mount(mountHost, block.config || {}, makeStubApi(block));
+        // In canvas-preview rendering we disable randomness so the editor stays stable
+        // while the author types. Runtime/preview keeps the original config.
+        const stableConfig = Object.assign({}, block.config || {}, { shuffle: false, randomize: false });
+        def.mount(mountHost, stableConfig, makeStubApi(block));
+        // Run KaTeX over the mounted content (auto-render walks the DOM and replaces $...$).
+        if(window.BlockUtils && typeof window.BlockUtils.renderMath === 'function'){
+          window.BlockUtils.renderMath(mountHost);
+        }
         return;
       } catch(e){
         // Fall through to legacy preview()
@@ -518,7 +714,7 @@
       case 'heading': return cfg.text || '(leer)';
       case 'rich-text': { const t = stripHtmlText(cfg.html); return t.length > 80 ? t.slice(0, 80) + '…' : (t || '(leerer Text)'); }
       case 'note-box': return cfg.title || 'Hinweis';
-      case 'image': return cfg.src ? '🖼 Bild gesetzt' : '(noch kein Bild)';
+      case 'image': return cfg.src ? 'Bild gesetzt' : '(noch kein Bild)';
       case 'divider': return '- Trennlinie -';
       case 'multiple-choice': return (stripHtmlText(cfg.question) || '(Frage leer)') + ' · ' + ((cfg.choices||[]).length) + ' Antworten';
       case 'numeric-input': return cfg.questionTemplate || '(Frage leer)';
@@ -782,15 +978,35 @@
         configHost.appendChild(el('div', {className:'field-help', text:'Dieser Block hat keine Konfiguration.'}));
       } else {
         schema.forEach(spec => configHost.appendChild(renderField(spec, () => sel.config, (k, v) => {
+          pushHistoryDebounced();
           sel.config[k] = v;
-          const card = canvas.querySelector('[data-block-id="' + cssEscape(sel.id) + '"]');
-          if(card){
-            const body = card.querySelector('.canvas-block-body');
-            if(body) renderBlockPreview(body, sel);
-          }
+          // Debounce expensive canvas re-renders during typing
+          scheduleBlockPreviewRefresh(sel);
           renderTaskList();
         })));
       }
+      // Render validation warnings inline in the config pane
+      const warnings = validateBlock(sel);
+      if(warnings.length > 0){
+        const box = el('div', {className:'config-warnings'});
+        box.appendChild(el('div', {className:'config-warnings-title', text:'Hinweise (' + warnings.length + ')'}));
+        warnings.forEach(w => box.appendChild(el('div', {className:'config-warnings-item', text:'• ' + w})));
+        configHost.appendChild(box);
+      }
+    }
+    // Debounce canvas-block re-renders so heavy mount() (e.g. plots) doesn't run per keystroke.
+    let _refreshTimers = new Map();
+    function scheduleBlockPreviewRefresh(block){
+      const id = block.id;
+      if(_refreshTimers.has(id)) clearTimeout(_refreshTimers.get(id));
+      _refreshTimers.set(id, setTimeout(() => {
+        _refreshTimers.delete(id);
+        const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
+        if(card){
+          const body = card.querySelector('.canvas-block-body');
+          if(body) renderBlockPreview(body, block);
+        }
+      }, 250));
     }
     function posLabel(b){ return 'Position ' + Math.round(b.pos.x) + ', ' + Math.round(b.pos.y) + ' · Größe ' + Math.round(b.pos.w) + '×' + Math.round(b.pos.h); }
 
@@ -881,10 +1097,16 @@
         const head = el('div', {className:'canvas-block-head'});
         head.appendChild(el('span', {className:'canvas-block-type', text: ((def && def.label) || block.type) + (def && def.graded ? ' · gewertet' : '')}));
         const ctrls = el('div', {className:'canvas-block-controls'});
+        const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Höhe an Inhalt anpassen'}, text:'↕'});
         const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Duplizieren'}, text:'⧉'});
         const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
+        fitBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          autoFitBlock(block);
+        });
         dupBtn.addEventListener('click', e => {
           e.stopPropagation();
+          pushHistory();
           const copy = JSON.parse(JSON.stringify(block));
           copy.id = uid('b_');
           copy.pos = Object.assign({}, block.pos, { x: block.pos.x + 24, y: block.pos.y + 24 });
@@ -895,12 +1117,13 @@
         rmBtn.addEventListener('click', e => {
           e.stopPropagation();
           if(!confirm('Block "' + ((def && def.label) || block.type) + '" entfernen?')) return;
+          pushHistory();
           const i = task.blocks.findIndex(b => b.id === block.id);
           if(i >= 0) task.blocks.splice(i, 1);
           selectedBlockIds.delete(block.id); persistSelection();
           renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
         });
-        ctrls.appendChild(dupBtn); ctrls.appendChild(rmBtn);
+        ctrls.appendChild(fitBtn); ctrls.appendChild(dupBtn); ctrls.appendChild(rmBtn);
         head.appendChild(ctrls);
         card.appendChild(head);
 
@@ -954,6 +1177,7 @@
         movingBlocks.forEach(b => { startPos[b.id] = {x: b.pos.x, y: b.pos.y}; });
         const startX = e.clientX, startY = e.clientY;
         let dragged = false;
+        takeHistorySnap();
 
         function onMove(ev){
           const sdx = ev.clientX - startX, sdy = ev.clientY - startY;
@@ -980,6 +1204,8 @@
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
           hideSnapGuides(canvas);
+          if(dragged) commitHistorySnap();
+          else discardHistorySnap();
           // No drag occurred → it was a pure click. Reduce multi-selection to single block (unless Shift).
           if(!dragged && !shift && wasSelected && selectedBlockIds.size > 1){
             selectedBlockIds.clear();
@@ -1004,9 +1230,12 @@
         renderConfigPane();
         const startX = e.clientX, startY = e.clientY;
         const startW = block.pos.w, startH = block.pos.h;
+        takeHistorySnap();
+        let didResize = false;
         function onMove(ev){
           const dx = (ev.clientX - startX) / zoom;
           const dy = (ev.clientY - startY) / zoom;
+          if(Math.abs(dx) > 1 || Math.abs(dy) > 1) didResize = true;
           const others = task.blocks.filter(b => b.id !== block.id);
           const snapped = applyResizeSnap(block, startW + dx, startH + dy, others);
           block.pos.w = snapped.w; block.pos.h = snapped.h;
@@ -1021,6 +1250,7 @@
           document.removeEventListener('mouseup', onUp);
           hideSnapGuides(canvas);
           adjustCanvasHeight();
+          if(didResize) commitHistorySnap(); else discardHistorySnap();
         }
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
@@ -1036,6 +1266,7 @@
     });
 
     function addBlockOfType(blockType){
+      pushHistory();
       const def = window.Blocks.get(blockType);
       const block = { id: uid('b_'), type: blockType, config: def && def.defaultConfig ? def.defaultConfig() : {} };
       ensurePos(block, task.blocks);
@@ -1129,13 +1360,16 @@
   }
 
   // ===== ZIP build/load =====
+  // Cache-bust template fetches by appending a timestamp; we always want the freshest
+  // version when generating the preview iframe or SCORM ZIP, regardless of HTTP caching.
+  function withBust(url){ return url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now(); }
   async function fetchTextRel(path){
-    const r = await fetch('template/' + path);
+    const r = await fetch(withBust('template/' + path));
     if(!r.ok) throw new Error('Konnte Template-Datei nicht laden: ' + path);
     return r.text();
   }
   async function fetchBinaryRel(path){
-    const r = await fetch('template/' + path);
+    const r = await fetch(withBust('template/' + path));
     if(!r.ok) return null;
     return await r.blob();
   }
@@ -1320,6 +1554,9 @@
       const html = [
         '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Vorschau</title>',
         '<style>', tmpl['styles.css'], '</style>',
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous" />',
+        '<script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"><\/script>',
+        '<script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"><\/script>',
         '</head><body>', bodyInner,
         '<script>window.__SCORM_THEME__=', themeJson, ';window.__SCORM_TASKS__=', tasksJson, ';<\/script>',
         '<script>', tmpl['scorm12.js'], '<\/script>',
@@ -1351,6 +1588,7 @@
     document.getElementById('taskCreatePanelTemplates').classList.add('hidden');
 
     document.getElementById('btnCreateEmpty').onclick = () => {
+      pushHistory();
       const newTask = { id: uid('t_'), title: 'Aufgabe ' + (state.course.tasks.length + 1), blocks: [] };
       state.course.tasks.push(newTask);
       state.selected = {kind:'task', idx: state.course.tasks.length - 1};
@@ -1393,6 +1631,7 @@
     const actions = el('div', {className:'tpl-actions'});
     const useBtn = el('button', {className:'btn btn-primary btn-sm', attrs:{type:'button'}, text:'Einfügen'});
     useBtn.addEventListener('click', () => {
+      pushHistory();
       const newTask = instantiateTemplate(tpl);
       state.course.tasks.push(newTask);
       state.selected = {kind:'task', idx: state.course.tasks.length - 1};
@@ -1521,15 +1760,40 @@
     });
     applySidebarState();
 
-    // ---- Global keyboard shortcuts (active when in task editor) ----
+    // ---- Global keyboard shortcuts ----
     document.addEventListener('keydown', (e) => {
+      const ae = document.activeElement;
+      const inField = ae && ae.matches('input, textarea, select, [contenteditable="true"]');
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key;
+
+      // Undo/Redo work globally (not only in task editor)
+      if(mod && !e.shiftKey && (key === 'z' || key === 'Z')){
+        if(inField) return; // let the field handle its own undo
+        e.preventDefault(); undo(); return;
+      }
+      if(mod && (key === 'y' || key === 'Y' || (e.shiftKey && (key === 'z' || key === 'Z')))){
+        if(inField) return;
+        e.preventDefault(); redo(); return;
+      }
+      // Copy/Paste blocks (only when in task editor and not in a field)
+      if(mod && (key === 'c' || key === 'C') && !inField){
+        if(state.selected.kind !== 'task') return;
+        if(copySelectedBlocks()) e.preventDefault();
+        return;
+      }
+      if(mod && (key === 'v' || key === 'V') && !inField){
+        if(state.selected.kind !== 'task') return;
+        if(pasteBlocks()) e.preventDefault();
+        return;
+      }
+
+      // Task-editor-only shortcuts (require active task context)
       if(state.selected.kind !== 'task') return;
       if(!activeTaskCtx) return;
-      const ae = document.activeElement;
-      if(ae && ae.matches('input, textarea, select, [contenteditable="true"]')) return;
-      if(activeTaskCtx.selectedIds.length === 0 && !(e.ctrlKey && e.key.toLowerCase() === 'a')) return;
+      if(inField) return;
+      if(activeTaskCtx.selectedIds.length === 0 && !(mod && (key === 'a' || key === 'A'))) return;
 
-      const key = e.key;
       if(key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown'){
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
@@ -1548,12 +1812,12 @@
         activeTaskCtx.deselectAll();
         return;
       }
-      if(e.ctrlKey && (key === 'd' || key === 'D')){
+      if(mod && (key === 'd' || key === 'D')){
         e.preventDefault();
         activeTaskCtx.bulkDuplicate();
         return;
       }
-      if(e.ctrlKey && (key === 'a' || key === 'A')){
+      if(mod && (key === 'a' || key === 'A')){
         e.preventDefault();
         activeTaskCtx.selectAll();
         return;

@@ -240,8 +240,11 @@
           pushScoreToLMS(false); updateScorePill(); updateNavStates();
         }
       };
-      try { slot.blockInstances.push(def.mount(cell, block.config || {}, blockApi) || {}); }
-      catch(err){
+      try {
+        slot.blockInstances.push(def.mount(cell, block.config || {}, blockApi) || {});
+        // Render LaTeX inside this block, if KaTeX is loaded.
+        utils.renderMath(cell);
+      } catch(err){
         console.error('Block ' + block.type + ' mount error:', err);
         cell.innerHTML = '<div class="block-error">Fehler beim Block <code>' + escapeHtml(block.type) + '</code>: ' + escapeHtml(String(err)) + '</div>';
       }
