@@ -23,7 +23,7 @@
     },
     builderSchema(){
       return [
-        { key:'question', label:'Frage (HTML erlaubt)', type:'textarea', rows:2 },
+        { key:'question', label:'Frage', type:'math-textarea', rows:2 },
         { key:'choices', label:'Antwortmöglichkeiten', type:'list', itemLabel:'Antwort',
           itemSchema:[
             { key:'text', label:'Text', type:'text' },
@@ -43,7 +43,7 @@
       card.className = 'section-card block-question';
       card.innerHTML = '<h3>Frage</h3>';
       const qEl = document.createElement('p');
-      qEl.innerHTML = config.question || '';
+      qEl.textContent = config.question || '';
       card.appendChild(qEl);
 
       const list = document.createElement('div'); list.className = 'choice-list';

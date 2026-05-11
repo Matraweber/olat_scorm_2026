@@ -16,7 +16,7 @@
     },
     builderSchema(){
       return [
-        { key:'question', label:'Frage', type:'textarea', rows:2 },
+        { key:'question', label:'Frage', type:'math-textarea', rows:2 },
         { key:'answers', label:'Akzeptierte Antworten', type:'list', itemLabel:'Antwort',
           itemSchema:[
             { key:'value', label:'Antworttext / Regex', type:'text' },

@@ -275,3 +275,26 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .block-edit-empty .empty-cta { margin-top: 0.8rem; }
 
 @media (max-width: 900px) { .builder-main { grid-template-columns: 1fr; } }
+
+/* Math formula toolbar (math-textarea field type) */
+.math-field { display:flex; flex-direction:column; gap:0.4rem; }
+.math-toolbar { border:1px solid var(--line); border-radius:8px; padding:0.4rem 0.5rem; background:#f8fafc; }
+.math-cat-pills { display:flex; flex-wrap:wrap; gap:0.25rem; margin-bottom:0.4rem; padding-bottom:0.35rem; border-bottom:1px solid var(--line); }
+.math-cat-btn { padding:0.12rem 0.45rem; border:1px solid transparent; border-radius:4px; font-size:0.71rem; font-weight:600; background:transparent; cursor:pointer; color:var(--muted); }
+.math-cat-btn:hover { background:var(--panel-soft); }
+.math-cat-btn.active { background:var(--primary); color:#fff; }
+.math-sym-grid { display:flex; flex-wrap:wrap; gap:0.22rem; min-height:1.9rem; }
+.math-sym-btn { padding:0.15rem 0.42rem; border:1px solid var(--line); border-radius:5px; font-size:0.87rem; background:#fff; cursor:pointer; line-height:1.4; transition:background 0.1s; }
+.math-sym-btn:hover { background:var(--primary-light); border-color:var(--primary); }
+.math-delim-row { display:flex; justify-content:flex-end; }
+.math-delim-btn { padding:0.15rem 0.6rem; border:1px solid var(--line); border-radius:5px; font-size:0.75rem; font-family:monospace; font-weight:700; background:#fff; cursor:pointer; color:var(--primary); }
+.math-delim-btn:hover { background:var(--primary); color:#fff; }
+.math-preview { min-height:1.8rem; max-height:5rem; padding:0.4rem 0.7rem; background:#fff; border:1px solid var(--line); border-radius:6px; font-size:0.92rem; overflow:auto; color:#444; }
+.math-preview:empty::before { content:'Vorschau…'; color:var(--muted); font-style:italic; font-size:0.85rem; }
+.math-hint { font-size:0.71rem; color:var(--muted); line-height:1.5; }
+
+/* Formula helper toolbar (formula-text field type) */
+.formula-field { display:flex; flex-direction:column; gap:0.3rem; }
+.formula-toolbar { display:flex; flex-wrap:wrap; gap:0.22rem; }
+.formula-fn-btn { padding:0.14rem 0.38rem; border:1px solid var(--line); border-radius:4px; font-size:0.74rem; font-family:monospace; background:#f8fafc; cursor:pointer; color:#2a5870; }
+.formula-fn-btn:hover { background:var(--primary-light); border-color:var(--primary); }

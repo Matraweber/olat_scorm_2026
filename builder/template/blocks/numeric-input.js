@@ -21,7 +21,7 @@
     },
     builderSchema(){
       return [
-        { key:'questionTemplate', label:'Frage-Vorlage (Variablen als {name})', type:'textarea', rows:2 },
+        { key:'questionTemplate', label:'Frage-Vorlage (Variablen als {name})', type:'math-textarea', rows:2 },
         { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
           itemSchema:[
             { key:'name', label:'Name', type:'text' },
@@ -29,7 +29,7 @@
             { key:'max', label:'Max', type:'number', step:'any' },
             { key:'integer', label:'Nur Ganzzahl', type:'boolean' }
           ]},
-        { key:'formula', label:'Lösungs-Formel (sin/cos/sqrt etc. erlaubt)', type:'text', placeholder:'sqrt(a^2 + b^2)' },
+        { key:'formula', label:'Lösungs-Formel', type:'formula-text', placeholder:'sqrt(a^2 + b^2)' },
         { key:'tolerance', label:'Toleranz', type:'number', step:'any' },
         { key:'unit', label:'Einheit (optional)', type:'text' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }

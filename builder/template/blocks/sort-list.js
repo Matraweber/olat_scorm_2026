@@ -15,7 +15,7 @@
     },
     builderSchema(){
       return [
-        { key:'question', label:'Aufgabentext', type:'textarea', rows:2 },
+        { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2 },
         { key:'items', label:'Items in der korrekten Reihenfolge', type:'list', itemLabel:'Item',
           itemSchema:[ { key:'value', label:'Text', type:'text' } ] },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
