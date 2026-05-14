@@ -35,7 +35,7 @@
       const variant = config.variant || 'info';
       const colors = {
         info: { border:'#84bf66', bg:'#f5f8fa', icon:'ℹ' },
-        warn: { border:'#d4a72a', bg:'#fff8e6', icon:'⚠' },
+        warn: { border:'#d4a72a', bg:'#fff8e6', icon:'!' },
         tip:  { border:'#1565ff', bg:'#eff5ff', icon:'★' }
       };
       const c = colors[variant] || colors.info;

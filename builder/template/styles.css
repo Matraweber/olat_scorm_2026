@@ -92,6 +92,13 @@ table.truth-table th { background: var(--panel-soft); color: var(--primary); }
 /* Block-system specific */
 .task-page-title { color: var(--primary); margin: 0 0 1rem; font-size: clamp(1.4rem, 2.2vw, 1.9rem); }
 .task-canvas { position: relative; max-width: 100%; margin: 0 auto; background: transparent; }
+
+/* Optional per-task tab navigation (e.g. Visualisierung + Aufgabe) */
+.task-tab-nav { display: flex; gap: 0.4rem; margin: 0.4rem 0 1rem; flex-wrap: wrap; border-bottom: 2px solid var(--line, #d8e0e6); }
+.task-tab-btn { background: transparent; border: none; padding: 0.55rem 1rem; font: inherit; font-weight: 600; color: var(--muted, #5d6872); cursor: pointer; border-radius: 6px 6px 0 0; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; }
+.task-tab-btn:hover { color: var(--primary, #003b5c); background: rgba(0,0,0,0.03); }
+.task-tab-btn.active { color: var(--primary, #003b5c); border-bottom-color: var(--primary, #003b5c); }
+
 .canvas-block { position: absolute; box-sizing: border-box; overflow: auto; }
 .canvas-block > * { margin-bottom: 0; }
 .canvas-block .section-card, .canvas-block .hero-card { margin-bottom: 0; }

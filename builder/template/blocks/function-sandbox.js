@@ -123,7 +123,7 @@
       const ns = 'http://www.w3.org/2000/svg';
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.4rem 0.7rem; font-size:0.78rem; display:flex; flex-direction:column; height:100%; gap:0.25rem; overflow:hidden;';
-      const tag = document.createElement('div'); tag.textContent = '🎛  Sandbox: ' + (config.expr || ''); tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; font-family:"Courier New",monospace;';
+      const tag = document.createElement('div'); tag.textContent = 'ƒ  Sandbox: ' + (config.expr || ''); tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; font-family:"Courier New",monospace;';
       wrap.appendChild(tag);
       const svg = document.createElementNS(ns, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -162,7 +162,7 @@
       // Slider hint
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872; padding-top:0.2rem;';
-      hint.textContent = '🎛 ' + ((config.sliders||[]).length) + ' Schieberegler · interaktiv im SCORM';
+      hint.textContent = ((config.sliders||[]).length) + ' Schieberegler · interaktiv im SCORM';
       wrap.appendChild(hint);
       host.appendChild(wrap);
     }

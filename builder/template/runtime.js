@@ -72,6 +72,11 @@
   }
 
   function migrateLegacyTask(task){
+    // Tab-based task: ensure positions for each tab's blocks
+    if(task.tabs && Array.isArray(task.tabs)){
+      task.tabs.forEach(t => { ensurePositions(t.blocks = t.blocks || []); });
+      return task;
+    }
     // Backward compat: old monolithic task types that now live as blocks
     if(task.blocks){
       ensurePositions(task.blocks);
@@ -132,7 +137,7 @@
   function isTaskDone(idx){
     const t = perTask[idx];
     if(!t || !t.blockScores) return false;
-    const blocks = courseConfig.tasks[idx].blocks || [];
+    const blocks = getAllTaskBlocks(courseConfig.tasks[idx]);
     const graded = blocks.filter(b => {
       const def = window.Blocks.get(b.type);
       return def && def.graded;
@@ -176,6 +181,22 @@
     }
   }
 
+  function getTabBlocks(task){
+    if(task.tabs && Array.isArray(task.tabs) && task.tabs.length >= 2){
+      const i = (task._activeTab != null) ? task._activeTab : 0;
+      return (task.tabs[i] && task.tabs[i].blocks) || [];
+    }
+    return task.blocks || [];
+  }
+  function getAllTaskBlocks(task){
+    if(task.tabs && Array.isArray(task.tabs) && task.tabs.length >= 2){
+      const out = [];
+      task.tabs.forEach(t => (t.blocks || []).forEach(b => out.push(b)));
+      return out;
+    }
+    return task.blocks || [];
+  }
+
   function showPage(idx){
     if(idx < 0 || idx >= courseConfig.tasks.length) return;
     if(currentPageIdx >= 0) tearDownTask(currentPageIdx);
@@ -194,6 +215,27 @@
       page.appendChild(h);
     }
 
+    // Optional tab navigation (per-task, e.g. Visualisierung + Aufgabe)
+    const useTabs = task.tabs && Array.isArray(task.tabs) && task.tabs.length >= 2;
+    if(useTabs){
+      if(task._activeTab == null) task._activeTab = 0;
+      const tabNav = document.createElement('nav');
+      tabNav.className = 'task-tab-nav';
+      task.tabs.forEach((t, ti) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'task-tab-btn' + (ti === task._activeTab ? ' active' : '');
+        btn.textContent = t.title || ('Tab ' + (ti+1));
+        btn.addEventListener('click', () => {
+          if(ti === task._activeTab) return;
+          task._activeTab = ti;
+          showPage(idx);
+        });
+        tabNav.appendChild(btn);
+      });
+      page.appendChild(tabNav);
+    }
+
     // Canvas: blocks are absolutely positioned per their pos.{x,y,w,h}
     const canvas = document.createElement('div');
     canvas.className = 'task-canvas';
@@ -204,7 +246,7 @@
     slot.blockInstances = [];
 
     let maxBottom = 200;
-    (task.blocks || []).forEach((block, bIdx) => {
+    getTabBlocks(task).forEach((block, bIdx) => {
       const def = window.Blocks.get(block.type);
       const cell = document.createElement('div');
       cell.className = 'canvas-block';

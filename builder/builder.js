@@ -14,6 +14,7 @@
     'text-input':        'text-input.js',
     'cloze':             'cloze.js',
     'match-pairs':       'match-pairs.js',
+    'hotzone':           'hotzone.js',
     'sort-list':         'sort-list.js',
     'complex-question':  'complex-question.js',
     'function-question': 'function-question.js',
@@ -216,7 +217,10 @@
   }
   function validateTask(task){
     const out = [];
-    (task.blocks || []).forEach((b, i) => {
+    const allBlocks = (task.tabs && task.tabs.length)
+      ? task.tabs.flatMap(t => t.blocks || [])
+      : (task.blocks || []);
+    allBlocks.forEach((b, i) => {
       const def = window.Blocks && window.Blocks.get(b.type);
       const label = (def && def.label) || b.type;
       validateBlock(b).forEach(w => out.push({blockId: b.id, blockLabel: label + ' #' + (i+1), message: w}));
@@ -242,17 +246,68 @@
     // Deep-clone, generate fresh IDs for task and every block
     const t = JSON.parse(JSON.stringify(tpl.task || {title:'Aufgabe', blocks:[]}));
     t.id = uid('t_');
-    t.blocks = (t.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')}));
+    if(t.tabs && Array.isArray(t.tabs) && t.tabs.length){
+      t.tabs.forEach(tab => { tab.blocks = (tab.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')})); });
+      t._uiActiveTab = 0;
+      t.blocks = t.tabs[0].blocks; // alias
+    } else {
+      t.blocks = (t.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')}));
+    }
     return t;
   }
   function captureTaskAsTemplateData(task){
     // Strip transient IDs from task data so it can be re-instantiated cleanly
-    const blocks = (task.blocks || []).map(b => ({type: b.type, config: JSON.parse(JSON.stringify(b.config || {}))}));
-    return { title: task.title, blocks };
+    const cleanBlocks = arr => (arr || []).map(b => ({type: b.type, config: JSON.parse(JSON.stringify(b.config || {}))}));
+    if(task.tabs && task.tabs.length){
+      return { title: task.title, tabs: task.tabs.map(t => ({title: t.title, blocks: cleanBlocks(t.blocks)})) };
+    }
+    return { title: task.title, blocks: cleanBlocks(task.blocks) };
   }
 
   // ===== Migration of legacy single-task model into block-based =====
+  // ----- Tab helpers -----
+  // When task.tabs exists with >=2 entries, task.blocks is kept as a *reference alias*
+  // to task.tabs[activeTab].blocks so all existing code paths keep working.
+  function hasTabs(task){ return task && Array.isArray(task.tabs) && task.tabs.length >= 2; }
+  function syncTaskBlocksAlias(task){
+    if(!hasTabs(task)) return;
+    const i = (task._uiActiveTab != null) ? task._uiActiveTab : 0;
+    task._uiActiveTab = Math.max(0, Math.min(task.tabs.length - 1, i));
+    task.tabs[task._uiActiveTab].blocks = task.tabs[task._uiActiveTab].blocks || [];
+    task.blocks = task.tabs[task._uiActiveTab].blocks; // alias, same array reference
+  }
+  function enableTabsOn(task){
+    if(hasTabs(task)) return;
+    task.tabs = [
+      { title: 'Visualisierung', blocks: task.blocks || [] },
+      { title: 'Aufgabe',         blocks: [] }
+    ];
+    task._uiActiveTab = 0;
+    task.blocks = task.tabs[0].blocks;
+  }
+  function disableTabsOn(task){
+    if(!hasTabs(task)) return;
+    task.blocks = (task.tabs[0] && task.tabs[0].blocks) || [];
+    delete task.tabs;
+    delete task._uiActiveTab;
+  }
+  function cleanTaskForExport(task){
+    // Strip UI-only fields and avoid double-serializing task.blocks when tabs exist
+    const copy = JSON.parse(JSON.stringify(task));
+    delete copy._uiSelectedBlockIds; delete copy._uiZoom; delete copy._uiActiveTab;
+    if(hasTabs(copy)){
+      delete copy.blocks; // the alias would otherwise duplicate tabs[0].blocks
+    }
+    return copy;
+  }
+
   function migrateTaskIfNeeded(task){
+    if(task.tabs && Array.isArray(task.tabs)){
+      task.tabs.forEach(t => { t.blocks = t.blocks || []; });
+      task._uiActiveTab = task._uiActiveTab || 0;
+      syncTaskBlocksAlias(task);
+      return task;
+    }
     if(task.blocks) return task;
     const legacyMap = {
       'complex-numbers': 'complex-question',
@@ -627,6 +682,138 @@
       wrap.appendChild(formulaWrap);
       return wrap;
 
+    } else if(spec.type === 'zone-editor') {
+      // Interactive image + drag-to-draw rectangle editor.
+      // Reads sibling key `src` from the same obj.
+      // Stores zones as [{x,y,w,h}] in normalized 0..1 coordinates.
+      const ze = el('div', {className:'zone-editor'});
+      const status = el('div', {className:'zone-editor-status'});
+      const stage  = el('div', {className:'zone-editor-stage'});
+      const list   = el('div', {className:'zone-editor-list'});
+
+      function getZones(){
+        const a = (getObj() || {})[spec.key];
+        return Array.isArray(a) ? a : [];
+      }
+      function setZones(arr){ setObj(spec.key, arr.slice()); }
+
+      let drawStart = null, drawRect = null, currentOverlay = null;
+      function pos(e){
+        const r = stage.getBoundingClientRect();
+        return { x:(e.clientX - r.left)/r.width, y:(e.clientY - r.top)/r.height };
+      }
+      function onMove(e){
+        if(!drawStart || !drawRect) return;
+        const p = pos(e);
+        const x = Math.max(0, Math.min(1, Math.min(drawStart.x, p.x)));
+        const y = Math.max(0, Math.min(1, Math.min(drawStart.y, p.y)));
+        const w = Math.max(0, Math.min(1, Math.abs(p.x - drawStart.x)));
+        const h = Math.max(0, Math.min(1, Math.abs(p.y - drawStart.y)));
+        drawRect.style.left = (x*100) + '%'; drawRect.style.top = (y*100) + '%';
+        drawRect.style.width = (w*100) + '%'; drawRect.style.height = (h*100) + '%';
+      }
+      function onUp(e){
+        if(!drawStart || !drawRect){ drawStart = null; drawRect = null; return; }
+        const p = pos(e);
+        const x = Math.max(0, Math.min(1, Math.min(drawStart.x, p.x)));
+        const y = Math.max(0, Math.min(1, Math.min(drawStart.y, p.y)));
+        const w = Math.max(0, Math.min(1, Math.abs(p.x - drawStart.x)));
+        const h = Math.max(0, Math.min(1, Math.abs(p.y - drawStart.y)));
+        drawStart = null;
+        if(drawRect.parentNode) drawRect.parentNode.removeChild(drawRect);
+        drawRect = null;
+        if(w > 0.01 && h > 0.01){
+          const arr = getZones(); arr.push({x, y, w, h}); setZones(arr); render();
+        }
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup',   onUp);
+
+      let lastRenderedSrc = null;
+      function render(){
+        const cur = getObj() || {};
+        const src = cur.src;
+        lastRenderedSrc = src;
+        stage.innerHTML = '';
+        list.innerHTML  = '';
+        if(!src){
+          status.textContent = 'Lade zuerst ein Bild hoch (Feld oben), um Zonen zu markieren.';
+          stage.style.display = 'none';
+          return;
+        }
+        status.textContent = 'Klicke und ziehe auf dem Bild, um eine Zone zu markieren. Klicke eine Zone an, um sie zu löschen.';
+        stage.style.display = 'inline-block';
+        const img = el('img', {attrs:{src, alt:''}});
+        stage.appendChild(img);
+        const overlay = el('div', {className:'zone-editor-overlay'});
+        currentOverlay = overlay;
+        stage.appendChild(overlay);
+
+        const zones = getZones();
+        zones.forEach((z, idx) => {
+          const r = el('div', {className:'zone-editor-rect'});
+          r.style.left = (z.x*100)+'%'; r.style.top = (z.y*100)+'%';
+          r.style.width = (z.w*100)+'%'; r.style.height = (z.h*100)+'%';
+          r.title = 'Zone ' + (idx+1) + ' - klicken zum Löschen';
+          r.addEventListener('mousedown', e => e.stopPropagation()); // don't start draw on existing zone
+          r.addEventListener('click', e => {
+            e.stopPropagation();
+            const arr = getZones(); arr.splice(idx, 1); setZones(arr); render();
+          });
+          overlay.appendChild(r);
+
+          const row = el('div', {className:'zone-editor-list-item'});
+          row.appendChild(el('span', {text:'Zone ' + (idx+1) + ': ' + Math.round(z.w*100) + '×' + Math.round(z.h*100) + '% @ ('+ Math.round(z.x*100) +'%, '+ Math.round(z.y*100) +'%)'}));
+          const del = el('button', {className:'icon-btn danger', attrs:{type:'button'}, text:'×'});
+          del.addEventListener('click', () => {
+            const arr = getZones(); arr.splice(idx, 1); setZones(arr); render();
+          });
+          row.appendChild(del);
+          list.appendChild(row);
+        });
+        if(zones.length === 0){
+          list.appendChild(el('div', {className:'field-help', text:'Noch keine Zonen markiert.'}));
+        }
+      }
+
+      stage.addEventListener('mousedown', e => {
+        if(!currentOverlay) return;
+        if(e.button !== 0) return;
+        // Ignore if mousedown lands on an existing rect (its handler stopped propagation)
+        drawStart = pos(e);
+        drawRect = el('div', {className:'zone-editor-rect zone-editor-rect-draft'});
+        drawRect.style.left = (drawStart.x*100)+'%';
+        drawRect.style.top  = (drawStart.y*100)+'%';
+        drawRect.style.width = '0%'; drawRect.style.height = '0%';
+        currentOverlay.appendChild(drawRect);
+        e.preventDefault();
+      });
+
+      // Watch the src field via interval (form re-render doesn't propagate sibling changes here)
+      const watcher = setInterval(() => {
+        const cur = (getObj() || {}).src;
+        if(cur !== lastRenderedSrc) render();
+      }, 500);
+
+      // Cleanup when wrap is detached from DOM
+      const mo = new MutationObserver(() => {
+        if(!document.body.contains(wrap)){
+          clearInterval(watcher);
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.body, {childList:true, subtree:true});
+
+      render();
+
+      ze.appendChild(status);
+      ze.appendChild(stage);
+      ze.appendChild(list);
+      wrap.appendChild(ze);
+      return wrap;
+
     } else { // text
       input = el('input', {attrs:{type:'text', placeholder: spec.placeholder || ''}});
       const v = obj[spec.key];
@@ -654,8 +841,11 @@
         titleSpan.appendChild(badge);
       }
       btn.appendChild(titleSpan);
-      const blockCount = (task.blocks || []).length;
-      btn.appendChild(el('span', {className:'task-meta', text: blockCount + ' Block' + (blockCount === 1 ? '' : 'e')}));
+      const blockCount = (task.tabs && task.tabs.length)
+        ? task.tabs.reduce((n, t) => n + (t.blocks || []).length, 0)
+        : (task.blocks || []).length;
+      const tabSuffix = (task.tabs && task.tabs.length) ? ' · ' + task.tabs.length + ' Tabs' : '';
+      btn.appendChild(el('span', {className:'task-meta', text: blockCount + ' Block' + (blockCount === 1 ? '' : 'e') + tabSuffix}));
       btn.addEventListener('click', () => { state.selected = {kind:'task', idx}; render(); });
       li.appendChild(btn);
       const ctrls = el('div', {className:'task-controls'});
@@ -1009,6 +1199,8 @@
   function renderTaskPane(host, idx){
     const task = state.course.tasks[idx];
     if(!task){ state.selected = {kind:'course'}; renderActivePane(); return; }
+    // Keep task.blocks pointing at the active tab's blocks (if tabs mode is on)
+    syncTaskBlocksAlias(task);
     task.blocks = task.blocks || [];
     ensureAllPos(task.blocks);
 
@@ -1033,7 +1225,22 @@
     const saveTplBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text:'★ Vorlage'});
     saveTplBtn.title = 'Aufgabe als Vorlage speichern';
     saveTplBtn.addEventListener('click', () => openSaveTemplateModal(task));
-    toolbar.appendChild(addBtn); toolbar.appendChild(saveTplBtn);
+    // Tabs toggle (Visualisierung + Aufgabe)
+    const tabsBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}});
+    function refreshTabsBtn(){ tabsBtn.textContent = hasTabs(task) ? 'Tabs deaktivieren' : '+ Tabs aktivieren'; tabsBtn.title = hasTabs(task) ? 'Tabs entfernen (nur Tab 1 wird behalten)' : '2 Tabs aktivieren: Visualisierung + Aufgabe'; }
+    refreshTabsBtn();
+    tabsBtn.addEventListener('click', () => {
+      if(hasTabs(task)){
+        const tab2Count = (task.tabs[1] && task.tabs[1].blocks ? task.tabs[1].blocks.length : 0);
+        if(tab2Count > 0 && !confirm('Tab 2 enthält ' + tab2Count + ' Block/Blöcke. Beim Deaktivieren gehen diese verloren. Fortfahren?')) return;
+        disableTabsOn(task);
+      } else {
+        enableTabsOn(task);
+      }
+      pushHistory();
+      renderActivePane();
+    });
+    toolbar.appendChild(addBtn); toolbar.appendChild(saveTplBtn); toolbar.appendChild(tabsBtn);
     // Zoom controls
     const zoomBar = el('div', {className:'canvas-zoom-bar'});
     const zoomOut = el('button', {className:'icon-btn', attrs:{type:'button', title:'Verkleinern (Strg + Mausrad)'}, text:'−'});
@@ -1044,6 +1251,32 @@
     toolbar.appendChild(zoomBar);
     head.appendChild(toolbar);
     host.appendChild(head);
+
+    // Optional tab nav bar (only shown when tabs are enabled)
+    if(hasTabs(task)){
+      const tabBar = el('div', {className:'builder-tab-bar'});
+      task.tabs.forEach((tab, ti) => {
+        const isActive = ti === (task._uiActiveTab || 0);
+        const btn = el('button', {
+          className: 'builder-tab-btn' + (isActive ? ' active' : ''),
+          attrs:{type:'button', title:'Tab wechseln'},
+        });
+        const titleSpan = el('input', {className:'builder-tab-title', attrs:{type:'text', value: tab.title || ('Tab ' + (ti+1)), title:'Tab-Titel bearbeiten'}});
+        titleSpan.value = tab.title || ('Tab ' + (ti+1));
+        titleSpan.addEventListener('click', e => e.stopPropagation());
+        titleSpan.addEventListener('input', () => { tab.title = titleSpan.value; });
+        btn.appendChild(titleSpan);
+        btn.appendChild(el('span', {className:'builder-tab-count', text: '(' + ((tab.blocks||[]).length) + ')'}));
+        btn.addEventListener('click', () => {
+          if(ti === (task._uiActiveTab || 0)) return;
+          task._uiActiveTab = ti;
+          syncTaskBlocksAlias(task);
+          renderActivePane();
+        });
+        tabBar.appendChild(btn);
+      });
+      host.appendChild(tabBar);
+    }
 
     // Body: canvas (left) + config-pane (right)
     const body = el('div', {className:'task-edit-body'});
@@ -1253,10 +1486,11 @@
       const sel = selectedBlocks(); if(sel.length === 0) return;
       if(!confirm(sel.length === 1 ? 'Block löschen?' : sel.length + ' Blöcke löschen?')) return;
       const ids = sel.map(b => b.id);
-      task.blocks = task.blocks.filter(b => !ids.includes(b.id));
+      // In-place removal keeps task.blocks and task.tabs[i].blocks pointing at same array
+      for(let bi = task.blocks.length - 1; bi >= 0; bi--){ if(ids.includes(task.blocks[bi].id)) task.blocks.splice(bi, 1); }
       selectedBlockIds.clear();
       persistSelection();
-      renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
+      renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
     }
 
     function updateSelectionVisuals(){
@@ -1447,6 +1681,14 @@
       }
     });
 
+    function refreshTabCounts(){
+      if(!hasTabs(task)) return;
+      document.querySelectorAll('.builder-tab-btn').forEach((btn, i) => {
+        const cnt = btn.querySelector('.builder-tab-count');
+        if(cnt && task.tabs[i]) cnt.textContent = '(' + ((task.tabs[i].blocks || []).length) + ')';
+      });
+    }
+
     function addBlockOfType(blockType){
       pushHistory();
       const def = window.Blocks.get(blockType);
@@ -1454,7 +1696,7 @@
       ensurePos(block, task.blocks);
       task.blocks.push(block);
       selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
-      renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
+      renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
       // After the shadow DOM mounts, shrink/grow the card to fit the actual rendered content.
       requestAnimationFrame(() => {
         const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
@@ -1589,7 +1831,10 @@
   }
   function usedBlockTypes(){
     const set = new Set();
-    state.course.tasks.forEach(t => (t.blocks || []).forEach(b => set.add(b.type)));
+    state.course.tasks.forEach(t => {
+      const allBlocks = (t.tabs && t.tabs.length) ? t.tabs.flatMap(tb => tb.blocks || []) : (t.blocks || []);
+      allBlocks.forEach(b => set.add(b.type));
+    });
     return Array.from(set);
   }
   async function gatherTemplateFiles(usedBlocks){
@@ -1617,7 +1862,10 @@
       courseTitle: state.course.courseTitle,
       courseSubtitle: state.course.courseSubtitle,
       passThreshold: state.course.passThreshold,
-      tasks: state.course.tasks.map(t => ({ id: t.id, title: t.title, blocks: t.blocks }))
+      tasks: state.course.tasks.map(t => {
+        const clean = cleanTaskForExport(t);
+        return { id: t.id, title: t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
+      })
     }, null, 2);
     const themeJson = JSON.stringify(state.theme, null, 2);
 
@@ -1704,7 +1952,10 @@
   }
 
   function exportJson(){
-    const blob = new Blob([JSON.stringify({course: state.course, theme: state.theme}, null, 2)], {type:'application/json'});
+    const courseClean = Object.assign({}, state.course, {
+      tasks: (state.course.tasks || []).map(cleanTaskForExport)
+    });
+    const blob = new Blob([JSON.stringify({course: courseClean, theme: state.theme}, null, 2)], {type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = sanitizeFilename(state.course.courseTitle || 'scorm') + '.json';
@@ -1741,7 +1992,10 @@
         courseTitle: state.course.courseTitle,
         courseSubtitle: state.course.courseSubtitle,
         passThreshold: state.course.passThreshold,
-        tasks: state.course.tasks.map(t => ({id:t.id, title:t.title, blocks:t.blocks}))
+        tasks: state.course.tasks.map(t => {
+          const clean = cleanTaskForExport(t);
+          return { id:t.id, title:t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
+        })
       });
       const previewTheme = Object.assign({}, state.theme);
       if(!previewTheme.logoDataUrl && previewTheme.logoUrl && !/^(https?:|data:)/i.test(previewTheme.logoUrl)){
@@ -1825,8 +2079,11 @@
     if(tpl.category) card.appendChild(el('span', {className:'tpl-cat', text: tpl.category}));
     card.appendChild(el('span', {className:'tpl-label', text: tpl.label}));
     if(tpl.description) card.appendChild(el('span', {className:'tpl-desc', text: tpl.description}));
-    const blockCount = (tpl.task && tpl.task.blocks ? tpl.task.blocks.length : 0);
-    card.appendChild(el('span', {className:'tpl-desc', text: blockCount + ' Block' + (blockCount === 1 ? '' : 'e')}));
+    const tplTask = tpl.task || {};
+    const blockCount = (tplTask.tabs && tplTask.tabs.length)
+      ? tplTask.tabs.reduce((n, t) => n + ((t.blocks || []).length), 0)
+      : (tplTask.blocks ? tplTask.blocks.length : 0);
+    card.appendChild(el('span', {className:'tpl-desc', text: blockCount + ' Block' + (blockCount === 1 ? '' : 'e') + (tplTask.tabs ? ' · ' + tplTask.tabs.length + ' Tabs' : '')}));
 
     const actions = el('div', {className:'tpl-actions'});
     const useBtn = el('button', {className:'btn btn-primary btn-sm', attrs:{type:'button'}, text:'Einfügen'});

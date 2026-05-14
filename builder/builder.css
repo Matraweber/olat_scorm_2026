@@ -293,6 +293,29 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .math-preview:empty::before { content:'Vorschau…'; color:var(--muted); font-style:italic; font-size:0.85rem; }
 .math-hint { font-size:0.71rem; color:var(--muted); line-height:1.5; }
 
+/* Builder task tab bar (Visualisierung / Aufgabe) */
+.builder-tab-bar { display: flex; gap: 0.4rem; margin: 0.4rem 0 0.6rem; border-bottom: 2px solid var(--line); padding-bottom: 0; align-items: stretch; flex-wrap: wrap; }
+.builder-tab-btn { background: transparent; border: none; padding: 0.3rem 0.5rem 0.4rem; font: inherit; color: var(--muted); cursor: pointer; border-radius: 6px 6px 0 0; border-bottom: 3px solid transparent; margin-bottom: -2px; display: flex; align-items: center; gap: 0.35rem; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.builder-tab-btn:hover { background: var(--panel-soft); color: var(--primary); }
+.builder-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+.builder-tab-title { background: transparent; border: 1px solid transparent; font: inherit; color: inherit; min-width: 100px; max-width: 200px; padding: 0.18rem 0.4rem; border-radius: 4px; font-weight: 600; pointer-events: none; }
+.builder-tab-btn.active .builder-tab-title { pointer-events: auto; cursor: text; }
+.builder-tab-title:focus { background: #fff; border-color: var(--line); outline: none; }
+.builder-tab-count { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+.builder-tab-btn.active .builder-tab-count { color: var(--primary); }
+
+/* Zone editor (hotzone block image overlay) */
+.zone-editor { display:flex; flex-direction:column; gap:0.45rem; }
+.zone-editor-status { font-size:0.78rem; color:var(--muted); line-height:1.45; }
+.zone-editor-stage { position:relative; display:inline-block; max-width:100%; border:1px solid var(--line); border-radius:8px; overflow:hidden; cursor:crosshair; user-select:none; background:#f8fafc; }
+.zone-editor-stage img { display:block; max-width:100%; height:auto; pointer-events:none; -webkit-user-drag:none; }
+.zone-editor-overlay { position:absolute; inset:0; }
+.zone-editor-rect { position:absolute; border:2px solid #1565ff; background:rgba(21,101,255,0.18); border-radius:3px; cursor:pointer; transition:background 0.1s; }
+.zone-editor-rect:hover { background:rgba(180,35,24,0.25); border-color:#b42318; }
+.zone-editor-rect-draft { border-style:dashed; background:rgba(132,191,102,0.22); border-color:#84bf66; cursor:crosshair; pointer-events:none; }
+.zone-editor-list { display:flex; flex-direction:column; gap:0.25rem; font-size:0.78rem; }
+.zone-editor-list-item { display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0.5rem; background:var(--panel-soft); border:1px solid var(--line); border-radius:6px; }
+
 /* Formula helper toolbar (formula-text field type) */
 .formula-field { display:flex; flex-direction:column; gap:0.3rem; }
 .formula-toolbar { display:flex; flex-wrap:wrap; gap:0.22rem; }
