@@ -1,3 +1,13 @@
+// ============================================================================
+// utils.js - Shared helpers passed into every block's mount() as `api.utils`.
+// Provides: DOM/SVG element builders, number/angle parsing, a safe math-
+// expression evaluator, two ready-made question-card layouts (questionCard /
+// simpleQuestionCard), a coordinate-plane renderer (renderPlane), a feedback
+// box, and the KaTeX auto-render bootstrap (utils.renderMath).
+//
+// Block modules use these so each block stays small and visually consistent
+// with the rest of the runtime.
+// ============================================================================
 (function(){
   'use strict';
   if(window.BlockUtils) return;

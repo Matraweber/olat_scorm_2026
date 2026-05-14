@@ -9,7 +9,9 @@ import { state, render, defaultTheme } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
 
-// ---- Template-file fetchers (cache-busted) ----
+// ---- File fetchers (cache-busted) ----
+// *Rel variants prepend 'template/' for runtime templates;
+// the plain variants take a path relative to the builder/ root (e.g. 'lib/katex/...').
 async function fetchTextRel(path){
   const r = await fetch(withBust('template/' + path));
   if(!r.ok) throw new Error('Konnte Template-Datei nicht laden: ' + path);
@@ -19,6 +21,45 @@ async function fetchBinaryRel(path){
   const r = await fetch(withBust('template/' + path));
   if(!r.ok) return null;
   return await r.blob();
+}
+async function fetchText(absPath){
+  const r = await fetch(withBust(absPath));
+  if(!r.ok) throw new Error('Konnte Datei nicht laden: ' + absPath);
+  return r.text();
+}
+async function fetchBinary(absPath){
+  const r = await fetch(withBust(absPath));
+  if(!r.ok) return null;
+  return await r.blob();
+}
+
+// KaTeX bundle: shipped inside the SCORM ZIP at /katex/ for fully-offline math rendering.
+const KATEX_FONTS = [
+  'KaTeX_AMS-Regular.woff2','KaTeX_Caligraphic-Bold.woff2','KaTeX_Caligraphic-Regular.woff2',
+  'KaTeX_Fraktur-Bold.woff2','KaTeX_Fraktur-Regular.woff2','KaTeX_Main-Bold.woff2',
+  'KaTeX_Main-BoldItalic.woff2','KaTeX_Main-Italic.woff2','KaTeX_Main-Regular.woff2',
+  'KaTeX_Math-BoldItalic.woff2','KaTeX_Math-Italic.woff2','KaTeX_SansSerif-Bold.woff2',
+  'KaTeX_SansSerif-Italic.woff2','KaTeX_SansSerif-Regular.woff2','KaTeX_Script-Regular.woff2',
+  'KaTeX_Size1-Regular.woff2','KaTeX_Size2-Regular.woff2','KaTeX_Size3-Regular.woff2',
+  'KaTeX_Size4-Regular.woff2','KaTeX_Typewriter-Regular.woff2'
+];
+async function addKatexToZip(zip){
+  const css = await fetchText('lib/katex/katex.min.css');
+  const js  = await fetchText('lib/katex/katex.min.js');
+  const ar  = await fetchText('lib/katex/contrib/auto-render.min.js');
+  zip.file('katex/katex.min.css', css);
+  zip.file('katex/katex.min.js', js);
+  zip.file('katex/contrib/auto-render.min.js', ar);
+  for(const f of KATEX_FONTS){
+    const blob = await fetchBinary('lib/katex/fonts/' + f);
+    if(blob) zip.file('katex/fonts/' + f, blob);
+  }
+}
+function katexZipFileList(){
+  return [
+    'katex/katex.min.css', 'katex/katex.min.js', 'katex/contrib/auto-render.min.js',
+    ...KATEX_FONTS.map(f => 'katex/fonts/' + f)
+  ];
 }
 
 // ---- Manifest/index builders ----
@@ -77,7 +118,8 @@ async function buildZip(){
   const fileList = [
     'index.html', 'styles.css', 'scorm12.js', 'utils.js', 'runtime.js',
     'theme.json', 'tasks.json', 'blocks/_registry.js',
-    ...blockFiles, ...(logoFilename ? [logoFilename] : [])
+    ...blockFiles, ...katexZipFileList(),
+    ...(logoFilename ? [logoFilename] : [])
   ];
   const manifestXml = buildManifest(manifestTpl, state.course.courseTitle, fileList);
 
@@ -95,6 +137,7 @@ async function buildZip(){
     const rel = 'blocks/' + BLOCK_FILES[b];
     zip.file(rel, tmpl[rel]);
   });
+  await addKatexToZip(zip);
   if(logoFilename && logoBlob) zip.file(logoFilename, logoBlob);
   return zip;
 }
@@ -198,12 +241,15 @@ export async function showPreview(){
     const themeJson = JSON.stringify(previewTheme);
     let bodyInner = extractBodyInner(tmpl['index.html']);
     bodyInner = bodyInner.replace(/<script[^>]+src=[^>]+><\/script>/gi, '').replace(/<!--\s*BLOCK_SCRIPTS\s*-->/g, '');
+    // srcdoc iframes need an explicit <base> for relative URLs (e.g. local KaTeX) to resolve.
+    const baseHref = window.location.href.replace(/[^/]*$/, '');
     const html = [
       '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Vorschau</title>',
+      '<base href="', baseHref, '" />',
       '<style>', tmpl['styles.css'], '</style>',
-      '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous" />',
-      '<script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"><\/script>',
-      '<script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"><\/script>',
+      '<link rel="stylesheet" href="lib/katex/katex.min.css" />',
+      '<script src="lib/katex/katex.min.js"><\/script>',
+      '<script src="lib/katex/contrib/auto-render.min.js"><\/script>',
       '</head><body>', bodyInner,
       '<script>window.__SCORM_THEME__=', themeJson, ';window.__SCORM_TASKS__=', tasksJson, ';<\/script>',
       '<script>', tmpl['scorm12.js'], '<\/script>',

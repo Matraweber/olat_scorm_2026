@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCORM Lerneinheit</title>
   <link rel="stylesheet" href="styles.css" />
-  <!-- KaTeX for math rendering. Replace these URLs with local files for fully-offline SCORM. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous" />
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="katex/katex.min.css" />
+  <script defer src="katex/katex.min.js"></script>
+  <script defer src="katex/contrib/auto-render.min.js"></script>
 </head>
 <body>
   <div class="scorm-shell">
@@ -25,6 +24,12 @@
     </header>
 
     <main class="scorm-main" id="scormMain">
+      <div class="progress-bar-wrap" id="progressBarWrap" aria-label="Lernfortschritt">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div>
+        </div>
+        <div class="progress-bar-text" id="progressBarText">Aufgabe 1 von 1</div>
+      </div>
       <div id="taskContainer"></div>
     </main>
 

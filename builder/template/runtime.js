@@ -1,7 +1,15 @@
+// ============================================================================
+// runtime.js - SCORM-1.2 player runtime. Loads tasks.json + theme.json,
+// builds the top navigation, renders each task's blocks onto an absolutely-
+// positioned canvas, tracks per-block scores, and pushes the aggregate
+// score into the LMS via scorm12.js.
+//
+// Per-task default sizes are duplicated from canvas.js because the runtime
+// must work standalone inside the SCORM ZIP without builder code.
+// ============================================================================
 (function(){
   'use strict';
 
-  // ---- Block utilities loaded from utils.js, exposed to block modules via api.utils ----
   const utils = window.BlockUtils;
   if(!utils) throw new Error('runtime.js: window.BlockUtils not loaded. Make sure utils.js is loaded before runtime.js.');
 
@@ -154,6 +162,21 @@
       btn.classList.toggle('active', i === currentPageIdx);
       btn.classList.toggle('done', isTaskDone(i));
     });
+    updateProgressBar();
+  }
+
+  function updateProgressBar(){
+    const fill = document.getElementById('progressBarFill');
+    const text = document.getElementById('progressBarText');
+    if(!fill || !text || !courseConfig) return;
+    const total = courseConfig.tasks.length;
+    if(total === 0){ fill.style.width = '0%'; text.textContent = ''; return; }
+    let done = 0;
+    for(let i = 0; i < total; i++) if(isTaskDone(i)) done++;
+    const pct = Math.round((done / total) * 100);
+    fill.style.width = pct + '%';
+    const current = currentPageIdx >= 0 ? currentPageIdx + 1 : 1;
+    text.innerHTML = '<strong>Aufgabe ' + current + ' von ' + total + '</strong> · ' + done + ' erledigt (' + pct + '%)';
   }
 
   function buildNav(){
@@ -320,6 +343,8 @@
   function finishCourse(){
     pushScoreToLMS(true);
     try { Scorm12.finish(); } catch(e) {}
+    const pb = document.getElementById('progressBarWrap');
+    if(pb) pb.classList.add('hidden');
     const container = document.getElementById('taskContainer');
     const {pts, max} = totalScore();
     const threshold = (courseConfig.passThreshold == null) ? 0.5 : courseConfig.passThreshold;

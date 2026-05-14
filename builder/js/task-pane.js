@@ -1,20 +1,21 @@
 // ============================================================================
-// task-pane.js - The free-canvas editor for one task: drag, snap, multi-select,
-// zoom, optional tab nav, block-config side panel. Largest single module.
+// task-pane.js - Orchestrator for the free-canvas task editor. Builds the
+// shared `ctx` object and wires up the head/toolbar/zoom/tab-bar. The heavy
+// lifting lives in sibling modules:
+//   • task-pane-canvas.js  - canvas render + drag/resize handlers
+//   • task-pane-config.js  - right-side block config pane + multi-select UI
+//   • task-pane-bulk.js    - bulk align/distribute/duplicate/delete
 // ============================================================================
 import { el, uid, cssEscape } from './util.js';
-import { state, pushHistory, pushHistoryDebounced, takeHistorySnap, commitHistorySnap, discardHistorySnap, renderActivePane } from './state.js';
-import {
-  CANVAS_WIDTH,
-  ensurePos, ensureAllPos,
-  applySnap, applyResizeSnap, showSnapGuides, hideSnapGuides,
-  autoFitBlock
-} from './canvas.js';
-import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn, validateBlock } from './tasks.js';
-import { renderField } from './form.js';
-import { renderBlockPreview } from './preview.js';
+import { state, pushHistory, renderActivePane } from './state.js';
+import { CANVAS_WIDTH, ensurePos, ensureAllPos } from './canvas.js';
+import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { openBlockTypeModal, openSaveTemplateModal } from './modals.js';
+import { renderBlockPreview } from './preview.js';
+import { renderCanvas } from './task-pane-canvas.js';
+import { renderConfigPane, posLabel } from './task-pane-config.js';
+import { bulkDelete, bulkDuplicate } from './task-pane-bulk.js';
 
 // Currently-active task pane context - used by global keyboard handler.
 export let activeTaskCtx = null;
@@ -117,6 +118,7 @@ export function renderTaskPane(host, idx){
   body.appendChild(configHost);
   host.appendChild(body);
 
+  // ===== Local helpers shared via ctx =====
   function applyZoom(){
     canvas.style.transform = 'scale(' + zoom + ')';
     zoomContainer.style.width  = (CANVAS_WIDTH * zoom) + 'px';
@@ -142,95 +144,18 @@ export function renderTaskPane(host, idx){
     applyZoom();
   }
 
-  function selectedBlocks(){ return task.blocks.filter(b => selectedBlockIds.has(b.id)); }
+  function updateSelectionVisuals(){
+    canvas.querySelectorAll('.canvas-block-card').forEach(c => {
+      c.classList.toggle('selected', selectedBlockIds.has(c.dataset.blockId));
+    });
+  }
 
-  // ===== Config side-pane (single block / multi-select / empty) =====
-  function renderConfigPane(){
-    configHost.innerHTML = '';
-    const selBlocks = selectedBlocks();
-
-    if(selBlocks.length === 0){
-      configHost.appendChild(el('div', {className:'block-config-empty', html:'Klicke einen Block auf der Canvas, um ihn zu bearbeiten.<br><br><strong>Tipps:</strong><br>• Shift + Klick: mehrere Blöcke auswählen<br>• Pfeiltasten: pixelweise verschieben (Shift = 10 px)<br>• Entf: Block löschen<br>• Strg + Mausrad: Zoom'}));
-      return;
-    }
-
-    if(selBlocks.length > 1){
-      // Multi-select bulk actions
-      const head = el('div', {className:'block-config-head'});
-      head.appendChild(el('h3', {html: 'Mehrfachauswahl <span class="multi-count-badge">' + selBlocks.length + '</span>'}));
-      configHost.appendChild(head);
-      configHost.appendChild(el('div', {className:'field-help', text:'Wähle eine Aktion für alle ausgewählten Blöcke.'}));
-
-      const actions = el('div', {className:'bulk-actions'});
-      const alignRow = el('div', {className:'bulk-row'});
-      alignRow.appendChild(el('strong', {text:'Ausrichten'}));
-      [
-        {label:'⟸ Links',   fn:()=>bulkAlign('left')},
-        {label:'⇔ Mitte X', fn:()=>bulkAlign('cx')},
-        {label:'Rechts ⟹', fn:()=>bulkAlign('right')},
-        {label:'⤒ Oben',   fn:()=>bulkAlign('top')},
-        {label:'⇕ Mitte Y', fn:()=>bulkAlign('cy')},
-        {label:'Unten ⤓',  fn:()=>bulkAlign('bottom')}
-      ].forEach(a => {
-        const b = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:a.label});
-        b.addEventListener('click', a.fn);
-        alignRow.appendChild(b);
-      });
-      actions.appendChild(alignRow);
-
-      if(selBlocks.length >= 3){
-        const distRow = el('div', {className:'bulk-row'});
-        distRow.appendChild(el('strong', {text:'Verteilen (gleicher Abstand)'}));
-        const dh = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Horizontal'});
-        dh.addEventListener('click', () => bulkDistribute('h'));
-        const dv = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Vertikal'});
-        dv.addEventListener('click', () => bulkDistribute('v'));
-        distRow.appendChild(dh); distRow.appendChild(dv);
-        actions.appendChild(distRow);
-      }
-      const commonRow = el('div', {className:'bulk-row'});
-      commonRow.appendChild(el('strong', {text:'Aktionen'}));
-      const dupAll = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'⧉ Duplizieren'});
-      dupAll.addEventListener('click', bulkDuplicate);
-      const delAll = el('button', {className:'btn btn-danger btn-sm', attrs:{type:'button'}, text:'✕ Löschen'});
-      delAll.addEventListener('click', bulkDelete);
-      commonRow.appendChild(dupAll); commonRow.appendChild(delAll);
-      actions.appendChild(commonRow);
-      configHost.appendChild(actions);
-      return;
-    }
-
-    // Single selection: full config form
-    const sel = selBlocks[0];
-    const def = window.Blocks.get(sel.type);
-    const headBlock = el('div', {className:'block-config-head'});
-    headBlock.appendChild(el('h3', {text: 'Konfiguration: ' + ((def && def.label) || sel.type)}));
-    const meta = el('span', {className:'block-config-meta', text: posLabel(sel)});
-    headBlock.appendChild(meta);
-    configHost.appendChild(headBlock);
-    if(!def){
-      configHost.appendChild(el('div', {className:'block-edit-error', text: 'Block-Typ "' + sel.type + '" ist nicht registriert.'}));
-      return;
-    }
-    if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
-    const schema = def.builderSchema ? def.builderSchema() : [];
-    if(schema.length === 0){
-      configHost.appendChild(el('div', {className:'field-help', text:'Dieser Block hat keine Konfiguration.'}));
-    } else {
-      schema.forEach(spec => configHost.appendChild(renderField(spec, () => sel.config, (k, v) => {
-        pushHistoryDebounced();
-        sel.config[k] = v;
-        scheduleBlockPreviewRefresh(sel);
-        renderTaskList();
-      })));
-    }
-    const warnings = validateBlock(sel);
-    if(warnings.length > 0){
-      const box = el('div', {className:'config-warnings'});
-      box.appendChild(el('div', {className:'config-warnings-title', text:'Hinweise (' + warnings.length + ')'}));
-      warnings.forEach(w => box.appendChild(el('div', {className:'config-warnings-item', text:'• ' + w})));
-      configHost.appendChild(box);
-    }
+  function refreshTabCounts(){
+    if(!hasTabs(task)) return;
+    document.querySelectorAll('.builder-tab-btn').forEach((btn, i) => {
+      const cnt = btn.querySelector('.builder-tab-count');
+      if(cnt && task.tabs[i]) cnt.textContent = '(' + ((task.tabs[i].blocks || []).length) + ')';
+    });
   }
 
   // Debounce canvas block re-renders so heavy mount() (e.g. plots) doesn't run on every keystroke.
@@ -247,267 +172,21 @@ export function renderTaskPane(host, idx){
       }
     }, 250));
   }
-  function posLabel(b){ return 'Position ' + Math.round(b.pos.x) + ', ' + Math.round(b.pos.y) + ' · Größe ' + Math.round(b.pos.w) + '×' + Math.round(b.pos.h); }
 
-  // ===== Bulk actions =====
-  function bulkAlign(edge){
-    const sel = selectedBlocks(); if(sel.length < 2) return;
-    let target;
-    if(edge === 'left')   target = Math.min(...sel.map(b => b.pos.x));
-    if(edge === 'right')  target = Math.max(...sel.map(b => b.pos.x + b.pos.w));
-    if(edge === 'cx')     target = sel.reduce((s,b) => s + b.pos.x + b.pos.w/2, 0) / sel.length;
-    if(edge === 'top')    target = Math.min(...sel.map(b => b.pos.y));
-    if(edge === 'bottom') target = Math.max(...sel.map(b => b.pos.y + b.pos.h));
-    if(edge === 'cy')     target = sel.reduce((s,b) => s + b.pos.y + b.pos.h/2, 0) / sel.length;
-    sel.forEach(b => {
-      if(edge === 'left')   b.pos.x = Math.round(target);
-      if(edge === 'right')  b.pos.x = Math.round(target - b.pos.w);
-      if(edge === 'cx')     b.pos.x = Math.round(target - b.pos.w / 2);
-      if(edge === 'top')    b.pos.y = Math.round(target);
-      if(edge === 'bottom') b.pos.y = Math.round(target - b.pos.h);
-      if(edge === 'cy')     b.pos.y = Math.round(target - b.pos.h / 2);
-    });
-    renderCanvas(); adjustCanvasHeight();
-  }
-  function bulkDistribute(axis){
-    const sel = selectedBlocks(); if(sel.length < 3) return;
-    if(axis === 'h'){
-      sel.sort((a,b) => a.pos.x - b.pos.x);
-      const first = sel[0], last = sel[sel.length-1];
-      const totalSpan = (last.pos.x + last.pos.w) - first.pos.x;
-      const widths = sel.reduce((s,b) => s + b.pos.w, 0);
-      const gap = (totalSpan - widths) / (sel.length - 1);
-      let cursor = first.pos.x;
-      sel.forEach(b => { b.pos.x = Math.round(cursor); cursor += b.pos.w + gap; });
-    } else {
-      sel.sort((a,b) => a.pos.y - b.pos.y);
-      const first = sel[0], last = sel[sel.length-1];
-      const totalSpan = (last.pos.y + last.pos.h) - first.pos.y;
-      const heights = sel.reduce((s,b) => s + b.pos.h, 0);
-      const gap = (totalSpan - heights) / (sel.length - 1);
-      let cursor = first.pos.y;
-      sel.forEach(b => { b.pos.y = Math.round(cursor); cursor += b.pos.h + gap; });
-    }
-    renderCanvas(); adjustCanvasHeight();
-  }
-  function bulkDuplicate(){
-    const sel = selectedBlocks(); if(sel.length === 0) return;
-    const newIds = [];
-    sel.forEach(b => {
-      const copy = JSON.parse(JSON.stringify(b));
-      copy.id = uid('b_');
-      copy.pos = Object.assign({}, b.pos, {x: b.pos.x + 24, y: b.pos.y + 24});
-      task.blocks.push(copy);
-      newIds.push(copy.id);
-    });
-    selectedBlockIds.clear();
-    newIds.forEach(id => selectedBlockIds.add(id));
-    persistSelection();
-    renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
-  }
-  function bulkDelete(){
-    const sel = selectedBlocks(); if(sel.length === 0) return;
-    if(!confirm(sel.length === 1 ? 'Block löschen?' : sel.length + ' Blöcke löschen?')) return;
-    const ids = sel.map(b => b.id);
-    // In-place removal keeps task.blocks and task.tabs[i].blocks pointing at same array
-    for(let bi = task.blocks.length - 1; bi >= 0; bi--){ if(ids.includes(task.blocks[bi].id)) task.blocks.splice(bi, 1); }
-    selectedBlockIds.clear();
-    persistSelection();
-    renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
-  }
-
-  function updateSelectionVisuals(){
-    canvas.querySelectorAll('.canvas-block-card').forEach(c => {
-      c.classList.toggle('selected', selectedBlockIds.has(c.dataset.blockId));
-    });
-  }
-
-  // ===== Canvas rendering =====
-  function renderCanvas(){
-    canvas.querySelectorAll('.canvas-block-card, .canvas-block-empty').forEach(c => c.remove());
-    task.blocks.forEach(block => {
-      ensurePos(block, task.blocks);
-      const def = window.Blocks.get(block.type);
-      const card = el('div', {className:'canvas-block-card', attrs:{'data-block-id': block.id}});
-      if(selectedBlockIds.has(block.id)) card.classList.add('selected');
-      Object.assign(card.style, {
-        left: block.pos.x + 'px', top: block.pos.y + 'px',
-        width: block.pos.w + 'px', height: block.pos.h + 'px'
-      });
-      const cardHead = el('div', {className:'canvas-block-head'});
-      cardHead.appendChild(el('span', {className:'canvas-block-type', text: ((def && def.label) || block.type) + (def && def.graded ? ' · gewertet' : '')}));
-      const ctrls = el('div', {className:'canvas-block-controls'});
-      const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Höhe an Inhalt anpassen'}, text:'↕'});
-      const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Duplizieren'}, text:'⧉'});
-      const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
-      fitBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        autoFitBlock(block);
-      });
-      dupBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        pushHistory();
-        const copy = JSON.parse(JSON.stringify(block));
-        copy.id = uid('b_');
-        copy.pos = Object.assign({}, block.pos, { x: block.pos.x + 24, y: block.pos.y + 24 });
-        task.blocks.push(copy);
-        selectedBlockIds.clear(); selectedBlockIds.add(copy.id); persistSelection();
-        renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
-      });
-      rmBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        if(!confirm('Block "' + ((def && def.label) || block.type) + '" entfernen?')) return;
-        pushHistory();
-        const i = task.blocks.findIndex(b => b.id === block.id);
-        if(i >= 0) task.blocks.splice(i, 1);
-        selectedBlockIds.delete(block.id); persistSelection();
-        renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList();
-      });
-      ctrls.appendChild(fitBtn); ctrls.appendChild(dupBtn); ctrls.appendChild(rmBtn);
-      cardHead.appendChild(ctrls);
-      card.appendChild(cardHead);
-
-      const cardBody = el('div', {className:'canvas-block-body'});
-      renderBlockPreview(cardBody, block);
-      card.appendChild(cardBody);
-
-      const resize = el('div', {className:'canvas-block-resize', attrs:{title:'Größe ändern'}, text:'⌟'});
-      card.appendChild(resize);
-
-      installDragHandlers(card, block);
-      installResizeHandler(resize, card, block);
-
-      canvas.appendChild(card);
-    });
-    if(task.blocks.length === 0){
-      const empty = el('div', {className:'canvas-block-empty', html:'<strong>Leere Canvas.</strong><br>Klicke <strong>+ Block</strong> oben rechts, um Inhalte hinzuzufügen.'});
-      canvas.appendChild(empty);
-    }
-  }
-
-  function installDragHandlers(card, block){
-    card.addEventListener('mousedown', e => {
-      if(e.target.closest('.canvas-block-resize') || e.target.closest('.canvas-block-controls')) return;
-      if(e.button !== 0) return;
-      e.preventDefault();
-
-      // Selection logic on MOUSEDOWN
-      const wasSelected = selectedBlockIds.has(block.id);
-      const shift = e.shiftKey;
-      if(shift){
-        if(wasSelected) selectedBlockIds.delete(block.id);
-        else selectedBlockIds.add(block.id);
-      } else {
-        if(!wasSelected){
-          selectedBlockIds.clear();
-          selectedBlockIds.add(block.id);
-        }
-      }
-      persistSelection();
-      updateSelectionVisuals();
-      renderConfigPane();
-
-      const movingIds = Array.from(selectedBlockIds);
-      const movingBlocks = movingIds.map(id => task.blocks.find(b => b.id === id)).filter(Boolean);
-      if(movingBlocks.length === 0) return;
-      const startPos = {};
-      movingBlocks.forEach(b => { startPos[b.id] = {x: b.pos.x, y: b.pos.y}; });
-      const startX = e.clientX, startY = e.clientY;
-      let dragged = false;
-      takeHistorySnap();
-
-      function onMove(ev){
-        const sdx = ev.clientX - startX, sdy = ev.clientY - startY;
-        if(!dragged && (Math.abs(sdx) > 3 || Math.abs(sdy) > 3)) dragged = true;
-        if(!dragged) return;
-        const dx = sdx / zoom, dy = sdy / zoom;
-        const others = task.blocks.filter(b => !selectedBlockIds.has(b.id));
-        const candidate = {x: startPos[block.id].x + dx, y: startPos[block.id].y + dy, w: block.pos.w, h: block.pos.h};
-        const snapped = applySnap(block, candidate, others);
-        const finalDx = snapped.x - startPos[block.id].x;
-        const finalDy = snapped.y - startPos[block.id].y;
-        movingBlocks.forEach(b => {
-          const newX = Math.max(0, Math.min(startPos[b.id].x + finalDx, CANVAS_WIDTH - b.pos.w));
-          const newY = Math.max(0, startPos[b.id].y + finalDy);
-          b.pos.x = newX; b.pos.y = newY;
-          const c = canvas.querySelector('[data-block-id="' + cssEscape(b.id) + '"]');
-          if(c){ c.style.left = newX + 'px'; c.style.top = newY + 'px'; }
-        });
-        showSnapGuides(canvas, snapped.guides);
-        const meta = configHost.querySelector('.block-config-meta');
-        if(meta && movingBlocks.length === 1) meta.textContent = posLabel(movingBlocks[0]);
-      }
-      function onUp(){
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        hideSnapGuides(canvas);
-        if(dragged) commitHistorySnap();
-        else discardHistorySnap();
-        if(!dragged && !shift && wasSelected && selectedBlockIds.size > 1){
-          selectedBlockIds.clear();
-          selectedBlockIds.add(block.id);
-          persistSelection();
-          updateSelectionVisuals();
-          renderConfigPane();
-        }
-        adjustCanvasHeight();
-      }
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  }
-
-  function installResizeHandler(handle, card, block){
-    handle.addEventListener('mousedown', e => {
-      e.stopPropagation();
-      e.preventDefault();
-      selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
-      updateSelectionVisuals();
-      renderConfigPane();
-      const startX = e.clientX, startY = e.clientY;
-      const startW = block.pos.w, startH = block.pos.h;
-      takeHistorySnap();
-      let didResize = false;
-      function onMove(ev){
-        const dx = (ev.clientX - startX) / zoom;
-        const dy = (ev.clientY - startY) / zoom;
-        if(Math.abs(dx) > 1 || Math.abs(dy) > 1) didResize = true;
-        const others = task.blocks.filter(b => b.id !== block.id);
-        const snapped = applyResizeSnap(block, startW + dx, startH + dy, others);
-        block.pos.w = snapped.w; block.pos.h = snapped.h;
-        card.style.width = snapped.w + 'px';
-        card.style.height = snapped.h + 'px';
-        showSnapGuides(canvas, snapped.guides);
-        const meta = configHost.querySelector('.block-config-meta');
-        if(meta) meta.textContent = posLabel(block);
-      }
-      function onUp(){
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        hideSnapGuides(canvas);
-        adjustCanvasHeight();
-        if(didResize) commitHistorySnap(); else discardHistorySnap();
-      }
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  }
-
-  canvas.addEventListener('mousedown', e => {
-    if(e.target === canvas){
-      selectedBlockIds.clear(); persistSelection();
-      updateSelectionVisuals();
-      renderConfigPane();
-    }
-  });
-
-  function refreshTabCounts(){
-    if(!hasTabs(task)) return;
-    document.querySelectorAll('.builder-tab-btn').forEach((btn, i) => {
-      const cnt = btn.querySelector('.builder-tab-count');
-      if(cnt && task.tabs[i]) cnt.textContent = '(' + ((task.tabs[i].blocks || []).length) + ')';
-    });
-  }
+  // ===== Shared ctx passed to sibling modules =====
+  const ctx = {
+    task, canvas, configHost,
+    selectedBlockIds,
+    get zoom(){ return zoom; },
+    selectedBlocks(){ return task.blocks.filter(b => selectedBlockIds.has(b.id)); },
+    persistSelection,
+    adjustCanvasHeight,
+    updateSelectionVisuals,
+    refreshTabCounts,
+    scheduleBlockPreviewRefresh,
+    renderCanvas: () => renderCanvas(ctx),
+    renderConfigPane: () => renderConfigPane(ctx),
+  };
 
   function addBlockOfType(blockType){
     pushHistory();
@@ -516,8 +195,8 @@ export function renderTaskPane(host, idx){
     ensurePos(block, task.blocks);
     task.blocks.push(block);
     selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
-    renderCanvas(); renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
-    // After mount, autofit height
+    ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
+    // After mount, autofit height to actual rendered content.
     requestAnimationFrame(() => {
       const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
       if(!card) return;
@@ -537,9 +216,17 @@ export function renderTaskPane(host, idx){
     });
   }
 
+  canvas.addEventListener('mousedown', e => {
+    if(e.target === canvas){
+      selectedBlockIds.clear(); persistSelection();
+      updateSelectionVisuals();
+      ctx.renderConfigPane();
+    }
+  });
+
   // ===== Helpers exposed to global keyboard handler via activeTaskCtx =====
   function nudgeSelected(dx, dy){
-    const sel = selectedBlocks(); if(sel.length === 0) return;
+    const sel = ctx.selectedBlocks(); if(sel.length === 0) return;
     sel.forEach(b => {
       b.pos.x = Math.max(0, Math.min(b.pos.x + dx, CANVAS_WIDTH - b.pos.w));
       b.pos.y = Math.max(0, b.pos.y + dy);
@@ -554,27 +241,27 @@ export function renderTaskPane(host, idx){
     task.blocks.forEach(b => selectedBlockIds.add(b.id));
     persistSelection();
     updateSelectionVisuals();
-    renderConfigPane();
+    ctx.renderConfigPane();
   }
   function deselectAll(){
     selectedBlockIds.clear(); persistSelection();
     updateSelectionVisuals();
-    renderConfigPane();
+    ctx.renderConfigPane();
   }
 
   activeTaskCtx = {
     task,
     get selectedIds(){ return Array.from(selectedBlockIds); },
     nudgeSelected,
-    bulkDelete,
-    bulkDuplicate,
+    bulkDelete: () => bulkDelete(ctx),
+    bulkDuplicate: () => bulkDuplicate(ctx),
     selectAll,
     deselectAll
   };
 
-  renderCanvas();
+  ctx.renderCanvas();
   adjustCanvasHeight();
-  renderConfigPane();
+  ctx.renderConfigPane();
 }
 
 // Clear the activeTaskCtx (called from panes when leaving a task)

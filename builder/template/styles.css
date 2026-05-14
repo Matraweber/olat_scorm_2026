@@ -29,6 +29,11 @@ body { font-family: var(--font); color: var(--text); background: linear-gradient
 .nav-link.active { background: rgba(161,216,132,0.75); border-color: rgba(161,216,132,0.95); color: var(--primary); }
 .nav-link.done::before { content: "\2713 "; color: var(--accent-dark); }
 .scorm-main { max-width: 1200px; width: 100%; margin: -1.3rem auto 0; padding: 0 1.2rem 1.5rem; }
+.progress-bar-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 1rem; margin: 0 0 1rem; box-shadow: var(--shadow); display: flex; align-items: center; gap: 1rem; }
+.progress-bar-track { flex: 1; height: 10px; background: var(--panel-soft); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%); border-radius: 999px; transition: width 0.35s ease; }
+.progress-bar-text { font-size: 0.85rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.progress-bar-text strong { color: var(--primary); }
 .hero-card, .section-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .hero-card { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.2rem; padding: 1.4rem; margin-bottom: 1.4rem; }
 .hero-card h2, .section-card h3, .note-title, .formula-title { color: var(--primary); }

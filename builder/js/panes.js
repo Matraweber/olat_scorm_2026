@@ -1,7 +1,7 @@
 // ============================================================================
-// panes.js - Sidebar (task list) + course + theme settings pane.
-// renderTaskPane lives in its own file because of its size; renderActivePane
-// dispatches to one of the three pane renderers.
+// panes.js - Sidebar (task list) + course + theme settings panes.
+// renderActivePaneImpl dispatches to course / theme / task-pane based on the
+// current selection. The task editor lives in task-pane.js + sibling modules.
 // ============================================================================
 import { el, toast } from './util.js';
 import { state, pushHistory, render, renderActivePane } from './state.js';
