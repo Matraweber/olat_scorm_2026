@@ -90,6 +90,76 @@
         bad(msg){ box.classList.remove('feedback-good'); box.classList.add('feedback-bad'); text.textContent = msg; },
         neutral(msg){ box.classList.remove('feedback-good','feedback-bad'); text.textContent = msg; }
       };
+    },
+    /**
+     * Standard question card layout used by numeric-input, number-base, and
+     * other "ask a question, accept a single text answer, check, regenerate"
+     * style blocks.
+     *
+     * opts: {
+     *   h3?: string              // section heading (default 'Aufgabe')
+     *   qBoxTitle?: string       // title of the formula-box (default 'Aufgabe')
+     *   inputLabel?: string      // label for the answer input (default 'Antwort')
+     *   inputPlaceholder?: string // placeholder for the answer input
+     * }
+     *
+     * Returns: { card, qText, inp, checkBtn, newBtn, fb }
+     *  - qText: the element to set the question text into
+     *  - inp:   the answer <input>
+     *  - checkBtn / newBtn: buttons (attach onclick handlers yourself)
+     *  - fb:    feedbackBox API { ok, bad, neutral }
+     *
+     * The card is appended to `host` automatically.
+     */
+    questionCard(host, opts){
+      opts = opts || {};
+      const card = document.createElement('section');
+      card.className = 'section-card block-question';
+      const h = document.createElement('h3');
+      h.textContent = opts.h3 || 'Aufgabe';
+      card.appendChild(h);
+
+      const qBox = document.createElement('div');
+      qBox.className = 'formula-box';
+      qBox.style.marginBottom = '1rem';
+      const qBoxTitle = document.createElement('div');
+      qBoxTitle.className = 'formula-title';
+      qBoxTitle.textContent = opts.qBoxTitle || 'Aufgabe';
+      qBox.appendChild(qBoxTitle);
+      const qText = document.createElement('div');
+      qText.className = 'formula-text';
+      qBox.appendChild(qText);
+      card.appendChild(qBox);
+
+      const grp = document.createElement('div');
+      grp.className = 'control-group control-group-compact';
+      const lbl = document.createElement('label');
+      lbl.textContent = opts.inputLabel || 'Antwort';
+      grp.appendChild(lbl);
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'text-input';
+      inp.placeholder = opts.inputPlaceholder || 'Antwort eingeben';
+      grp.appendChild(inp);
+      card.appendChild(grp);
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'button-cluster';
+      const checkBtn = document.createElement('button');
+      checkBtn.type = 'button';
+      checkBtn.className = 'btn btn-primary';
+      checkBtn.textContent = 'Korrektur';
+      const newBtn = document.createElement('button');
+      newBtn.type = 'button';
+      newBtn.className = 'btn btn-secondary';
+      newBtn.textContent = 'Neu generieren';
+      btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
+      card.appendChild(btnRow);
+
+      const fb = utils.feedbackBox(card);
+      host.appendChild(card);
+
+      return { card, qText, inp, checkBtn, newBtn, fb };
     }
   };
 

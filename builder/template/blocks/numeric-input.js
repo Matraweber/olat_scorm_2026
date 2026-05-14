@@ -39,30 +39,13 @@
       const u = api.utils;
       let current = null;
 
-      const card = document.createElement('section');
-      card.className = 'section-card block-question';
-      card.innerHTML = '<h3>Aufgabe</h3>';
-      const qBox = document.createElement('div'); qBox.className = 'formula-box';
-      qBox.style.marginBottom = '1rem';
-      qBox.innerHTML = '<div class="formula-title">Frage</div>';
-      const qText = document.createElement('div'); qText.className = 'formula-text';
-      qBox.appendChild(qText);
-      card.appendChild(qBox);
-
-      const grp = document.createElement('div'); grp.className = 'control-group control-group-compact';
-      grp.appendChild(Object.assign(document.createElement('label'), {textContent: 'Antwort' + (config.unit ? ' (' + config.unit + ')' : '')}));
-      const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'text-input'; inp.placeholder = 'Zahl eingeben';
-      grp.appendChild(inp);
-      card.appendChild(grp);
-
-      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
-      const checkBtn = document.createElement('button'); checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
-      const newBtn = document.createElement('button'); newBtn.type = 'button'; newBtn.className = 'btn btn-secondary'; newBtn.textContent = 'Neu generieren';
-      btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
-      card.appendChild(btnRow);
-
-      const fb = u.feedbackBox(card);
-      host.appendChild(card);
+      const ui = u.questionCard(host, {
+        h3: 'Aufgabe',
+        qBoxTitle: 'Frage',
+        inputLabel: 'Antwort' + (config.unit ? ' (' + config.unit + ')' : ''),
+        inputPlaceholder: 'Zahl eingeben'
+      });
+      const { qText, inp, checkBtn, newBtn, fb } = ui;
 
       function genVars(){
         const vars = {};

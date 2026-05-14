@@ -58,28 +58,52 @@
       overlay.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
       stage.appendChild(overlay);
 
-      // clicks made by user
-      const clicks = []; // {x, y} in normalized coords
+      // clicks made by user - each entry: {x, y, dot}
+      const clicks = [];
+      const maxClicks = (config.zones || []).length;
+
+      // Small counter under the image
+      const counter = document.createElement('div');
+      counter.style.cssText = 'font-size:0.82rem; color:var(--muted); margin:0.4rem 0 0.2rem;';
+      function updateCounter(){
+        counter.textContent = clicks.length + ' / ' + maxClicks + ' Markierungen gesetzt';
+        // Visually indicate when max is reached
+        stage.style.cursor = (clicks.length >= maxClicks) ? 'not-allowed' : 'crosshair';
+      }
 
       stage.addEventListener('click', e => {
         if(stage.dataset.locked === '1') return;
+        if(maxClicks === 0) return;
+        if(clicks.length >= maxClicks) return;
         const r = stage.getBoundingClientRect();
         const x = (e.clientX - r.left) / r.width;
         const y = (e.clientY - r.top)  / r.height;
-        clicks.push({x, y});
-        drawClick(x, y);
+        const dot = drawClick(x, y);
+        clicks.push({x, y, dot});
+        updateCounter();
       });
 
       function drawClick(x, y){
         const dot = document.createElement('div');
         dot.className = 'hotzone-click';
-        dot.style.cssText = 'position:absolute; width:18px; height:18px; border-radius:50%; background:rgba(21,101,255,0.7); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); transform:translate(-50%,-50%); pointer-events:none;';
+        // pointer-events:auto so the dot itself can capture clicks for removal
+        dot.style.cssText = 'position:absolute; width:18px; height:18px; border-radius:50%; background:rgba(21,101,255,0.7); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer;';
         dot.style.left = (x * 100) + '%';
         dot.style.top  = (y * 100) + '%';
+        dot.title = 'Klicken zum Entfernen';
+        dot.addEventListener('click', ev => {
+          if(stage.dataset.locked === '1') return;
+          ev.stopPropagation(); // don't let it create a new dot
+          const idx = clicks.findIndex(c => c.dot === dot);
+          if(idx >= 0){ clicks.splice(idx, 1); dot.remove(); updateCounter(); }
+        });
         overlay.appendChild(dot);
+        return dot;
       }
 
       card.appendChild(stage);
+      card.appendChild(counter);
+      updateCounter();
 
       const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
       const checkBtn = document.createElement('button'); checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
@@ -136,7 +160,7 @@
         clicks.length = 0;
         overlay.innerHTML = '';
         stage.dataset.locked = '';
-        stage.style.cursor = 'crosshair';
+        updateCounter();
         fb.neutral('Zurückgesetzt. Klicke neu.');
       }
       checkBtn.addEventListener('click', grade);

@@ -41,26 +41,8 @@
       const baseRadix  = {bin:2, oct:8, dec:10, hex:16};
       let current = null;
 
-      const card = document.createElement('section'); card.className = 'section-card block-question';
-      card.appendChild(Object.assign(document.createElement('h3'), {textContent:'Aufgabe'}));
-      const qBox = document.createElement('div'); qBox.className = 'formula-box'; qBox.style.marginBottom = '1rem';
-      qBox.innerHTML = '<div class="formula-title">Aufgabe</div>';
-      const qText = document.createElement('div'); qText.className = 'formula-text';
-      qBox.appendChild(qText); card.appendChild(qBox);
-
-      const grp = document.createElement('div'); grp.className = 'control-group control-group-compact';
-      grp.appendChild(Object.assign(document.createElement('label'), {textContent:'Antwort'}));
-      const inp = document.createElement('input'); inp.type='text'; inp.className='text-input'; inp.placeholder='Antwort eingeben';
-      grp.appendChild(inp); card.appendChild(grp);
-
-      const btnRow = document.createElement('div'); btnRow.className='button-cluster';
-      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
-      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
-      btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
-      card.appendChild(btnRow);
-
-      const fb = u.feedbackBox(card);
-      host.appendChild(card);
+      const ui = u.questionCard(host, { h3:'Aufgabe', qBoxTitle:'Aufgabe', inputLabel:'Antwort', inputPlaceholder:'Antwort eingeben' });
+      const { qText, inp, checkBtn, newBtn, fb } = ui;
 
       function chooseNew(showMsg){
         const directions = config.directions && config.directions.length ? config.directions : [{from:'dec', to:'bin'}];

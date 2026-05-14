@@ -1,0 +1,140 @@
+// ============================================================================
+// state.js - Global app state, defaults, history (undo/redo), clipboard.
+// `render` and `renderActivePane` are set by main.js to break circular imports.
+// ============================================================================
+import { toast } from './util.js';
+
+export function defaultCourse(){
+  return { courseTitle: 'Neue SCORM-Lerneinheit', courseSubtitle: '', passThreshold: 0.5, tasks: [] };
+}
+export function defaultTheme(){
+  return {
+    primaryColor: '#003b5c', primaryLight: '#0f567d',
+    accentColor: '#a1d884', accentDarkColor: '#84bf66',
+    fontFamily: 'Verdana, Arial, sans-serif',
+    kicker: 'Umwelt-Campus Birkenfeld | Hochschule Trier',
+    footerText: 'Dr.-Ing. Lukas Lentz',
+    footerLink: 'https://www.umwelt-campus.de/dr-lukas-lentz',
+    logoUrl: 'default-logo.svg', logoDataUrl: null
+  };
+}
+
+export const state = {
+  course: defaultCourse(),
+  theme: defaultTheme(),
+  selected: { kind: 'course' },  // {kind:'course'|'theme'} or {kind:'task', idx}
+  jsonMode: false,
+  userTemplates: []
+};
+
+// ---- Render dispatchers (set up by main.js via setRenderer) ----
+// Stubs ensure modules can call render() at module-load time without throwing.
+let _render = () => {};
+let _renderActivePane = () => {};
+export function setRenderer(renderFn, renderActivePaneFn){
+  _render = renderFn;
+  _renderActivePane = renderActivePaneFn;
+}
+export function render(){ _render(); }
+export function renderActivePane(){ _renderActivePane(); }
+
+// ============================================================================
+// History (undo / redo)
+// ============================================================================
+const history = { past: [], future: [] };
+const HISTORY_LIMIT = 50;
+function snapshotState(){ return JSON.stringify({course: state.course, theme: state.theme}); }
+function applySnapshot(snap){
+  try {
+    const o = JSON.parse(snap);
+    if(o.course) state.course = o.course;
+    if(o.theme) state.theme = o.theme;
+    if(state.selected.kind === 'task' && state.selected.idx >= state.course.tasks.length){
+      state.selected = state.course.tasks.length > 0 ? {kind:'task', idx:0} : {kind:'course'};
+    }
+    render();
+  } catch(e){ toast('Rückgängig fehlgeschlagen: ' + e.message, 'error'); }
+}
+export function pushHistory(){
+  history.past.push(snapshotState());
+  if(history.past.length > HISTORY_LIMIT) history.past.shift();
+  history.future = [];
+}
+
+let _pendingHistorySnap = null;
+export function takeHistorySnap(){ _pendingHistorySnap = snapshotState(); }
+export function commitHistorySnap(){
+  if(_pendingHistorySnap == null) return;
+  history.past.push(_pendingHistorySnap);
+  if(history.past.length > HISTORY_LIMIT) history.past.shift();
+  history.future = [];
+  _pendingHistorySnap = null;
+}
+export function discardHistorySnap(){ _pendingHistorySnap = null; }
+
+let _debounceTimer = null;
+export function pushHistoryDebounced(){
+  if(_pendingHistorySnap == null) takeHistorySnap();
+  clearTimeout(_debounceTimer);
+  _debounceTimer = setTimeout(() => { commitHistorySnap(); _debounceTimer = null; }, 700);
+}
+
+export function undo(){
+  if(history.past.length === 0){ toast('Nichts zum Rückgängigmachen.'); return; }
+  history.future.push(snapshotState());
+  applySnapshot(history.past.pop());
+  toast('Rückgängig');
+}
+export function redo(){
+  if(history.future.length === 0){ toast('Nichts zum Wiederherstellen.'); return; }
+  history.past.push(snapshotState());
+  applySnapshot(history.future.pop());
+  toast('Wiederherstellen');
+}
+
+// ============================================================================
+// Clipboard (blocks, persisted via localStorage)
+// ============================================================================
+const CLIPBOARD_KEY = 'scorm-builder-clipboard';
+function clipboardPut(payload){ try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(payload)); } catch(e){} }
+function clipboardGet(){
+  try { const raw = localStorage.getItem(CLIPBOARD_KEY); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+
+export function copySelectedBlocks(){
+  if(state.selected.kind !== 'task') return false;
+  const task = state.course.tasks[state.selected.idx];
+  if(!task) return false;
+  const selectedIds = Array.isArray(task._uiSelectedBlockIds) ? task._uiSelectedBlockIds : [];
+  const blocks = (task.blocks || []).filter(b => selectedIds.includes(b.id));
+  if(blocks.length === 0) return false;
+  clipboardPut({ kind: 'blocks', data: blocks.map(b => JSON.parse(JSON.stringify(b))) });
+  toast(blocks.length + ' Block' + (blocks.length === 1 ? '' : 'e') + ' kopiert.');
+  return true;
+}
+
+import { uid as uidGen } from './util.js';
+
+export function pasteBlocks(){
+  if(state.selected.kind !== 'task') return false;
+  const task = state.course.tasks[state.selected.idx];
+  if(!task) return false;
+  const payload = clipboardGet();
+  if(!payload || payload.kind !== 'blocks' || !Array.isArray(payload.data)) {
+    toast('Zwischenablage ist leer.'); return false;
+  }
+  pushHistory();
+  const newIds = [];
+  payload.data.forEach(b => {
+    const copy = JSON.parse(JSON.stringify(b));
+    copy.id = uidGen('b_');
+    if(copy.pos){ copy.pos = Object.assign({}, copy.pos, { x: (copy.pos.x || 20) + 24, y: (copy.pos.y || 20) + 24 }); }
+    task.blocks.push(copy);
+    newIds.push(copy.id);
+  });
+  task._uiSelectedBlockIds = newIds;
+  render();
+  toast(payload.data.length + ' Block' + (payload.data.length === 1 ? '' : 'e') + ' eingefügt.');
+  return true;
+}
