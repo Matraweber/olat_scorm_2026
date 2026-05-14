@@ -73,14 +73,10 @@
       return {};
     },
     preview(host, config){
+      const u = window.BlockUtils;
       const baseLabels = {bin:'Binär (₂)', oct:'Oktal (₈)', dec:'Dezimal (₁₀)', hex:'Hex (₁₆)'};
       const baseRadix = {bin:2, oct:8, dec:10, hex:16};
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.85rem; height:100%; overflow:hidden;';
-      const tag = document.createElement('div');
-      tag.textContent = '0x  Zahlensystem-Umrechnung';
-      tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.4rem;';
-      wrap.appendChild(tag);
+      const wrap = u.tagPreview(host, { icon:'0x', label:'Zahlensystem-Umrechnung', fillHeight:true });
       // Show example
       const dirs = config.directions || [{from:'dec', to:'bin'}];
       const dir = dirs[0];
@@ -97,7 +93,6 @@
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872; margin-top:0.3rem;';
       hint.textContent = (config.directions || []).length + ' Richtung(en) im Pool, Werte ' + min + ' bis ' + max;
       wrap.appendChild(hint);
-      host.appendChild(wrap);
     }
   });
 })();

@@ -160,6 +160,70 @@
       host.appendChild(card);
 
       return { card, qText, inp, checkBtn, newBtn, fb };
+    },
+    /**
+     * Simpler question-card layout used by blocks where the answer area is
+     * not a single text input (multiple-choice, sort-list, text-input, hotzone).
+     * Builds: section.section-card.block-question > h3 > [p with question] > content > button-cluster > feedback-box
+     *
+     * opts: {
+     *   title?: string         // h3 text (default 'Frage')
+     *   question?: string      // textual question; rendered into a <p>
+     *   questionHtml?: string  // HTML question; rendered into a <p> (overrides question)
+     * }
+     * Returns: { card, content, buttons, fb }
+     *   content: empty <div> placeholder where caller appends block-specific UI
+     *   buttons: <div class="button-cluster"> for caller to append <button>s
+     *   fb:      feedbackBox API
+     */
+    simpleQuestionCard(host, opts){
+      opts = opts || {};
+      const card = document.createElement('section');
+      card.className = 'section-card block-question';
+      const h = document.createElement('h3');
+      h.textContent = opts.title || 'Frage';
+      card.appendChild(h);
+      if(opts.questionHtml != null || opts.question != null){
+        const p = document.createElement('p');
+        if(opts.questionHtml != null) p.innerHTML = opts.questionHtml;
+        else p.textContent = opts.question || '';
+        card.appendChild(p);
+      }
+      const content = document.createElement('div');
+      content.className = 'block-content';
+      card.appendChild(content);
+      const buttons = document.createElement('div');
+      buttons.className = 'button-cluster';
+      card.appendChild(buttons);
+      const fb = utils.feedbackBox(card);
+      host.appendChild(card);
+      return { card, content, buttons, fb };
+    },
+    /**
+     * Standard preview wrapper used in the builder canvas: a small padded div
+     * with an optional green tag (icon + label) at the top. Caller appends
+     * block-specific content to the returned wrap.
+     *
+     * opts: {
+     *   icon?: string        // short icon string, e.g. '#', '↕', '⇄'
+     *   label?: string       // label text after the icon
+     *   fillHeight?: boolean // set height:100%; overflow:hidden on wrap
+     * }
+     * Returns: the wrap element (also the body - caller appends content to it).
+     */
+    tagPreview(host, opts){
+      opts = opts || {};
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.85rem;' +
+        (opts.fillHeight ? ' height:100%; overflow:hidden;' : '');
+      if(opts.icon || opts.label){
+        const tag = document.createElement('div');
+        tag.textContent = [opts.icon, opts.label].filter(Boolean).join('  ');
+        tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.4rem;';
+        wrap.appendChild(tag);
+      }
+      host.appendChild(wrap);
+      return wrap;
     }
   };
 

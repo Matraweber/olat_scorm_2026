@@ -115,12 +115,10 @@
       return {};
     },
     preview(host, config){
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.88rem; line-height:1.7;';
-      const tag = document.createElement('div');
-      tag.textContent = '___  Lückentext';
-      tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.4rem;';
-      wrap.appendChild(tag);
+      const u = window.BlockUtils;
+      const wrap = u.tagPreview(host, { icon:'___', label:'Lückentext' });
+      wrap.style.lineHeight = '1.7';
+      wrap.style.fontSize = '0.88rem';
       let html = String(config.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).replace(/\n/g, '<br>');
       html = html.replace(/\{\{([^}]*)\}\}/g, (m, body) => {
         if(body.trim().startsWith('=')){
@@ -130,7 +128,6 @@
       });
       const body = document.createElement('div'); body.innerHTML = html;
       wrap.appendChild(body);
-      host.appendChild(wrap);
     }
   });
 

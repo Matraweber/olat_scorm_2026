@@ -32,10 +32,8 @@
         [order[i], order[j]] = [order[j], order[i]];
       }
 
-      const card = document.createElement('section');
-      card.className = 'section-card block-question';
-      card.innerHTML = '<h3>Sortieren</h3>';
-      const q = document.createElement('p'); q.textContent = config.question || ''; card.appendChild(q);
+      const ui = u.simpleQuestionCard(host, { title:'Sortieren', question: config.question || '' });
+      const { content, buttons, fb } = ui;
 
       const list = document.createElement('div');
       list.style.cssText = 'display:flex; flex-direction:column; gap:0.5rem; margin:0.6rem 0;';
@@ -71,15 +69,10 @@
           list.appendChild(item);
         });
       }
-      card.appendChild(list);
+      content.appendChild(list);
 
-      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster'; 
       const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
-      btnRow.appendChild(checkBtn);
-      card.appendChild(btnRow);
-
-      const fb = u.feedbackBox(card);
-      host.appendChild(card);
+      buttons.appendChild(checkBtn);
 
       checkBtn.addEventListener('click', () => {
         let correctCount = 0;
@@ -106,12 +99,8 @@
       return {};
     },
     preview(host, config){
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.85rem; height:100%; overflow:hidden;';
-      const tag = document.createElement('div');
-      tag.textContent = '↕  Sortieren (D&D)';
-      tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.4rem;';
-      wrap.appendChild(tag);
+      const u = window.BlockUtils;
+      const wrap = u.tagPreview(host, { icon:'↕', label:'Sortieren (D&D)', fillHeight:true });
       if(config.question){
         const q = document.createElement('div'); q.textContent = config.question;
         q.style.cssText = 'color:#003b5c; font-weight:700; margin-bottom:0.4rem; font-size:0.82rem;';
@@ -129,7 +118,6 @@
         const m = document.createElement('div'); m.textContent = '… +' + (config.items.length - 5) + ' weitere'; m.style.cssText = 'color:#888; font-size:0.78rem; padding-left:1rem; font-style:italic;';
         wrap.appendChild(m);
       }
-      host.appendChild(wrap);
     }
   });
 })();

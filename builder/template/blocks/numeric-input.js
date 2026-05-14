@@ -95,12 +95,8 @@
       return {};
     },
     preview(host, config){
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.85rem;';
-      const tag = document.createElement('div');
-      tag.textContent = '#  Numerische Eingabe';
-      tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.3rem;';
-      wrap.appendChild(tag);
+      const u = window.BlockUtils;
+      const wrap = u.tagPreview(host, { icon:'#', label:'Numerische Eingabe' });
       const q = document.createElement('div');
       q.style.cssText = 'color:#0f2d44; margin-bottom:0.5rem; font-family:"Courier New",monospace; line-height:1.4;';
       q.textContent = config.questionTemplate || '(Aufgabe)';
@@ -115,7 +111,6 @@
       inp.style.cssText = 'border:1px solid #c6d1d8; border-radius:6px; padding:0.4rem 0.6rem; background:#f5f8fa; color:#888; font-size:0.8rem;';
       inp.textContent = '⏤ Zahl eingeben';
       wrap.appendChild(inp);
-      host.appendChild(wrap);
     }
   });
 })();

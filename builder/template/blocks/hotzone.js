@@ -26,23 +26,14 @@
       ];
     },
     mount(host, config, api){
-      const card = document.createElement('section');
-      card.className = 'section-card block-question';
-      const h = document.createElement('h3'); h.textContent = 'Aufgabe'; card.appendChild(h);
-
-      if(config.prompt){
-        const p = document.createElement('p');
-        p.textContent = config.prompt;
-        p.style.marginBottom = '0.8rem';
-        card.appendChild(p);
-      }
+      const ui = api.utils.simpleQuestionCard(host, { title:'Aufgabe', question: config.prompt || '' });
+      const { content, buttons, fb } = ui;
 
       if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'padding:2rem; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:8px;';
         ph.textContent = '(Kein Bild gesetzt)';
-        card.appendChild(ph);
-        host.appendChild(card);
+        content.appendChild(ph);
         return {};
       }
 
@@ -101,18 +92,13 @@
         return dot;
       }
 
-      card.appendChild(stage);
-      card.appendChild(counter);
+      content.appendChild(stage);
+      content.appendChild(counter);
       updateCounter();
 
-      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
       const checkBtn = document.createElement('button'); checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
       const resetBtn = document.createElement('button'); resetBtn.type = 'button'; resetBtn.className = 'btn btn-secondary'; resetBtn.textContent = 'Zurücksetzen';
-      btnRow.appendChild(checkBtn); btnRow.appendChild(resetBtn);
-      card.appendChild(btnRow);
-
-      const fb = api.utils.feedbackBox(card);
-      host.appendChild(card);
+      buttons.appendChild(checkBtn); buttons.appendChild(resetBtn);
 
       function pointInZone(p, z){
         return p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h;

@@ -32,27 +32,18 @@
       ];
     },
     mount(host, config, api){
-      const card = document.createElement('section');
-      card.className = 'section-card block-question';
-      card.innerHTML = '<h3>Frage</h3><p class="question-text"></p>';
-      card.querySelector('.question-text').textContent = config.question || '';
+      const ui = api.utils.simpleQuestionCard(host, { title:'Frage', question: config.question || '' });
+      const { content, buttons, fb } = ui;
 
       const inp = document.createElement('input');
       inp.type = 'text'; inp.className = 'text-input';
       inp.placeholder = 'Antwort eingeben';
-      card.appendChild(inp);
+      content.appendChild(inp);
 
-      const btnRow = document.createElement('div');
-      btnRow.className = 'button-cluster';
-      
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
       checkBtn.textContent = 'Korrektur';
-      btnRow.appendChild(checkBtn);
-      card.appendChild(btnRow);
-
-      const fb = api.utils.feedbackBox(card);
-      host.appendChild(card);
+      buttons.appendChild(checkBtn);
 
       function check(){
         const got = String(inp.value || '');
@@ -102,12 +93,8 @@
       return {};
     },
     preview(host, config){
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.85rem;';
-      const tag = document.createElement('div');
-      tag.textContent = '✎  Text-Eingabe';
-      tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.3rem;';
-      wrap.appendChild(tag);
+      const u = window.BlockUtils;
+      const wrap = u.tagPreview(host, { icon:'✎', label:'Text-Eingabe' });
       const q = document.createElement('div');
       q.style.cssText = 'font-weight:700; color:#003b5c; margin-bottom:0.4rem; line-height:1.3;';
       q.textContent = config.question || '(Frage)';
@@ -122,7 +109,6 @@
       inp.style.cssText = 'border:1px solid #c6d1d8; border-radius:6px; padding:0.4rem 0.6rem; background:#f5f8fa; color:#888;';
       inp.textContent = '⏤ Antwort eingeben';
       wrap.appendChild(inp);
-      host.appendChild(wrap);
     }
   });
 })();

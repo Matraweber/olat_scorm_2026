@@ -134,12 +134,8 @@
       return {};
     },
     preview(host, config){
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'padding:0.55rem 0.75rem; font-size:0.85rem; height:100%; overflow:hidden;';
-      const tag = document.createElement('div');
-      tag.textContent = '01  Wahrheitstabelle';
-      tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.4rem;';
-      wrap.appendChild(tag);
+      const u = window.BlockUtils;
+      const wrap = u.tagPreview(host, { icon:'01', label:'Wahrheitstabelle', fillHeight:true });
       const expr = ((config.expressions || [])[0] || {}).expr || 'a && b';
       const ex = document.createElement('div');
       ex.style.cssText = 'font-family:"Courier New",monospace; padding:0.3rem 0.6rem; background:#f5f8fa; border:1px solid #d8e0e6; border-radius:6px; color:#003b5c; font-weight:700; margin-bottom:0.4rem;';
@@ -166,7 +162,6 @@
         tr.appendChild(t2); tbl.appendChild(tr);
       }
       wrap.appendChild(tbl);
-      host.appendChild(wrap);
     }
   });
 })();

@@ -39,12 +39,8 @@
       ];
     },
     mount(host, config, api){
-      const card = document.createElement('section');
-      card.className = 'section-card block-question';
-      card.innerHTML = '<h3>Frage</h3>';
-      const qEl = document.createElement('p');
-      qEl.textContent = config.question || '';
-      card.appendChild(qEl);
+      const ui = api.utils.simpleQuestionCard(host, { title:'Frage', question: config.question || '' });
+      const { content, buttons, fb } = ui;
 
       const list = document.createElement('div'); list.className = 'choice-list';
       const choices = (config.choices || []).slice();
@@ -68,17 +64,11 @@
         list.appendChild(lbl);
         inputs.push({input: inp, correct: !!c.correct});
       });
-      card.appendChild(list);
+      content.appendChild(list);
 
-      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
-      
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
-      btnRow.appendChild(checkBtn);
-      card.appendChild(btnRow);
-
-      const fb = api.utils.feedbackBox(card);
-      host.appendChild(card);
+      buttons.appendChild(checkBtn);
 
       checkBtn.addEventListener('click', () => {
         const checked = inputs.filter(i => i.input.checked);
