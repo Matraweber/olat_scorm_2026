@@ -203,9 +203,31 @@ export function renderField(spec, getObj, setObj){
     input.value = cur != null ? String(cur) : ((spec.options && spec.options[0] && spec.options[0].value) || '');
     input.addEventListener('change', () => setObj(spec.key, input.value));
   } else if(spec.type === 'color'){
-    input = el('input', {attrs:{type:'color'}});
-    input.value = obj[spec.key] || '#000000';
-    input.addEventListener('input', () => setObj(spec.key, input.value));
+    // Native color swatch (shows a colour wheel on macOS/Chrome and a flat
+    // panel on Windows) paired with a hex-text field. Both stay in sync so
+    // power-users can type a hex value while casual users use the swatch.
+    const cfWrap = el('div', {className:'color-field'});
+    const swatch = el('input', {className:'color-field-swatch', attrs:{type:'color'}});
+    const hexInp = el('input', {className:'color-field-hex', attrs:{type:'text', maxlength:'7', spellcheck:'false', placeholder:'#RRGGBB'}});
+    const initial = (obj[spec.key] && /^#[0-9A-Fa-f]{6}$/.test(obj[spec.key])) ? obj[spec.key] : '#000000';
+    swatch.value = initial;
+    hexInp.value = initial;
+    swatch.addEventListener('input', () => {
+      hexInp.value = swatch.value;
+      setObj(spec.key, swatch.value);
+    });
+    hexInp.addEventListener('input', () => {
+      let v = hexInp.value.trim();
+      if(v && !v.startsWith('#')) v = '#' + v;
+      if(/^#[0-9A-Fa-f]{6}$/.test(v)){
+        swatch.value = v;
+        setObj(spec.key, v);
+      }
+    });
+    cfWrap.appendChild(swatch);
+    cfWrap.appendChild(hexInp);
+    wrap.appendChild(cfWrap);
+    return wrap;
   } else if(spec.type === 'image'){
     return renderImageField(spec, getObj, setObj, wrap);
   } else if(spec.type === 'math-textarea') {

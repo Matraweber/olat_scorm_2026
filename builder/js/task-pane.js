@@ -227,6 +227,14 @@ export function renderTaskPane(host, idx){
     }
   });
 
+  // When an interactive in-canvas editor (e.g. Komposition's drag-to-move)
+  // mutates a block's config, refresh the right-side config pane so any
+  // numerical fields stay in sync with what the user just drew.
+  canvas.addEventListener('block-config-changed', () => {
+    ctx.renderConfigPane();
+    adjustCanvasHeight();
+  });
+
   // ===== Helpers exposed to global keyboard handler via activeTaskCtx =====
   function nudgeSelected(dx, dy){
     const sel = ctx.selectedBlocks(); if(sel.length === 0) return;

@@ -24,8 +24,10 @@ export const BLOCK_FILES = {
   'function-question': 'function-question.js',
   'vector-question':   'vector-question.js',
   'number-base':       'number-base.js',
+  'unit-convert':      'unit-convert.js',
   'truth-table':       'truth-table.js',
-  'function-sandbox':  'function-sandbox.js'
+  'function-sandbox':  'function-sandbox.js',
+  'composition':       'composition.js'
 };
 
 export function usedBlockTypes(){
@@ -60,7 +62,8 @@ const BLOCK_DEFAULT_SIZES = {
   'vector-question':   {w: 1080, h: 720},
   'number-base':       {w: 700, h: 360},
   'truth-table':       {w: 700, h: 520},
-  'function-sandbox':  {w: 1080, h: 580}
+  'function-sandbox':  {w: 1080, h: 580},
+  'composition':       {w: 700, h: 460}
 };
 export function defaultSizeFor(type){ return BLOCK_DEFAULT_SIZES[type] || {w: 500, h: 200}; }
 

@@ -104,15 +104,30 @@ function renderSingleBlockPane(ctx, sel){
 
   if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
 
-  // Reset handler: fired by type:'action' buttons with action:'reset'
+  // Action handler: dispatched by `type:'action'` buttons in builderSchema().
+  // Currently understood actions:
+  //   reset             - restore the block's defaultConfig()
+  //   add-shape:<type>  - push a fresh shape of <type> onto sel.config.shapes
+  //                       (block must expose def.newShape(type))
   const prevHandler = configHost._blockActionHandler;
   if(prevHandler) configHost.removeEventListener('block-field-action', prevHandler);
   const actionHandler = e => {
-    if(e.detail && e.detail.action === 'reset'){
+    const action = e.detail && e.detail.action;
+    if(!action) return;
+    if(action === 'reset'){
       sel.config = def.defaultConfig ? def.defaultConfig() : {};
       pushHistoryDebounced();
       ctx.scheduleBlockPreviewRefresh(sel);
       renderTaskList();
+      renderConfigPane(ctx);
+      return;
+    }
+    if(action.indexOf('add-shape:') === 0 && typeof def.newShape === 'function'){
+      const shapeType = action.slice('add-shape:'.length);
+      sel.config.shapes = Array.isArray(sel.config.shapes) ? sel.config.shapes : [];
+      sel.config.shapes.push(def.newShape(shapeType));
+      pushHistoryDebounced();
+      ctx.scheduleBlockPreviewRefresh(sel);
       renderConfigPane(ctx);
     }
   };

@@ -50,12 +50,43 @@ function makeStubApi(block){
   };
 }
 
+// API passed to builderMount() for blocks that opt into in-canvas editing.
+// The block mutates `block.config` directly and calls `requestConfigRefresh`
+// to ask the right-side config pane to re-render. `stopBlockSelection` is
+// called on internal pointer events so they don't trigger the card-level
+// drag/select handler in task-pane-canvas.js.
+function makeBuilderApi(block, host){
+  return {
+    utils: window.BlockUtils,
+    blockId: 'edit_' + String(block.id || '').replace(/[^A-Za-z0-9_]/g, ''),
+    requestConfigRefresh(){
+      host.dispatchEvent(new CustomEvent('block-config-changed', {
+        bubbles: true,
+        detail: { blockId: block.id }
+      }));
+    }
+  };
+}
+
 export function renderBlockPreview(host, block){
   host.innerHTML = '';
   const def = window.Blocks.get(block.type);
 
-  // Preferred: real runtime mount() inside an isolated shadow DOM so the
-  // canvas matches the preview exactly.
+  // Blocks that opt into interactive in-canvas editing register a
+  // `builderMount(host, block, api)` method. Rendered in regular DOM so
+  // drag/click work without pointer-events tricks.
+  if(def && typeof def.builderMount === 'function' && window.BlockUtils){
+    try {
+      def.builderMount(host, block, makeBuilderApi(block, host));
+      return;
+    } catch(e){
+      host.innerHTML = '';
+      // Fall through to the standard mount() path on error.
+    }
+  }
+
+  // Standard path: real runtime mount() inside an isolated shadow DOM so the
+  // canvas matches the SCORM preview exactly.
   if(def && typeof def.mount === 'function' && window.BlockUtils){
     try {
       const shadowHost = document.createElement('div');
