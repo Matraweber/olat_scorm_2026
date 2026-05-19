@@ -1,5 +1,5 @@
 // ============================================================================
-// tasks.js - Task data manipulation: migration, tab helpers, validation,
+// tasks.js: Task data manipulation: migration, tab helpers, validation,
 //            template management (built-in & user-defined).
 // ============================================================================
 import { state } from './state.js';
@@ -38,6 +38,9 @@ export function cleanTaskForExport(task){
   // Strip UI-only fields and avoid double-serializing task.blocks when tabs exist
   const copy = JSON.parse(JSON.stringify(task));
   delete copy._uiSelectedBlockIds; delete copy._uiZoom; delete copy._uiActiveTab;
+  const stripFlags = (arr) => (arr || []).forEach(b => { delete b._needsAutofit; });
+  stripFlags(copy.blocks);
+  if(copy.tabs) copy.tabs.forEach(t => stripFlags(t.blocks));
   if(hasTabs(copy)){
     delete copy.blocks; // alias would otherwise duplicate tabs[0].blocks
   }
@@ -78,16 +81,19 @@ export function validateBlock(block){
   const cfg = block.config || {};
   switch(block.type){
     case 'multiple-choice':
+      if(cfg.preset && cfg.preset !== 'custom') break;
       if(!cfg.question || !String(cfg.question).trim()) warnings.push('Frage ist leer.');
       if(!Array.isArray(cfg.choices) || cfg.choices.length < 2) warnings.push('Mindestens zwei Antwortmöglichkeiten erforderlich.');
       else if(!cfg.choices.some(c => c.correct)) warnings.push('Keine richtige Antwort markiert.');
       else if(cfg.choices.every(c => c.correct)) warnings.push('Alle Antworten als richtig markiert.');
       break;
     case 'match-pairs':
+      if(cfg.preset && cfg.preset !== 'custom') break;
       if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) warnings.push('Mindestens zwei Paare erforderlich.');
       else if(cfg.pairs.some(p => !p.left || !p.right)) warnings.push('Mindestens ein Paar hat eine leere Seite.');
       break;
     case 'numeric-input':
+      if(cfg.preset && cfg.preset !== 'custom') break;
       if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) warnings.push('Frage-Vorlage fehlt.');
       if(!cfg.formula || !String(cfg.formula).trim()) warnings.push('Lösungsformel fehlt.');
       break;
@@ -100,9 +106,12 @@ export function validateBlock(block){
       if(cfg.src && !cfg.alt) warnings.push('Alt-Text fehlt (Barrierefreiheit).');
       break;
     case 'cloze':
+      if(cfg.preset && cfg.preset !== 'custom') break;
       if(!cfg.text || !String(cfg.text).includes('{{')) warnings.push('Keine Lücken im Text ({{Antwort}}).');
       break;
     case 'truth-table':
+      if(cfg.expressionPreset && cfg.expressionPreset !== 'custom') break;
+      if(!cfg.expressionPreset && (!Array.isArray(cfg.expressions) || cfg.expressions.length === 0)) break;
       if(!Array.isArray(cfg.expressions) || cfg.expressions.length === 0 || cfg.expressions.every(e => !e.expr)) warnings.push('Keine booleschen Ausdrücke definiert.');
       break;
   }

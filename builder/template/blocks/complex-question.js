@@ -8,10 +8,12 @@
     graded: true,
     defaultConfig(){
       return {
+        blockTitle: '',
         pool: [
           {a:1,b:1}, {a:2,b:0}, {a:0,b:2}, {a:-1,b:1}, {a:2,b:-1},
           {a:-2,b:2}, {a:-2,b:-1}, {a:1,b:-2}, {a:3,b:0}, {a:0,b:-3}
         ],
+        questionMode: 'all',
         randomize: true,
         fields: { real: true, imag: true, abs: true, arg: true },
         tolerances: { real: 0.01, imag: 0.01, abs: 0.06, arg: 0.06 },
@@ -21,37 +23,58 @@
     },
     builderSchema(){
       return [
-        { key:'pool', label:'Aufgaben-Pool (z = a + bi)', type:'list', itemLabel:'Punkt',
+        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Komplexe Zahlen' },
+        // Aufgaben-Pool
+        { key:'pool', label:'Aufgaben-Pool  (z = a + bi)', type:'list', itemLabel:'Punkt',
+          itemSummary: item => {
+            const a = item.a ?? 0, b = item.b ?? 0;
+            const bStr = b >= 0 ? '+ ' + b + 'i' : '− ' + Math.abs(b) + 'i';
+            return 'z = ' + a + '  ' + bStr;
+          },
           itemSchema:[
-            { key:'a', label:'Re(z)', type:'number', step:'any' },
-            { key:'b', label:'Im(z)', type:'number', step:'any' }
+            { key:'a', label:'Re(z)  =  a', type:'number', step:'any' },
+            { key:'b', label:'Im(z)  =  b', type:'number', step:'any' }
           ]},
         { key:'randomize', label:'Zufällig wählen', type:'boolean' },
-        { key:'fields', label:'Abgefragte Felder', type:'group', schema:[
-          { key:'real', label:'Re(z)', type:'boolean' },
-          { key:'imag', label:'Im(z)', type:'boolean' },
-          { key:'abs',  label:'|z|',   type:'boolean' },
-          { key:'arg',  label:'φ',     type:'boolean' }
+        // Abfrage
+        { type:'section', label:'Abfrage', key:'_sec_query' },
+        { key:'questionMode', label:'Was wird gefragt?', type:'select', options:[
+          {value:'all',       label:'Kartesisch und polar  (Re, Im, |z|, φ)'},
+          {value:'cartesian', label:'Nur kartesisch  (Re(z) und Im(z))'},
+          {value:'polar',     label:'Nur polar  (|z| und φ)'},
+          {value:'conjugate', label:'Konjugierte Zahl  z̄'}
         ]},
-        { key:'tolerances', label:'Toleranzen', type:'group', schema:[
-          { key:'real', label:'Re(z)', type:'number', step:'any' },
-          { key:'imag', label:'Im(z)', type:'number', step:'any' },
-          { key:'abs',  label:'|z|',   type:'number', step:'any' },
+        // Felder & Toleranzen
+        { type:'section', label:'Felder & Toleranzen', key:'_sec_fields' },
+        { key:'fields', label:'Felder individuell ein-/ausblenden',
+          help:'Nur bei „Kartesisch und polar" relevant. Alle anderen Modi legen die Felder fest.',
+          type:'group', schema:[
+            { key:'real', label:'Re(z)', type:'boolean' },
+            { key:'imag', label:'Im(z)', type:'boolean' },
+            { key:'abs',  label:'|z|',   type:'boolean' },
+            { key:'arg',  label:'φ',     type:'boolean' }
+          ], showIf: c => (c.questionMode || 'all') === 'all' },
+        { key:'tolerances', label:'Toleranzen  (±)', type:'group', schema:[
+          { key:'real', label:'Re(z)',   type:'number', step:'any' },
+          { key:'imag', label:'Im(z)',   type:'number', step:'any' },
+          { key:'abs',  label:'|z|',     type:'number', step:'any' },
           { key:'arg',  label:'φ (rad)', type:'number', step:'any' }
         ]},
+        // Darstellung & Bewertung
+        { type:'section', label:'Darstellung & Bewertung', key:'_sec_score' },
         { key:'plotRange', label:'Plot-Bereich (±)', type:'number', step:'any' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 }
       ];
     },
     mount(host, config, api){
       const u = api.utils;
-      const fields = Object.assign({real:true,imag:true,abs:true,arg:true}, config.fields || {});
+      const fields = complexFields(config);
       const tol = Object.assign({real:0.01,imag:0.01,abs:0.06,arg:0.06}, config.tolerances || {});
       let current = null;
 
       const grid = document.createElement('section'); grid.className = 'content-grid';
       const plotCard = document.createElement('article'); plotCard.className = 'section-card plot-card';
-      plotCard.innerHTML = '<div class="card-header"><h3>Aufgabenplot</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>z</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div>';
+      plotCard.innerHTML = '<div class="card-header"><h3>' + (config.blockTitle || 'Aufgabenplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>z</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
       controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Eingabe'}));
       const stack = document.createElement('div'); stack.className = 'input-stack';
@@ -66,8 +89,9 @@
         grp.appendChild(inp);
         stack.appendChild(grp); inputs[key] = inp;
       }
-      if(fields.real) addInput('real', 'Re(z)', 'z. B. 2');
-      if(fields.imag) addInput('imag', 'Im(z)', 'z. B. -1');
+      const complexLabel = (config.questionMode || 'all') === 'conjugate' ? 'z̄' : 'z';
+      if(fields.real) addInput('real', 'Re(' + complexLabel + ')', 'z. B. 2');
+      if(fields.imag) addInput('imag', 'Im(' + complexLabel + ')', 'z. B. -1');
       if(fields.abs)  addInput('abs',  '|z|',   'z. B. 2.24');
       if(fields.arg)  addInput('arg',  'φ',     'z. B. pi/2');
 
@@ -83,13 +107,19 @@
 
       function pickInstance(){
         const pool = config.pool && config.pool.length ? config.pool : [{a:1,b:1}];
-        const item = config.randomize !== false ? pool[Math.floor(Math.random()*pool.length)] : pool[0];
+        const item = config.randomize !== false
+          ? u.pickDifferent(pool, current, (candidate, active) => Number(candidate.a) === active.a && Number(candidate.b) === active.b)
+          : pool[0];
         const a = Number(item.a), b = Number(item.b);
         return { a, b, r: Math.sqrt(a*a + b*b), phi: u.normalizeAngle(Math.atan2(b,a)) };
       }
       function renderPlot(){
         const hostP = plotCard.querySelector('#' + api.blockId + '_plot');
         const R = config.plotRange || 5.5;
+        const phiForArc = Math.abs(current.phi) < 1e-6 ? 0.001 : current.phi;
+        const angleArc = fields.arg && current.r > 0.001
+          ? [{cx:0, cy:0, r:Math.min(Math.max(current.r * 0.36, 0.65), R * 0.32), start:0, end:phiForArc, label:'φ', stroke:'#d4a72a', strokeWidth:3}]
+          : [];
         u.renderPlane(hostP, {
           xMin:-R, xMax:R, yMin:-R, yMax:R,
           xLabel:'Re', yLabel:'Im', gridStep: 1,
@@ -98,8 +128,10 @@
             {x1:current.a,y1:0,x2:current.a,y2:current.b, stroke:'#9bbdff', strokeWidth:2, dash:'5 4'},
             {x1:0,y1:current.b,x2:current.a,y2:current.b, stroke:'#9bbdff', strokeWidth:2, dash:'5 4'}
           ],
+          arcs: angleArc,
           points: [{x:current.a, y:current.b, label:'z'}]
         });
+        plotCard.querySelector('#' + api.blockId + '_q').textContent = complexQuestionText(config);
       }
       function chooseNew(){
         current = pickInstance();
@@ -120,8 +152,10 @@
           parts.push(ok ? (label + ' richtig.') : (label + ' noch nicht richtig.'));
           if(ok) okCount++;
         }
-        check('real', u.parseNum,   current.a,   tol.real, 'Re(z)');
-        check('imag', u.parseNum,   current.b,   tol.imag, 'Im(z)');
+        const expectedReal = config.questionMode === 'conjugate' ? current.a : current.a;
+        const expectedImag = config.questionMode === 'conjugate' ? -current.b : current.b;
+        check('real', u.parseNum,   expectedReal,   tol.real, 'Re(z)');
+        check('imag', u.parseNum,   expectedImag,   tol.imag, 'Im(z)');
         check('abs',  u.parseNum,   current.r,   tol.abs,  '|z|');
         check('arg',  u.parseAngle, current.phi, tol.arg,  'φ');
         const maxPoints = config.maxPoints || 1;
@@ -160,6 +194,7 @@
       });
       const reLab = document.createElementNS(ns,'text'); reLab.textContent='Re'; reLab.setAttribute('x',W-P+2); reLab.setAttribute('y',sy(0)-4); reLab.setAttribute('font-size',10); reLab.setAttribute('fill','#003b5c'); svg.appendChild(reLab);
       const imLab = document.createElementNS(ns,'text'); imLab.textContent='Im'; imLab.setAttribute('x',sx(0)+4); imLab.setAttribute('y',P+10); imLab.setAttribute('font-size',10); imLab.setAttribute('fill','#003b5c'); svg.appendChild(imLab);
+      drawAngleArc(svg, ns, sx, sy, pt, R);
       // vector
       const vec = document.createElementNS(ns,'line');
       vec.setAttribute('x1',sx(0)); vec.setAttribute('y1',sy(0)); vec.setAttribute('x2',sx(pt.a)); vec.setAttribute('y2',sy(pt.b));
@@ -171,4 +206,60 @@
       host.appendChild(wrap);
     }
   });
+
+  function complexFields(config){
+    const manual = Object.assign({real:true,imag:true,abs:true,arg:true}, config.fields || {});
+    switch(config.questionMode || 'all'){
+      case 'cartesian':
+      case 'conjugate': return {real:true, imag:true, abs:false, arg:false};
+      case 'polar': return {real:false, imag:false, abs:true, arg:true};
+      case 'all':
+      default: return manual;
+    }
+  }
+
+  function complexQuestionText(config){
+    switch(config.questionMode || 'all'){
+      case 'cartesian': return 'Lesen Sie Realteil und Imaginärteil der komplexen Zahl ab.';
+      case 'polar': return 'Bestimmen Sie Betrag |z| und Argument φ.';
+      case 'conjugate': return 'Bestimmen Sie die konjugierte komplexe Zahl z̄ = a - bi.';
+      default: return 'Lesen Sie kartesische und polare Darstellung der komplexen Zahl ab.';
+    }
+  }
+
+  function drawAngleArc(svg, ns, sx, sy, pt, R){
+    const a = Number(pt.a), b = Number(pt.b);
+    const rPoint = Math.sqrt(a*a + b*b);
+    if(!Number.isFinite(rPoint) || rPoint <= 0.001) return;
+    const rawPhi = Math.atan2(b, a);
+    const phi = Math.abs(rawPhi) < 1e-6 ? 0.001 : rawPhi;
+    const radius = Math.min(Math.max(rPoint * 0.36, 0.65), R * 0.32);
+    const steps = Math.max(12, Math.ceil(Math.abs(phi) / (Math.PI / 36)));
+    const pts = [];
+    for(let i = 0; i <= steps; i++){
+      const t = phi * (i / steps);
+      pts.push([radius * Math.cos(t), radius * Math.sin(t)]);
+    }
+    const d = pts.map((p, i) => (i === 0 ? 'M' : 'L') + sx(p[0]) + ' ' + sy(p[1])).join(' ');
+    const arc = document.createElementNS(ns, 'path');
+    arc.setAttribute('d', d);
+    arc.setAttribute('stroke', '#d4a72a');
+    arc.setAttribute('stroke-width', '2.4');
+    arc.setAttribute('stroke-linecap', 'round');
+    arc.setAttribute('fill', 'none');
+    svg.appendChild(arc);
+
+    const mid = phi / 2;
+    const labelR = radius + 0.38;
+    const lab = document.createElementNS(ns, 'text');
+    lab.textContent = 'φ';
+    lab.setAttribute('x', sx(labelR * Math.cos(mid)));
+    lab.setAttribute('y', sy(labelR * Math.sin(mid)));
+    lab.setAttribute('font-size', '13');
+    lab.setAttribute('fill', '#8a6a00');
+    lab.setAttribute('font-weight', '700');
+    lab.setAttribute('text-anchor', 'middle');
+    lab.setAttribute('dominant-baseline', 'middle');
+    svg.appendChild(lab);
+  }
 })();

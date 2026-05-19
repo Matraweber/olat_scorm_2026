@@ -1,12 +1,11 @@
 // ============================================================================
-// main.js - Entry point. Wires render() / renderActivePane() into state,
+// main.js: Entry point. Wires render() / renderActivePane() into state,
 // hooks up event listeners on top-bar buttons, sidebar links, modal close
 // buttons, the JSON-mode toggle, sidebar collapse, and global keyboard shortcuts.
 // ============================================================================
-import { state, setRenderer, defaultCourse, undo, redo, copySelectedBlocks, pasteBlocks } from './state.js';
+import { state, setRenderer, defaultCourse, loadPersistentTheme, undo, redo, copySelectedBlocks, pasteBlocks } from './state.js';
 import { renderTaskList, renderActivePaneImpl } from './panes.js';
 import { loadUserTemplates } from './tasks.js';
-import { defaultTheme } from './state.js';
 import { openTaskCreateModal } from './modals.js';
 import { downloadZip, exportJson, loadJsonFile, loadZipFile, showPreview, syncJsonEditor, applyJsonEditor } from './io.js';
 import { getActiveTaskCtx } from './task-pane.js';
@@ -24,7 +23,7 @@ function init(){
   document.getElementById('btnNew').addEventListener('click', () => {
     if(!confirm('Aktuellen Stand verwerfen und neue Lerneinheit anlegen?')) return;
     state.course = defaultCourse();
-    state.theme = defaultTheme();
+    state.theme = loadPersistentTheme();
     state.selected = {kind:'course'};
     render();
   });

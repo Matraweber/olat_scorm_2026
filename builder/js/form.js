@@ -1,5 +1,5 @@
 // ============================================================================
-// form.js - Schema-driven form renderer.
+// form.js: Schema-driven form renderer.
 // `renderField(spec, getObj, setObj)` builds an editor UI for one field
 // based on the spec. Supports: group, list, text, textarea, number, boolean,
 // select, color, image, math-textarea, formula-text, zone-editor.
@@ -38,7 +38,23 @@ export function renderField(spec, getObj, setObj){
     function defaultItem(){
       const item = {};
       (spec.itemSchema || []).forEach(s => {
-        if(s.type === 'boolean') item[s.key] = false;
+        if(s.type === 'section') return; // visual only, no data
+        if(s.type === 'unit-pair'){
+          // Seed the four underlying keys with the spec's declared defaults
+          if(s.defaultFromValue != null) item[s.fromKey || 'fromValue']    = s.defaultFromValue;
+          if(s.defaultFromUnit  != null) item[s.fromUnitKey || 'fromUnit'] = s.defaultFromUnit;
+          if(s.defaultToValue   != null) item[s.toKey || 'toValue']        = s.defaultToValue;
+          if(s.defaultToUnit    != null) item[s.toUnitKey || 'toUnit']     = s.defaultToUnit;
+          return;
+        }
+        if(s.type === 'unit-from-to'){
+          if(s.defaultFrom != null) item[s.fromKey || 'fromUnit'] = s.defaultFrom;
+          if(s.defaultTo   != null) item[s.toKey   || 'toUnit']   = s.defaultTo;
+          return;
+        }
+        if(s.type === 'action') return; // buttons have no data
+        if(s.default != null) item[s.key] = s.default;
+        else if(s.type === 'boolean') item[s.key] = false;
         else if(s.type === 'number') item[s.key] = 0;
         else if(s.type === 'select' && s.options && s.options.length) item[s.key] = s.options[0].value;
         else item[s.key] = '';
@@ -53,6 +69,14 @@ export function renderField(spec, getObj, setObj){
         const card = el('div', {className:'list-item'});
         const ihead = el('div', {className:'list-item-head'});
         ihead.appendChild(el('span', {className:'list-item-title', text:(spec.itemLabel || 'Eintrag') + ' ' + (idx+1)}));
+
+        // Optional live summary subtitle
+        let summarySpan = null;
+        if(spec.itemSummary){
+          summarySpan = el('span', {className:'list-item-subtitle', text: spec.itemSummary(item) || ''});
+          ihead.appendChild(summarySpan);
+        }
+
         const ctrls = el('div', {className:'list-item-controls'});
         const upBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Nach oben'}, text:'▲'});
         const dnBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Nach unten'}, text:'▼'});
@@ -64,11 +88,43 @@ export function renderField(spec, getObj, setObj){
         ctrls.appendChild(upBtn); ctrls.appendChild(dnBtn); ctrls.appendChild(rmBtn);
         ihead.appendChild(ctrls);
         card.appendChild(ihead);
-        const itemRow = el('div', {className:'field-row'});
-        spec.itemSchema.forEach(sub => {
-          itemRow.appendChild(renderField(sub, () => item, (k, v) => { item[k] = v; setObj(spec.key, list); }));
+
+        // Collect showIf conditionals for this item's fields
+        const conditionals = [];
+        function evalConditionals(){
+          conditionals.forEach(c => { c.el.style.display = c.showIf(item) ? '' : 'none'; });
+        }
+
+        // Group itemSchema by section dividers so each section label sits
+        // outside its field-row (avoids Safari's grid-column:-1 bug with auto-fit).
+        const groups = [];
+        let cur = { label: null, fields: [] };
+        (spec.itemSchema || []).forEach(sub => {
+          if(sub.type === 'section'){ groups.push(cur); cur = { label: sub.label, fields: [] }; }
+          else cur.fields.push(sub);
         });
-        card.appendChild(itemRow);
+        groups.push(cur);
+
+        const itemBody = el('div');
+        groups.forEach(group => {
+          if(group.label != null)
+            itemBody.appendChild(el('div', {className:'field-section-label', text: group.label}));
+          if(!group.fields.length) return;
+          const groupRow = el('div', {className:'field-row'});
+          group.fields.forEach(sub => {
+            const fieldEl = renderField(sub, () => item, (k, v) => {
+              item[k] = v;
+              setObj(spec.key, list);
+              evalConditionals();
+              if(summarySpan) summarySpan.textContent = spec.itemSummary(item) || '';
+            });
+            groupRow.appendChild(fieldEl);
+            if(sub.showIf) conditionals.push({ el: fieldEl, showIf: sub.showIf });
+          });
+          itemBody.appendChild(groupRow);
+        });
+        evalConditionals();
+        card.appendChild(itemBody);
         body.appendChild(card);
       });
       if(list.length === 0) body.appendChild(el('div', {className:'field-help', text:'Noch keine Einträge.'}));
@@ -84,8 +140,34 @@ export function renderField(spec, getObj, setObj){
     return block;
   }
 
+  // ---------- section divider ----------
+  if(spec.type === 'section'){
+    return el('div', {className:'field-section-label', text: spec.label || ''});
+  }
+
+  // ---------- unit-pair: bidirectional live unit converter ----------
+  if(spec.type === 'unit-pair'){
+    return renderUnitPairField(spec, getObj, setObj);
+  }
+
+  // ---------- unit-from-to: two unit selects with swap button ----------
+  if(spec.type === 'unit-from-to'){
+    return renderUnitFromToField(spec, getObj, setObj);
+  }
+
+  // ---------- action button (e.g. reset) ----------
+  if(spec.type === 'action'){
+    const row = el('div', {className:'field-action-row'});
+    const btn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: spec.label || 'Aktion'});
+    btn.addEventListener('click', () => btn.dispatchEvent(
+      new CustomEvent('block-field-action', {detail:{action: spec.action}, bubbles:true})
+    ));
+    row.appendChild(btn);
+    return row;
+  }
+
   // ---------- scalar fields ----------
-  const wrap = el('div', {className: 'field'});
+  const wrap = el('div', {className: 'field' + (spec.help ? ' field-has-help' : '') + (spec.fullWidth ? ' field-full' : '')});
   if(spec.type !== 'boolean'){
     wrap.appendChild(el('label', {text: spec.label || spec.key}));
   }
@@ -423,5 +505,189 @@ function renderZoneEditor(spec, getObj, setObj, wrap){
   ze.appendChild(stage);
   ze.appendChild(list);
   wrap.appendChild(ze);
+  return wrap;
+}
+
+// ---------- unit-pair field: two number+unit selects with live bidirectional conversion ----------
+function renderUnitPairField(spec, getObj, setObj){
+  const units   = spec.units  || {};
+  const convert = spec.convertFn;
+  const fk  = spec.fromKey      || 'fromValue';
+  const fuk = spec.fromUnitKey  || 'fromUnit';
+  const tk  = spec.toKey        || 'toValue';
+  const tuk = spec.toUnitKey    || 'toUnit';
+
+  const obj = getObj() || {};
+
+  // Build grouped <optgroup> selects
+  const cats = {};
+  Object.entries(units).forEach(([id, u]) => {
+    if(!cats[u.cat]) cats[u.cat] = [];
+    cats[u.cat].push({id, label: u.label || id});
+  });
+  function buildSelect(currentVal){
+    const sel = el('select');
+    sel.style.cssText = 'flex:0 1 auto; min-width:80px; max-width:150px;';
+    Object.entries(cats).forEach(([catName, items]) => {
+      const og = document.createElement('optgroup');
+      og.label = catName;
+      items.forEach(({id, label}) => {
+        const op = document.createElement('option');
+        op.value = id; op.textContent = label;
+        og.appendChild(op);
+      });
+      sel.appendChild(og);
+    });
+    sel.value = currentVal || (Object.keys(units)[0] || '');
+    return sel;
+  }
+
+  function fmtNum(v){
+    if(v == null || !isFinite(v)) return '';
+    if(v === 0) return '0';
+    const abs = Math.abs(v);
+    if(abs >= 0.0001 && abs < 1e8) return String(parseFloat(v.toPrecision(7)));
+    return parseFloat(v.toPrecision(5)).toExponential();
+  }
+
+  const outer = el('div', {className:'field field-full'});
+  outer.appendChild(el('label', {text: spec.label || 'Umrechnungsaufgabe'}));
+  if(spec.help) outer.appendChild(el('div', {className:'field-help', text: spec.help}));
+
+  const row = el('div');
+  row.style.cssText = 'display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.3rem;';
+
+  const fromValInp = el('input', {attrs:{type:'number', step:'any', placeholder:'Eingabe'}});
+  fromValInp.style.cssText = 'width:110px; flex:0 0 110px;';
+  fromValInp.value = obj[fk] != null ? String(obj[fk]) : '';
+
+  const fromUnitSel = buildSelect(obj[fuk]);
+  const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Eingabe und Ausgabe vertauschen'}, text:'⇄'});
+  swapBtn.style.cssText = 'font-weight:700; color:var(--primary); font-size:1rem; flex:none; min-width:32px;';
+
+  const toValInp = el('input', {attrs:{type:'number', step:'any', placeholder:'Ausgabe'}});
+  toValInp.style.cssText = 'width:110px; flex:0 0 110px;';
+  toValInp.value = obj[tk] != null ? String(obj[tk]) : '';
+
+  const toUnitSel = buildSelect(obj[tuk]);
+
+  const errSpan = el('span');
+  errSpan.style.cssText = 'font-size:0.75rem; color:var(--danger); display:none; width:100%;';
+  errSpan.textContent = 'Einheiten nicht kompatibel.';
+
+  row.appendChild(fromValInp); row.appendChild(fromUnitSel);
+  row.appendChild(swapBtn);
+  row.appendChild(toValInp);   row.appendChild(toUnitSel);
+  row.appendChild(errSpan);
+  outer.appendChild(row);
+  outer.appendChild(el('div', {className:'field-help',
+    text:'Rechts tippt man in Ausgabe, links wird rückwärts berechnet, und umgekehrt.'}));
+
+  function syncFromLeft(){
+    const fv = parseFloat(fromValInp.value);
+    const fu = fromUnitSel.value, tu = toUnitSel.value;
+    if(!isNaN(fv) && convert){
+      const tv = convert(fv, fu, tu);
+      if(tv != null && isFinite(tv)){
+        toValInp.value = fmtNum(tv);
+        errSpan.style.display = 'none';
+      } else {
+        toValInp.value = '';
+        errSpan.style.display = '';
+      }
+    }
+    setObj(fk, isNaN(fv) ? null : fv);
+    setObj(tk, parseFloat(toValInp.value) || null);
+    setObj(fuk, fu); setObj(tuk, tu);
+  }
+  function syncFromRight(){
+    const tv = parseFloat(toValInp.value);
+    const fu = fromUnitSel.value, tu = toUnitSel.value;
+    if(!isNaN(tv) && convert){
+      const fv = convert(tv, tu, fu);
+      if(fv != null && isFinite(fv)){
+        fromValInp.value = fmtNum(fv);
+        errSpan.style.display = 'none';
+      } else {
+        fromValInp.value = '';
+        errSpan.style.display = '';
+      }
+    }
+    setObj(tk, isNaN(tv) ? null : tv);
+    setObj(fk, parseFloat(fromValInp.value) || null);
+    setObj(fuk, fu); setObj(tuk, tu);
+  }
+
+  fromValInp.addEventListener('input', syncFromLeft);
+  fromUnitSel.addEventListener('change', syncFromLeft);
+  toUnitSel.addEventListener('change', syncFromLeft);   // recompute output when toUnit changes
+  toValInp.addEventListener('input', syncFromRight);
+
+  swapBtn.addEventListener('click', e => {
+    e.preventDefault();
+    // Swap from/to values and units atomically
+    const fv = fromValInp.value, fu = fromUnitSel.value;
+    const tv = toValInp.value,   tu = toUnitSel.value;
+    fromValInp.value = tv; toValInp.value = fv;
+    fromUnitSel.value = tu; toUnitSel.value = fu;
+    syncFromLeft();
+  });
+
+  return outer;
+}
+
+// ---------- unit-from-to field: two unit selects + swap button (no value inputs) ----------
+function renderUnitFromToField(spec, getObj, setObj){
+  const units = spec.units || {};
+  const fk = spec.fromKey || 'fromUnit';
+  const tk = spec.toKey   || 'toUnit';
+  const obj = getObj() || {};
+
+  // Group units by category for optgroup display
+  const cats = {};
+  Object.entries(units).forEach(([id, u]) => {
+    if(!cats[u.cat]) cats[u.cat] = [];
+    cats[u.cat].push({ id, label: u.label || id });
+  });
+  function buildSelect(currentVal){
+    const sel = el('select');
+    sel.style.cssText = 'flex:1; min-width:90px;';
+    Object.entries(cats).forEach(([catName, items]) => {
+      const og = document.createElement('optgroup');
+      og.label = catName;
+      items.forEach(({id, label}) => {
+        const op = document.createElement('option');
+        op.value = id; op.textContent = label;
+        og.appendChild(op);
+      });
+      sel.appendChild(og);
+    });
+    sel.value = currentVal || (Object.keys(units)[0] || '');
+    return sel;
+  }
+
+  const wrap = el('div', {className:'field field-full'});
+  wrap.appendChild(el('label', {text: spec.label || 'Richtung'}));
+  if(spec.help) wrap.appendChild(el('div', {className:'field-help', text: spec.help}));
+
+  const row = el('div');
+  row.style.cssText = 'display:flex; align-items:center; gap:0.4rem; margin-top:0.2rem;';
+
+  const fromSel = buildSelect(obj[fk]);
+  const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Von ↔ Nach vertauschen'}, text:'⇄'});
+  swapBtn.style.cssText = 'font-weight:700; color:var(--primary); font-size:1rem; flex:none; min-width:32px;';
+  const toSel = buildSelect(obj[tk]);
+
+  fromSel.addEventListener('change', () => setObj(fk, fromSel.value));
+  toSel.addEventListener('change',   () => setObj(tk, toSel.value));
+  swapBtn.addEventListener('click', e => {
+    e.preventDefault();
+    const f = fromSel.value, t = toSel.value;
+    fromSel.value = t; toSel.value = f;
+    setObj(fk, t); setObj(tk, f);
+  });
+
+  row.appendChild(fromSel); row.appendChild(swapBtn); row.appendChild(toSel);
+  wrap.appendChild(row);
   return wrap;
 }

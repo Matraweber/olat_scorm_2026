@@ -1,5 +1,5 @@
 // ============================================================================
-// scorm12.js - Thin wrapper around the SCORM 1.2 API exposed by the LMS.
+// scorm12.js: Thin wrapper around the SCORM 1.2 API exposed by the LMS.
 // The LMS injects an `API` object into a parent window; findAPI walks up the
 // window chain to locate it. All methods degrade to no-ops when no API is
 // present, so the runtime also works when opened standalone (outside an LMS).

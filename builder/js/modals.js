@@ -1,116 +1,120 @@
 // ============================================================================
-// modals.js - Block-type picker, task-create (Baukasten + Vorlagen),
+// modals.js: Block-type picker, task-create (Leer + Vorlagen),
 // save-template, preview modal open/close logic.
 // ============================================================================
 import { el, uid, toast } from './util.js';
 import { state, pushHistory, render } from './state.js';
 import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates } from './tasks.js';
 
-// ===== Task-create modal (Baukasten / Vorlagen) =====
+// ===== Task-create modal =====
 export function openTaskCreateModal(){
-  document.querySelectorAll('#taskCreateModal .modal-tab').forEach(tab => {
-    tab.onclick = () => {
-      document.querySelectorAll('#taskCreateModal .modal-tab').forEach(t => t.classList.toggle('active', t === tab));
-      const which = tab.dataset.tab;
-      document.getElementById('taskCreatePanelEmpty').classList.toggle('hidden', which !== 'empty');
-      document.getElementById('taskCreatePanelTemplates').classList.toggle('hidden', which !== 'templates');
-    };
-  });
-  document.querySelectorAll('#taskCreateModal .modal-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-  document.getElementById('taskCreatePanelEmpty').classList.remove('hidden');
-  document.getElementById('taskCreatePanelTemplates').classList.add('hidden');
-
   document.getElementById('btnCreateEmpty').onclick = () => {
     pushHistory();
-    const newTask = { id: uid('t_'), title: 'Aufgabe ' + (state.course.tasks.length + 1), blocks: [] };
+    const newTask = { id: uid('t_'), title: '', blocks: [] };
     state.course.tasks.push(newTask);
-    state.selected = {kind:'task', idx: state.course.tasks.length - 1};
+    state.selected = { kind: 'task', idx: state.course.tasks.length - 1 };
     document.getElementById('taskCreateModal').classList.add('hidden');
     render();
   };
-
-  renderTemplateLists();
+  renderTemplateList();
   document.getElementById('taskCreateModal').classList.remove('hidden');
 }
 
-function renderTemplateLists(){
-  const builtinHost = document.getElementById('builtinTemplateList');
-  const userHost = document.getElementById('userTemplateList');
-  builtinHost.innerHTML = '';
-  userHost.innerHTML = '';
+function renderTemplateList(){
+  const host = document.getElementById('templateList');
+  host.innerHTML = '';
 
   const builtin = (window.BUILTIN_TEMPLATES || []).slice();
-  builtin.sort((a,b) => (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label));
-  builtin.forEach(tpl => builtinHost.appendChild(makeTemplateCard(tpl, false)));
-  if(builtin.length === 0){
-    builtinHost.appendChild(el('div', {className:'template-empty', text:'Keine eingebauten Vorlagen verfügbar.'}));
+  builtin.sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label));
+
+  // Group builtin templates by category
+  const cats = {};
+  builtin.forEach(tpl => {
+    const cat = tpl.category || 'Allgemein';
+    (cats[cat] = cats[cat] || []).push(tpl);
+  });
+
+  Object.keys(cats).forEach(cat => {
+    host.appendChild(el('div', { className: 'tpl-section-head', text: cat }));
+    cats[cat].forEach(tpl => host.appendChild(makeTplRow(tpl, false)));
+  });
+
+  // User templates
+  if (state.userTemplates.length > 0) {
+    host.appendChild(el('div', { className: 'tpl-section-head', text: 'Eigene Vorlagen' }));
+    state.userTemplates.forEach(tpl => host.appendChild(makeTplRow(tpl, true)));
   }
 
-  if(state.userTemplates.length === 0){
-    userHost.appendChild(el('div', {className:'template-empty', text:'Du hast noch keine eigenen Vorlagen. Beim Bearbeiten einer Aufgabe kannst du sie über „★ Als Vorlage speichern" sichern.'}));
-  } else {
-    state.userTemplates.forEach(tpl => userHost.appendChild(makeTemplateCard(tpl, true)));
+  if (builtin.length === 0 && state.userTemplates.length === 0) {
+    host.appendChild(el('div', { className: 'template-empty', text: 'Keine Vorlagen verfügbar.' }));
   }
 }
 
-function makeTemplateCard(tpl, isUser){
-  const card = el('div', {className:'template-card'});
-  if(tpl.category) card.appendChild(el('span', {className:'tpl-cat', text: tpl.category}));
-  card.appendChild(el('span', {className:'tpl-label', text: tpl.label}));
-  if(tpl.description) card.appendChild(el('span', {className:'tpl-desc', text: tpl.description}));
-  const tplTask = tpl.task || {};
-  const blockCount = (tplTask.tabs && tplTask.tabs.length)
-    ? tplTask.tabs.reduce((n, t) => n + ((t.blocks || []).length), 0)
-    : (tplTask.blocks ? tplTask.blocks.length : 0);
-  card.appendChild(el('span', {className:'tpl-desc', text: blockCount + ' Block' + (blockCount === 1 ? '' : 'e') + (tplTask.tabs ? ' · ' + tplTask.tabs.length + ' Tabs' : '')}));
+function makeTplRow(tpl, isUser){
+  const row = el('div', { className: 'tpl-row' });
 
-  const actions = el('div', {className:'tpl-actions'});
-  const useBtn = el('button', {className:'btn btn-primary btn-sm', attrs:{type:'button'}, text:'Einfügen'});
-  useBtn.addEventListener('click', () => {
+  const main = el('div', { className: 'tpl-row-main' });
+  main.appendChild(el('span', { className: 'tpl-row-label', text: tpl.label }));
+  if (tpl.description) main.appendChild(el('span', { className: 'tpl-row-desc', text: tpl.description }));
+  row.appendChild(main);
+
+  const insertBtn = el('button', { className: 'btn btn-primary btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Einfügen' });
+  insertBtn.addEventListener('click', e => {
+    e.stopPropagation();
     pushHistory();
     const newTask = instantiateTemplate(tpl);
+    // Flag template-instantiated blocks so the canvas auto-fits them to actual content
+    const flag = (blocks) => (blocks || []).forEach(b => { b._needsAutofit = true; });
+    if(newTask.tabs && newTask.tabs.length) newTask.tabs.forEach(t => flag(t.blocks));
+    else flag(newTask.blocks);
     state.course.tasks.push(newTask);
-    state.selected = {kind:'task', idx: state.course.tasks.length - 1};
+    state.selected = { kind: 'task', idx: state.course.tasks.length - 1 };
     document.getElementById('taskCreateModal').classList.add('hidden');
     render();
-    toast('Vorlage „' + tpl.label + '" eingefügt.');
+    toast('Vorlage "' + tpl.label + '" eingefügt.');
   });
-  actions.appendChild(useBtn);
-  if(isUser){
-    const renameBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Umbenennen'});
+  row.appendChild(insertBtn);
+
+  if (isUser) {
+    const renameBtn = el('button', { className: 'btn btn-secondary btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Umbenennen' });
     renameBtn.addEventListener('click', e => {
       e.stopPropagation();
-      const newName = prompt('Neuer Name für die Vorlage:', tpl.label);
-      if(!newName) return;
+      const newName = prompt('Neuer Name:', tpl.label);
+      if (!newName) return;
       tpl.label = newName.trim();
       saveUserTemplates();
-      renderTemplateLists();
+      renderTemplateList();
     });
-    const delBtn = el('button', {className:'btn btn-danger btn-sm', attrs:{type:'button'}, text:'Löschen'});
+
+    const delBtn = el('button', { className: 'btn btn-danger btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Löschen' });
     delBtn.addEventListener('click', e => {
       e.stopPropagation();
-      if(!confirm('Vorlage „' + tpl.label + '" wirklich löschen?')) return;
+      if (!confirm('Vorlage "' + tpl.label + '" wirklich löschen?')) return;
       const i = state.userTemplates.findIndex(x => x.id === tpl.id);
-      if(i >= 0){ state.userTemplates.splice(i, 1); saveUserTemplates(); renderTemplateLists(); }
+      if (i >= 0) { state.userTemplates.splice(i, 1); saveUserTemplates(); renderTemplateList(); }
     });
-    actions.appendChild(renameBtn);
-    actions.appendChild(delBtn);
+
+    row.appendChild(renameBtn);
+    row.appendChild(delBtn);
   }
-  card.appendChild(actions);
-  return card;
+
+  // Clicking the row itself triggers insert
+  row.addEventListener('click', () => insertBtn.click());
+
+  return row;
 }
 
 // ===== Save-template modal =====
 export function openSaveTemplateModal(task){
   const blocks = task.blocks || [];
-  if(blocks.length === 0){ toast('Diese Aufgabe enthält keine Blöcke.', 'warn'); return; }
+  if (blocks.length === 0) { toast('Diese Aufgabe enthält keine Blöcke.', 'warn'); return; }
   const m = document.getElementById('saveTemplateModal');
   document.getElementById('saveTplName').value = task.title || 'Meine Vorlage';
   document.getElementById('saveTplDesc').value = '';
   document.getElementById('saveTplCat').value = 'Eigene';
   document.getElementById('btnSaveTplConfirm').onclick = () => {
     const name = document.getElementById('saveTplName').value.trim();
-    if(!name){ toast('Name darf nicht leer sein.', 'error'); return; }
+    if (!name) { toast('Name darf nicht leer sein.', 'error'); return; }
     const tpl = {
       id: uid('utpl_'),
       label: name,
@@ -121,38 +125,68 @@ export function openSaveTemplateModal(task){
     state.userTemplates.push(tpl);
     saveUserTemplates();
     m.classList.add('hidden');
-    toast('Vorlage „' + name + '" gespeichert.');
+    toast('Vorlage "' + name + '" gespeichert.');
   };
   m.classList.remove('hidden');
 }
 
 // ===== Block-type modal =====
 export function openBlockTypeModal(onPick){
+  const nav  = document.getElementById('blockCatNav');
   const list = document.getElementById('blockTypeList');
+  nav.innerHTML  = '';
   list.innerHTML = '';
-  const all = window.Blocks.all().slice().sort((a,b) => (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label));
+
+  const all = window.Blocks.all().slice().sort((a, b) =>
+    (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label)
+  );
   const byCat = {};
-  all.forEach(def => { (byCat[def.category || 'Allgemein'] = byCat[def.category || 'Allgemein'] || []).push(def); });
-  Object.keys(byCat).forEach(cat => {
-    const head = el('h3', {text: cat, style:{margin:'0.6rem 0 0.4rem', color:'var(--primary)', fontSize:'1rem', gridColumn:'1 / -1'}});
-    list.appendChild(head);
-    byCat[cat].forEach(def => {
-      const card = el('button', {className:'task-type-card', attrs:{type:'button'}});
-      const cardHead = el('div', {className:'ttc-head'});
-      const ico = el('span', {className:'ttc-icon', text: def.icon || '◻'});
-      cardHead.appendChild(ico);
-      const titleWrap = el('div', {className:'ttc-titlewrap'});
-      titleWrap.appendChild(el('span', {className:'ttc-label', text: def.label}));
-      if(def.graded) titleWrap.appendChild(el('span', {className:'ttc-cat', text:'gewertet'}));
-      cardHead.appendChild(titleWrap);
-      card.appendChild(cardHead);
-      if(def.description) card.appendChild(el('span', {className:'ttc-desc', text: def.description}));
-      card.addEventListener('click', () => {
+  all.forEach(def => {
+    const cat = def.category || 'Allgemein';
+    (byCat[cat] = byCat[cat] || []).push(def);
+  });
+
+  const cats = Object.keys(byCat);
+  let activeCat = cats[0];
+
+  function showCat(cat){
+    activeCat = cat;
+    nav.querySelectorAll('.block-cat-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.cat === cat);
+    });
+    list.innerHTML = '';
+    (byCat[cat] || []).forEach(def => {
+      const row = el('button', { className: 'block-type-row', attrs: { type: 'button' } });
+
+      const ico = el('span', { className: 'block-type-ico', text: def.icon || '?' });
+      row.appendChild(ico);
+
+      const body = el('div', { className: 'block-type-body' });
+      const labelEl = el('span', { className: 'block-type-label', text: def.label });
+      if (def.graded) labelEl.appendChild(el('span', { className: 'block-type-badge', text: 'gewertet' }));
+      body.appendChild(labelEl);
+      if (def.description) body.appendChild(el('span', { className: 'block-type-desc', text: def.description }));
+      row.appendChild(body);
+
+      row.addEventListener('click', () => {
         document.getElementById('blockTypeModal').classList.add('hidden');
         onPick(def.id);
       });
-      list.appendChild(card);
+      list.appendChild(row);
     });
+  }
+
+  cats.forEach(cat => {
+    const btn = el('button', {
+      className: 'block-cat-btn',
+      text: cat,
+      attrs: { type: 'button' }
+    });
+    btn.dataset.cat = cat;
+    btn.addEventListener('click', () => showCat(cat));
+    nav.appendChild(btn);
   });
+
+  showCat(cats[0]);
   document.getElementById('blockTypeModal').classList.remove('hidden');
 }

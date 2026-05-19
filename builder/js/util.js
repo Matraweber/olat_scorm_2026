@@ -1,5 +1,5 @@
 // ============================================================================
-// util.js - DOM helpers, string/file utilities, toast notifications
+// util.js: DOM helpers, string/file utilities, toast notifications
 // No imports from other app modules. May be imported by anyone.
 // ============================================================================
 

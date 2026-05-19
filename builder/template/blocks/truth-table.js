@@ -8,24 +8,44 @@
     graded: true,
     defaultConfig(){
       return {
-        expressions: [
-          { expr: 'a && b', vars: ['a','b'] },
-          { expr: '!a || b', vars: ['a','b'] },
-          { expr: 'a xor b', vars: ['a','b'] },
-          { expr: '(a && b) || c', vars: ['a','b','c'] }
-        ],
+        blockTitle: '',
+        expressionPreset: 'custom',
+        variableCount: 2,
+        expressions: [],
         randomize: true,
         maxPoints: 1
       };
     },
     builderSchema(){
+      const isCustom = c => (c.expressionPreset || 'custom') === 'custom';
       return [
+        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Wahrheitstabelle' },
+        { key:'expressionPreset', label:'Vorlage', type:'select', options:[
+          {value:'custom',     label:'Manuell (leer)'},
+          {value:'basics-2',   label:'Beispiel: Logik - AND, OR, NOT  (2 Variablen)'},
+          {value:'mixed-2',    label:'Beispiel: Logik - Gemischt  (2 Variablen)'},
+          {value:'mixed-3',    label:'Beispiel: Logik - Gemischt  (3 Variablen)'},
+          {value:'de-morgan',  label:'Beispiel: Logik - De-Morgan-Gesetze'},
+          {value:'xor',        label:'Beispiel: Logik - XOR / Entweder-oder'}
+        ]},
+        { type:'action', label:'↺ Zurücksetzen', action:'reset',
+          showIf: c => (c.expressionPreset || 'custom') === 'custom' },
+        { key:'variableCount', label:'Variablenzahl', type:'number', step:1, min:2, max:3,
+          help:'2 Variablen = 4 Zeilen, 3 Variablen = 8 Zeilen.',
+          showIf: c => (c.expressionPreset || 'custom') !== 'custom' },
+        // Ausdrücke
+        { type:'section', label:'Boolesche Ausdrücke', key:'_sec_expr', showIf: isCustom },
         { key:'expressions', label:'Ausdrücke', type:'list', itemLabel:'Ausdruck',
+          showIf: isCustom,
+          itemSummary: item => (item.expr || '…').slice(0, 70),
           itemSchema:[
-            { key:'expr', label:'Boolescher Ausdruck', type:'text', placeholder:'a && b || !c' },
+            { key:'expr', label:'Boolescher Ausdruck', type:'text', placeholder:'a && b || !c', fullWidth:true,
+              help:'Operatoren: && (AND), || (OR), ! (NOT), xor (XOR)' },
             { key:'vars', label:'Variablen (kommasepariert)', type:'text', placeholder:'a,b,c', transform:'csv' }
           ]},
-        { key:'randomize', label:'Zufällig wählen', type:'boolean' },
+        // Einstellungen & Bewertung
+        { type:'section', label:'Einstellungen & Bewertung', key:'_sec_score' },
+        { key:'randomize', label:'Ausdruck zufällig wählen', type:'boolean' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];
     },
@@ -34,7 +54,7 @@
       let current = null;
 
       const card = document.createElement('section'); card.className = 'section-card block-question';
-      card.appendChild(Object.assign(document.createElement('h3'), {textContent:'Wahrheitstabelle'}));
+      card.appendChild(Object.assign(document.createElement('h3'), {textContent: config.blockTitle || 'Wahrheitstabelle'}));
       const exprBox = document.createElement('div'); exprBox.className='formula-box'; exprBox.style.marginBottom='1rem';
       exprBox.innerHTML = '<div class="formula-title">Ausdruck</div>';
       const exprText = document.createElement('div'); exprText.className='formula-text';
@@ -76,9 +96,13 @@
         return rows;
       }
       function pickInstance(){
-        const pool = (config.expressions || []).filter(e => e && e.expr);
+        const pool = expressionList(config).filter(e => e && e.expr);
         const list = pool.length ? pool : [{expr:'a', vars:['a']}];
-        const item = config.randomize !== false ? list[Math.floor(Math.random()*list.length)] : list[0];
+        const sameExpression = (candidate, active) => {
+          const vars = Array.isArray(candidate.vars) ? candidate.vars : String(candidate.vars || '').split(',').map(s => s.trim()).filter(Boolean);
+          return String(candidate.expr || '') === String(active.expr || '') && JSON.stringify(vars) === JSON.stringify(active.varNames || []);
+        };
+        const item = config.randomize !== false ? u.pickDifferent(list, current, sameExpression) : list[0];
         const vars = Array.isArray(item.vars) ? item.vars : String(item.vars || '').split(',').map(s => s.trim()).filter(Boolean);
         return { expr: item.expr, varNames: vars };
       }
@@ -136,7 +160,8 @@
     preview(host, config){
       const u = window.BlockUtils;
       const wrap = u.tagPreview(host, { icon:'01', label:'Wahrheitstabelle', fillHeight:true });
-      const expr = ((config.expressions || [])[0] || {}).expr || 'a && b';
+      const exprs = expressionList(config);
+      const expr = (exprs[0] || {}).expr || 'a && b';
       const ex = document.createElement('div');
       ex.style.cssText = 'font-family:"Courier New",monospace; padding:0.3rem 0.6rem; background:#f5f8fa; border:1px solid #d8e0e6; border-radius:6px; color:#003b5c; font-weight:700; margin-bottom:0.4rem;';
       ex.textContent = expr;
@@ -144,7 +169,7 @@
       // Mini truth-table preview (4 rows for 2 vars)
       const tbl = document.createElement('table');
       tbl.style.cssText = 'border-collapse:collapse; font-family:"Courier New",monospace; font-size:0.78rem;';
-      const vs = (((config.expressions || [])[0] || {}).vars) || ['a','b'];
+      const vs = ((exprs[0] || {}).vars) || ['a','b'];
       const varNames = Array.isArray(vs) ? vs : String(vs).split(',').map(s=>s.trim()).filter(Boolean);
       const head = document.createElement('tr');
       varNames.forEach(v => { const th = document.createElement('th'); th.textContent = v; th.style.cssText = 'padding:0.18rem 0.45rem; background:#003b5c; color:#fff; border:1px solid #003b5c;'; head.appendChild(th); });
@@ -164,4 +189,49 @@
       wrap.appendChild(tbl);
     }
   });
+
+  function expressionList(config){
+    if((config.expressionPreset || 'mixed-2') === 'custom'){
+      return config.expressions || [];
+    }
+    const n = Math.max(2, Math.min(3, Number(config.variableCount) || ((config.expressionPreset || '').includes('3') ? 3 : 2)));
+    const vars = n === 3 ? ['a','b','c'] : ['a','b'];
+    switch(config.expressionPreset || 'mixed-2'){
+      case 'basics-2':
+        return [
+          {expr:'a && b', vars:['a','b']},
+          {expr:'a || b', vars:['a','b']},
+          {expr:'!a && b', vars:['a','b']},
+          {expr:'!a || b', vars:['a','b']}
+        ];
+      case 'de-morgan':
+        return [
+          {expr:'!(a && b)', vars:['a','b']},
+          {expr:'!a || !b', vars:['a','b']},
+          {expr:'!(a || b)', vars:['a','b']},
+          {expr:'!a && !b', vars:['a','b']}
+        ];
+      case 'xor':
+        return [
+          {expr:'a xor b', vars:['a','b']},
+          {expr:'!(a xor b)', vars:['a','b']},
+          {expr:'(a || b) && !(a && b)', vars:['a','b']}
+        ];
+      case 'mixed-3':
+        return [
+          {expr:'(a && b) || c', vars:['a','b','c']},
+          {expr:'a && (b || c)', vars:['a','b','c']},
+          {expr:'!a || (b && c)', vars:['a','b','c']},
+          {expr:'(a xor b) && c', vars:['a','b','c']}
+        ];
+      case 'mixed-2':
+      default:
+        return [
+          {expr:'a && b', vars},
+          {expr:'!a || b', vars},
+          {expr:'a xor b', vars},
+          {expr:'!(a && b)', vars}
+        ];
+    }
+  }
 })();

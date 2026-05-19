@@ -1,30 +1,46 @@
 #!/bin/bash
 
-# Define the port
-PORT=8765 # [cite: 1]
+PORT=8765
 
-# Print startup messages
-echo "SCORM Builder wird auf http://localhost:$PORT/builder/ gestartet ..." # [cite: 1]
-echo "Druecke Strg+C zum Beenden." # [cite: 1]
+echo "SCORM Builder wird auf http://localhost:$PORT/builder/ gestartet ..."
+echo "Druecke Strg+C zum Beenden."
 
-# Check for python3 (Default on modern macOS)
 if command -v python3 >/dev/null 2>&1; then
-  open "http://localhost:$PORT/builder/" # [cite: 2]
-  python3 -m http.server $PORT --bind 127.0.0.1 # [cite: 2]
+  open "http://localhost:$PORT/builder/"
+  python3 - <<'PYEOF'
+import http.server, socketserver, os, sys
+
+PORT = 8765
+
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    """Like SimpleHTTPRequestHandler but adds Cache-Control: no-cache to every
+    response so that Safari (and other browsers) always fetch fresh files."""
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+    def log_message(self, fmt, *args):
+        pass  # suppress per-request noise; errors still go to stderr
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+with socketserver.TCPServer(('127.0.0.1', PORT), NoCacheHandler) as httpd:
+    httpd.allow_reuse_address = True
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print('\nServer gestoppt.')
+PYEOF
   exit 0
 fi
 
-# Fallback: Check for python (In case it's an older system or aliased)
 if command -v python >/dev/null 2>&1; then
-  open "http://localhost:$PORT/builder/" # [cite: 2]
-  python -m http.server $PORT --bind 127.0.0.1 # [cite: 2]
+  open "http://localhost:$PORT/builder/"
+  python -m http.server $PORT --bind 127.0.0.1
   exit 0
 fi
 
-# Error messages if Python is missing
-echo "Python wurde nicht gefunden." # [cite: 2]
-echo "Bitte Python 3 installieren oder einen anderen lokalen Webserver nutzen." # [cite: 3]
-
-# Emulate the Windows 'pause' command
-read -n 1 -s -r -p "Druecke eine beliebige Taste zum Beenden..." # [cite: 3]
+echo "Python wurde nicht gefunden."
+echo "Bitte Python 3 installieren oder einen anderen lokalen Webserver nutzen."
+read -n 1 -s -r -p "Druecke eine beliebige Taste zum Beenden..."
 echo ""

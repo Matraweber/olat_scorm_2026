@@ -1,5 +1,5 @@
 // ============================================================================
-// _registry.js - Block-type registry. Each block (heading, multiple-choice,
+// _registry.js: Block-type registry. Each block (heading, multiple-choice,
 // cloze, …) calls Blocks.register(id, def) at load time. The runtime and the
 // builder both read from this registry to look up labels, defaults, and the
 // mount() function that renders a block instance.

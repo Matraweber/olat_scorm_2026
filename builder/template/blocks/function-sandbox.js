@@ -20,19 +20,32 @@
     },
     builderSchema(){
       return [
-        { key:'title', label:'Titel (optional)', type:'text' },
-        { key:'expr', label:'Funktion f(x), Schieberegler-Variablen wie a, b, c sind erlaubt', type:'text', placeholder:'a*sin(b*x + c)' },
-        { key:'xMin', label:'x min', type:'number', step:'any' },
-        { key:'xMax', label:'x max', type:'number', step:'any' },
-        { key:'yMin', label:'y min', type:'number', step:'any' },
-        { key:'yMax', label:'y max', type:'number', step:'any' },
-        { key:'sliders', label:'Schieberegler', type:'list', itemLabel:'Slider',
+        // Funktion
+        { type:'section', label:'Funktion', key:'_sec_fn' },
+        { key:'title', label:'Titel (optional)', type:'text', placeholder:'z. B.  Sinus erkunden' },
+        { key:'expr',  label:'f(x) =', type:'text', placeholder:'a*sin(b*x + c)',
+          help:'Slider-Variablen (a, b, c, …) dürfen hier vorkommen.' },
+        // Koordinatenbereich
+        { type:'section', label:'Koordinatenbereich', key:'_sec_axes' },
+        { key:'xMin', label:'x von', type:'number', step:'any' },
+        { key:'xMax', label:'x bis', type:'number', step:'any' },
+        { key:'yMin', label:'y von', type:'number', step:'any' },
+        { key:'yMax', label:'y bis', type:'number', step:'any' },
+        // Schieberegler
+        { type:'section', label:'Schieberegler', key:'_sec_sliders' },
+        { key:'sliders', label:'Regler', type:'list', itemLabel:'Regler',
+          itemSummary: item => {
+            if(!item.name) return '…';
+            const start = item.value ?? '';
+            return item.name + ':  [' + (item.min ?? '') + ', ' + (item.max ?? '') + ']  Schritt ' + (item.step ?? '') + '  Start ' + start;
+          },
           itemSchema:[
-            { key:'name',  label:'Name', type:'text', placeholder:'a' },
-            { key:'min',   label:'Min',  type:'number', step:'any' },
-            { key:'max',   label:'Max',  type:'number', step:'any' },
+            { key:'name',  label:'Variable',    type:'text',   placeholder:'a' },
+            { type:'section', label:'Bereich & Schritt', key:'_sec_range' },
+            { key:'min',   label:'von',          type:'number', step:'any' },
+            { key:'max',   label:'bis',          type:'number', step:'any' },
             { key:'step',  label:'Schrittweite', type:'number', step:'any' },
-            { key:'value', label:'Startwert', type:'number', step:'any' }
+            { key:'value', label:'Startwert',    type:'number', step:'any' }
           ]}
       ];
     },

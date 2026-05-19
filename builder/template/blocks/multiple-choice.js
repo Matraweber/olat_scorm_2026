@@ -8,12 +8,10 @@
     graded: true,
     defaultConfig(){
       return {
-        question: 'Welche Aussage ist richtig?',
-        choices: [
-          { text: 'Antwort A', correct: true },
-          { text: 'Antwort B', correct: false },
-          { text: 'Antwort C', correct: false }
-        ],
+        blockTitle: '',
+        preset: 'custom',
+        question: '',
+        choices: [],
         multi: false,
         shuffle: true,
         maxPoints: 1,
@@ -22,29 +20,49 @@
       };
     },
     builderSchema(){
+      const isCustom = c => (c.preset || 'custom') === 'custom';
       return [
-        { key:'question', label:'Frage', type:'math-textarea', rows:2 },
-        { key:'choices', label:'Antwortmöglichkeiten', type:'list', itemLabel:'Antwort',
+        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Multiple Choice' },
+        { key:'preset', label:'Vorlage', type:'select', options:[
+          {value:'custom',         label:'Manuell (leer)'},
+          {value:'example-single', label:'Beispiel: Informatik - Zeitkomplexität (Einfachauswahl)'},
+          {value:'example-multi',  label:'Beispiel: Informatik - OOP-Konzepte (Mehrfachauswahl)'},
+          {value:'example-math',   label:'Beispiel: Mathematik - Ableitungsregeln (Einfachauswahl)'}
+        ], help:'Beispiele zeigen die Möglichkeiten des Blocks. Eigene Inhalte unter „Manuell" eingeben.' },
+        { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
+        // Frage
+        { type:'section', label:'Frage', key:'_sec_q', showIf: isCustom },
+        { key:'question', label:'Fragetext', type:'math-textarea', rows:2, showIf: isCustom },
+        // Antworten
+        { type:'section', label:'Antwortmöglichkeiten', key:'_sec_choices', showIf: isCustom },
+        { key:'choices', label:'Antworten', type:'list', itemLabel:'Antwort',
+          showIf: isCustom,
+          itemSummary: item => (item.correct ? '✓ ' : '○ ') + (item.text || '…').slice(0, 70),
           itemSchema:[
-            { key:'text', label:'Text', type:'text' },
-            { key:'correct', label:'Richtig?', type:'boolean' }
+            { key:'text',    label:'Antworttext', type:'text', fullWidth:true },
+            { key:'correct', label:'Ist richtig', type:'boolean' }
           ]},
-        { key:'multi', label:'Mehrfachauswahl erlauben', type:'boolean' },
-        { key:'shuffle', label:'Antworten mischen', type:'boolean' },
+        // Einstellungen
+        { type:'section', label:'Einstellungen', key:'_sec_opts', showIf: isCustom },
+        { key:'multi',   label:'Mehrfachauswahl erlauben', type:'boolean', showIf: isCustom },
+        { key:'shuffle', label:'Antworten mischen',        type:'boolean', showIf: isCustom },
+        // Bewertung
+        { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
         { key:'partialCredit', label:'Teilpunkte bei Mehrfachauswahl', type:'boolean',
-          help:'Jede richtig angekreuzte Antwort gibt anteilig Punkte (gesamt / Anzahl richtiger Antworten).' },
+          help:'Jede richtig angekreuzte Antwort gibt anteilig Punkte (gesamt ÷ Anzahl richtiger Antworten).' },
         { key:'penalizeWrong', label:'Falsche Auswahl abziehen', type:'boolean',
-          help:'Bei Teilpunkten: falsch angekreuzte Antworten ziehen jeweils einen Teilpunkt ab (mindestens 0).' }
+          help:'Bei Teilpunkten: falsch angekreuzte Antworten ziehen jeweils einen Teilpunkt ab (min. 0).' }
       ];
     },
     mount(host, config, api){
-      const ui = api.utils.simpleQuestionCard(host, { title:'Frage', question: config.question || '' });
+      const activeConfig = mcPresetConfig(config) || config;
+      const ui = api.utils.simpleQuestionCard(host, { title: activeConfig.blockTitle || 'Aufgabe', question: activeConfig.question || '' });
       const { content, buttons, fb } = ui;
 
       const list = document.createElement('div'); list.className = 'choice-list';
-      const choices = (config.choices || []).slice();
-      if(config.shuffle){
+      const choices = (activeConfig.choices || []).slice();
+      if(activeConfig.shuffle){
         for(let i = choices.length - 1; i > 0; i--){
           const j = Math.floor(Math.random() * (i + 1));
           [choices[i], choices[j]] = [choices[j], choices[i]];
@@ -56,7 +74,7 @@
         const id = api.blockId + '_c' + i;
         const lbl = document.createElement('label'); lbl.className = 'choice-item'; lbl.htmlFor = id;
         const inp = document.createElement('input');
-        inp.type = config.multi ? 'checkbox' : 'radio';
+        inp.type = activeConfig.multi ? 'checkbox' : 'radio';
         inp.id = id; inp.name = groupName;
         lbl.appendChild(inp);
         const span = document.createElement('span'); span.innerHTML = c.text || '';
@@ -78,8 +96,8 @@
         const wrongSelected   = inputs.filter(i => !i.correct && i.input.checked).length;
         const allCorrect = correctSelected === correctTotal;
         const noWrong   = wrongSelected === 0;
-        const maxPoints = config.maxPoints || 1;
-        const usePartial = config.partialCredit !== false && config.multi && correctTotal > 0;
+        const maxPoints = activeConfig.maxPoints || 1;
+        const usePartial = activeConfig.partialCredit !== false && activeConfig.multi && correctTotal > 0;
 
         if(allCorrect && noWrong){
           fb.ok('Korrekt. ' + maxPoints + ' / ' + maxPoints + ' Punkte.');
@@ -88,7 +106,7 @@
         }
 
         if(usePartial){
-          const penalize = config.penalizeWrong !== false;
+          const penalize = activeConfig.penalizeWrong !== false;
           const raw = penalize ? (correctSelected - wrongSelected) : correctSelected;
           const ratio = Math.max(0, raw / correctTotal);
           const pts = Math.round(ratio * maxPoints * 100) / 100;
@@ -105,10 +123,11 @@
         }
       });
 
-      api.initScore(config.maxPoints || 1);
+      api.initScore(activeConfig.maxPoints || 1);
       return {};
     },
     preview(host, config){
+      const activeConfig = mcPresetConfig(config);
       const card = document.createElement('div');
       card.style.cssText = 'background:#fff; border:1px solid #d8e0e6; border-radius:18px; padding:1.2rem; margin:0;';
       const h3 = document.createElement('h3');
@@ -116,13 +135,13 @@
       h3.style.cssText = 'color:#003b5c; margin:0 0 0.6rem; font-size:1rem;';
       card.appendChild(h3);
       const q = document.createElement('p');
-      q.innerHTML = config.question || '<em style="color:#888">(Frage leer)</em>';
+      q.innerHTML = activeConfig.question || '<em style="color:#888">(Frage leer)</em>';
       q.style.cssText = 'margin:0 0 0.9rem; color:#111; line-height:1.45;';
       card.appendChild(q);
-      const isMulti = !!config.multi;
+      const isMulti = !!activeConfig.multi;
       const list = document.createElement('div');
       list.style.cssText = 'display:grid; gap:0.5rem;';
-      (config.choices || []).forEach(c => {
+      (activeConfig.choices || []).forEach(c => {
         const li = document.createElement('div');
         li.style.cssText = 'display:flex; align-items:center; gap:0.5rem; padding:0.6rem 0.8rem; border:1px solid #d8e0e6; border-radius:12px; background:#fff; line-height:1.35;';
         const m = document.createElement('span');
@@ -148,4 +167,47 @@
       host.appendChild(card);
     }
   });
+
+  function mcPresetConfig(config){
+    if(!config || !config.preset || config.preset === 'custom') return config || {};
+    const base = Object.assign({}, config, { shuffle:true, partialCredit:true, penalizeWrong:true });
+
+    if(config.preset === 'example-single'){
+      return Object.assign(base, {
+        question: 'Welche Zeitkomplexität hat die binäre Suche?',
+        choices: [
+          { text:'O(log n)', correct:true  },
+          { text:'O(n)',     correct:false },
+          { text:'O(n²)',   correct:false },
+          { text:'O(1)',     correct:false }
+        ],
+        multi: false
+      });
+    }
+    if(config.preset === 'example-multi'){
+      return Object.assign(base, {
+        question: 'Welche Konzepte gehören zur objektorientierten Programmierung? (Mehrere Antworten möglich)',
+        choices: [
+          { text:'Kapselung',      correct:true  },
+          { text:'Vererbung',      correct:true  },
+          { text:'Polymorphismus', correct:true  },
+          { text:'Sequentialität', correct:false }
+        ],
+        multi: true
+      });
+    }
+    if(config.preset === 'example-math'){
+      return Object.assign(base, {
+        question: 'Welche Formel gibt die Ableitung von $f(x) = x^n$ nach der Potenzregel an?',
+        choices: [
+          { text:'$f\'(x) = n \\cdot x^{n-1}$', correct:true  },
+          { text:'$f\'(x) = x^{n+1}$',           correct:false },
+          { text:'$f\'(x) = n \\cdot x^n$',      correct:false },
+          { text:'$f\'(x) = (n-1) \\cdot x^n$',  correct:false }
+        ],
+        multi: false
+      });
+    }
+    return config;
+  }
 })();

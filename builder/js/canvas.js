@@ -1,5 +1,5 @@
 // ============================================================================
-// canvas.js - Canvas constants, default sizes, position helpers, snap algorithm,
+// canvas.js: Canvas constants, default sizes, position helpers, snap algorithm,
 //             snap guides, block summary, autofit, drop-marker helpers.
 // ============================================================================
 import { el, cssEscapeSafe, stripHtmlText } from './util.js';
@@ -185,7 +185,7 @@ export function blockSummary(block){
     case 'rich-text': { const t = stripHtmlText(cfg.html); return t.length > 80 ? t.slice(0, 80) + '…' : (t || '(leerer Text)'); }
     case 'note-box': return cfg.title || 'Hinweis';
     case 'image': return cfg.src ? 'Bild gesetzt' : '(noch kein Bild)';
-    case 'divider': return '- Trennlinie -';
+    case 'divider': return 'Trennlinie';
     case 'multiple-choice': return (stripHtmlText(cfg.question) || '(Frage leer)') + ' · ' + ((cfg.choices||[]).length) + ' Antworten';
     case 'numeric-input': return cfg.questionTemplate || '(Frage leer)';
     case 'text-input': return cfg.question || '(Frage leer)';
@@ -200,24 +200,41 @@ export function blockSummary(block){
   }
 }
 
-// ---- Auto-fit block height to its rendered content ----
-export function autoFitBlock(block){
-  const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscapeSafe(block.id) + '"]');
-  if(!card) return;
+// ---- Content-fit height measurement helpers ----
+// Used by autoFitBlock plus the post-render autofit passes in task-pane.js
+// and task-pane-canvas.js. Centralised so all three agree on how to read a
+// block's rendered height (which may live inside a shadow-DOM mount host).
+
+// Measure the rendered content height of a canvas-block card.
+// Returns 0 if the card has no body or has not rendered yet.
+export function measureCardContent(card){
+  if(!card) return 0;
   const body = card.querySelector('.canvas-block-body');
-  const head = card.querySelector('.canvas-block-head');
-  const shadowHost = body && body.querySelector('.canvas-mount-host');
-  let contentHeight = 0;
+  if(!body) return 0;
+  const shadowHost = body.querySelector('.canvas-mount-host');
   if(shadowHost && shadowHost.shadowRoot){
     const wrap = shadowHost.shadowRoot.querySelector('.canvas-mount-wrap');
-    if(wrap) contentHeight = wrap.scrollHeight;
-  } else if(body){
-    contentHeight = body.scrollHeight;
+    if(wrap) return wrap.scrollHeight;
   }
-  if(contentHeight <= 0) return;
-  const headHeight = head ? head.offsetHeight : 32;
-  const totalHeight = contentHeight + headHeight + 8;
+  return body.scrollHeight;
+}
+
+// Compute the card height (head + content + padding) that snugly fits the
+// rendered content. Returns null when there is nothing measurable yet.
+export function fitHeightForCard(card){
+  const content = measureCardContent(card);
+  if(content <= 0) return null;
+  const head = card.querySelector('.canvas-block-head');
+  const headH = head ? head.offsetHeight : 32;
+  return Math.max(60, Math.round(content + headH + 8));
+}
+
+// ---- Auto-fit block height to its rendered content (button + Enter handler) ----
+export function autoFitBlock(block){
+  const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscapeSafe(block.id) + '"]');
+  const newH = fitHeightForCard(card);
+  if(newH == null) return;
   pushHistory();
-  block.pos.h = Math.max(60, Math.round(totalHeight));
+  block.pos.h = newH;
   render();
 }

@@ -4,7 +4,7 @@
     label: 'Trennlinie',
     description: 'Horizontale Trennlinie mit etwas Abstand.',
     category: 'Inhalt',
-    icon: '-',
+    icon: '━',
     graded: false,
     defaultConfig(){ return {}; },
     builderSchema(){ return []; },

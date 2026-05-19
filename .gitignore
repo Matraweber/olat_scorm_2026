@@ -1,0 +1,22 @@
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Editor / IDE / local tooling workspaces
+.claude/
+
+# Ad-hoc test artefacts and screenshots
+# Real tests, if any, live inside builder/ and are versioned individually.
+screenshots/
+test_*.js
+
+# Node tooling (in case anyone adds package.json later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*

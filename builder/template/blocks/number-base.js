@@ -1,13 +1,15 @@
 (function(){
   'use strict';
   Blocks.register('number-base', {
-    label: 'Zahlensystem-Umrechnung',
-    description: 'Umrechnung zwischen Binär, Dezimal, Oktal, Hexadezimal.',
+    label: 'Zahlensysteme (Bin/Dez/Hex)',
+    description: 'Umrechnung zwischen Binär (Basis 2), Oktal (8), Dezimal (10) und Hexadezimal (16).',
     category: 'Frage',
     icon: '0x',
     graded: true,
     defaultConfig(){
       return {
+        blockTitle: '',
+        directionPreset: 'standard',
         directions: [{ from: 'dec', to: 'bin' }, { from: 'bin', to: 'dec' }, { from: 'dec', to: 'hex' }],
         valueRange: { min: 0, max: 255 },
         randomize: true,
@@ -21,17 +23,37 @@
         {value:'dec', label:'Dezimal (Basis 10)'},
         {value:'hex', label:'Hexadezimal (Basis 16)'}
       ];
+      const presetOpts = [
+        {value:'custom', label:'Eigene Richtungen'},
+        {value:'standard', label:'Standardmix'},
+        {value:'all-decimal', label:'Alle von/nach Dezimal'},
+        {value:'dec-bin', label:'Dezimal → Binär'},
+        {value:'bin-dec', label:'Binär → Dezimal'},
+        {value:'dec-hex', label:'Dezimal → Hex'},
+        {value:'hex-dec', label:'Hex → Dezimal'},
+        {value:'bin-hex', label:'Binär ↔ Hex'}
+      ];
+      const BASE_LABEL = { bin:'Binär', oct:'Oktal', dec:'Dezimal', hex:'Hex' };
       return [
-        { key:'directions', label:'Erlaubte Richtungen', type:'list', itemLabel:'Richtung',
+        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Zahlensysteme' },
+        { key:'directionPreset', label:'Umrechnungs-Preset', type:'select', options: presetOpts },
+        // Richtungen (nur bei „Eigene Richtungen")
+        { type:'section', label:'Erlaubte Umrechnungs-Richtungen', key:'_sec_dir',
+          showIf: c => (c.directionPreset || 'standard') === 'custom' },
+        { key:'directions', label:'Richtungen', type:'list', itemLabel:'Richtung',
+          showIf: c => (c.directionPreset || 'standard') === 'custom',
+          itemSummary: item => (BASE_LABEL[item.from] || item.from || '?') + '  →  ' + (BASE_LABEL[item.to] || item.to || '?'),
           itemSchema:[
-            { key:'from', label:'Von', type:'select', options: baseOpts },
+            { key:'from', label:'Von',  type:'select', options: baseOpts },
             { key:'to',   label:'Nach', type:'select', options: baseOpts }
           ]},
+        // Einstellungen & Bewertung
+        { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
         { key:'valueRange', label:'Wertebereich (dezimal)', type:'group', schema:[
-          { key:'min', label:'Min', type:'number', step:1 },
-          { key:'max', label:'Max', type:'number', step:1 }
+          { key:'min', label:'von', type:'number', step:1 },
+          { key:'max', label:'bis', type:'number', step:1 }
         ]},
-        { key:'randomize', label:'Zufällig wählen', type:'boolean' },
+        { key:'randomize', label:'Richtung zufällig wählen', type:'boolean' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];
     },
@@ -41,20 +63,28 @@
       const baseRadix  = {bin:2, oct:8, dec:10, hex:16};
       let current = null;
 
-      const ui = u.questionCard(host, { h3:'Aufgabe', qBoxTitle:'Aufgabe', inputLabel:'Antwort', inputPlaceholder:'Antwort eingeben' });
+      const ui = u.questionCard(host, { h3: config.blockTitle || 'Aufgabe', qBoxTitle:'Frage', inputLabel:'Antwort', inputPlaceholder:'Antwort eingeben' });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
 
-      function chooseNew(showMsg){
-        const directions = config.directions && config.directions.length ? config.directions : [{from:'dec', to:'bin'}];
+      function buildInstance(){
+        const directions = directionList(config);
         const dir = config.randomize !== false ? directions[Math.floor(Math.random()*directions.length)] : directions[0];
         const min = Math.max(0, Number((config.valueRange && config.valueRange.min) ?? 0));
         const max = Math.max(min + 1, Number((config.valueRange && config.valueRange.max) ?? 255));
         const valueDec = Math.floor(min + Math.random() * (max - min + 1));
         const fromStr = valueDec.toString(baseRadix[dir.from]).toUpperCase();
         const toStr   = valueDec.toString(baseRadix[dir.to]).toUpperCase();
-        current = { dir, valueDec, fromStr, toStr };
+        return { dir, valueDec, fromStr, toStr };
+      }
+      function sameInstance(a, b){
+        return !!a && !!b && a.valueDec === b.valueDec && a.dir.from === b.dir.from && a.dir.to === b.dir.to;
+      }
+      function chooseNew(showMsg){
+        let next = buildInstance();
+        for(let i = 0; current && sameInstance(next, current) && i < 30; i++) next = buildInstance();
+        current = next;
         inp.value = '';
-        qText.innerHTML = 'Wandeln Sie <strong>' + fromStr + '</strong> aus <em>' + baseLabels[dir.from] + '</em> nach <em>' + baseLabels[dir.to] + '</em> um.';
+        qText.innerHTML = 'Wandeln Sie <strong>' + current.fromStr + '</strong> aus <em>' + baseLabels[current.dir.from] + '</em> nach <em>' + baseLabels[current.dir.to] + '</em> um.';
         if(showMsg) fb.neutral('Neue Aufgabe generiert.');
       }
       function grade(){
@@ -78,7 +108,7 @@
       const baseRadix = {bin:2, oct:8, dec:10, hex:16};
       const wrap = u.tagPreview(host, { icon:'0x', label:'Zahlensystem-Umrechnung', fillHeight:true });
       // Show example
-      const dirs = config.directions || [{from:'dec', to:'bin'}];
+      const dirs = directionList(config);
       const dir = dirs[0];
       const min = (config.valueRange && config.valueRange.min) || 0;
       const max = (config.valueRange && config.valueRange.max) || 255;
@@ -91,8 +121,23 @@
       wrap.appendChild(ex);
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872; margin-top:0.3rem;';
-      hint.textContent = (config.directions || []).length + ' Richtung(en) im Pool, Werte ' + min + ' bis ' + max;
+      hint.textContent = dirs.length + ' Richtung(en) im Pool, Werte ' + min + ' bis ' + max;
       wrap.appendChild(hint);
     }
   });
+
+  function directionList(config){
+    const custom = config.directions && config.directions.length ? config.directions : [{from:'dec', to:'bin'}];
+    switch(config.directionPreset || 'standard'){
+      case 'custom': return custom;
+      case 'all-decimal': return [{from:'dec', to:'bin'}, {from:'bin', to:'dec'}, {from:'dec', to:'oct'}, {from:'oct', to:'dec'}, {from:'dec', to:'hex'}, {from:'hex', to:'dec'}];
+      case 'dec-bin': return [{from:'dec', to:'bin'}];
+      case 'bin-dec': return [{from:'bin', to:'dec'}];
+      case 'dec-hex': return [{from:'dec', to:'hex'}];
+      case 'hex-dec': return [{from:'hex', to:'dec'}];
+      case 'bin-hex': return [{from:'bin', to:'hex'}, {from:'hex', to:'bin'}];
+      case 'standard':
+      default: return [{from:'dec', to:'bin'}, {from:'bin', to:'dec'}, {from:'dec', to:'hex'}];
+    }
+  }
 })();

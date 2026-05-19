@@ -1,5 +1,5 @@
 // ============================================================================
-// preview.js - Render a block's real runtime mount() inside an isolated
+// preview.js: Render a block's real runtime mount() inside an isolated
 // Shadow DOM, so the builder canvas matches the SCORM preview exactly.
 // Falls back to def.preview() or a text summary if mount() isn't possible.
 // ============================================================================

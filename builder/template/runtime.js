@@ -1,5 +1,5 @@
 // ============================================================================
-// runtime.js - SCORM-1.2 player runtime. Loads tasks.json + theme.json,
+// runtime.js: SCORM-1.2 player runtime. Loads tasks.json + theme.json,
 // builds the top navigation, renders each task's blocks onto an absolutely-
 // positioned canvas, tracks per-block scores, and pushes the aggregate
 // score into the LMS via scorm12.js.

@@ -1,14 +1,14 @@
 // ============================================================================
-// task-pane.js - Orchestrator for the free-canvas task editor. Builds the
+// task-pane.js: Orchestrator for the free-canvas task editor. Builds the
 // shared `ctx` object and wires up the head/toolbar/zoom/tab-bar. The heavy
 // lifting lives in sibling modules:
-//   • task-pane-canvas.js  - canvas render + drag/resize handlers
-//   • task-pane-config.js  - right-side block config pane + multi-select UI
-//   • task-pane-bulk.js    - bulk align/distribute/duplicate/delete
+//   • task-pane-canvas.js: canvas render + drag/resize handlers
+//   • task-pane-config.js: right-side block config pane + multi-select UI
+//   • task-pane-bulk.js: bulk align/distribute/duplicate/delete
 // ============================================================================
 import { el, uid, cssEscape } from './util.js';
 import { state, pushHistory, renderActivePane } from './state.js';
-import { CANVAS_WIDTH, ensurePos, ensureAllPos } from './canvas.js';
+import { CANVAS_WIDTH, ensurePos, ensureAllPos, fitHeightForCard } from './canvas.js';
 import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { openBlockTypeModal, openSaveTemplateModal } from './modals.js';
@@ -17,7 +17,7 @@ import { renderCanvas } from './task-pane-canvas.js';
 import { renderConfigPane, posLabel } from './task-pane-config.js';
 import { bulkDelete, bulkDuplicate } from './task-pane-bulk.js';
 
-// Currently-active task pane context - used by global keyboard handler.
+// Currently-active task pane context: used by global keyboard handler.
 export let activeTaskCtx = null;
 
 export function renderTaskPane(host, idx){
@@ -158,7 +158,10 @@ export function renderTaskPane(host, idx){
     });
   }
 
-  // Debounce canvas block re-renders so heavy mount() (e.g. plots) doesn't run on every keystroke.
+  // Debounced re-render of a single block's preview. Heavy mount() calls
+  // (e.g. plot blocks) shouldn't run on every keystroke in the config form.
+  // After the preview re-renders, the block's height is auto-fit so config
+  // edits don't leave empty space or clip content.
   const _refreshTimers = new Map();
   function scheduleBlockPreviewRefresh(block){
     const id = block.id;
@@ -166,10 +169,18 @@ export function renderTaskPane(host, idx){
     _refreshTimers.set(id, setTimeout(() => {
       _refreshTimers.delete(id);
       const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
-      if(card){
-        const body = card.querySelector('.canvas-block-body');
-        if(body) renderBlockPreview(body, block);
-      }
+      if(!card) return;
+      const body = card.querySelector('.canvas-block-body');
+      if(body) renderBlockPreview(body, block);
+      // Wait one frame for the (possibly shadow-DOM) mount, then fit the card.
+      requestAnimationFrame(() => {
+        const newH = fitHeightForCard(card);
+        if(newH != null && Math.abs(newH - block.pos.h) > 15){
+          block.pos.h = newH;
+          card.style.height = newH + 'px';
+          adjustCanvasHeight();
+        }
+      });
     }, 250));
   }
 
@@ -196,22 +207,14 @@ export function renderTaskPane(host, idx){
     task.blocks.push(block);
     selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
     ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
-    // After mount, autofit height to actual rendered content.
+    // After mount, snap the new card's height to its actual rendered content.
     requestAnimationFrame(() => {
       const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
-      if(!card) return;
-      const cardBody = card.querySelector('.canvas-block-body');
-      const cardHeadEl = card.querySelector('.canvas-block-head');
-      const shadowHost = cardBody && cardBody.querySelector('.canvas-mount-host');
-      let contentH = 0;
-      if(shadowHost && shadowHost.shadowRoot){
-        const wrap = shadowHost.shadowRoot.querySelector('.canvas-mount-wrap');
-        if(wrap) contentH = wrap.scrollHeight;
-      } else if(cardBody) contentH = cardBody.scrollHeight;
-      if(contentH > 10){
-        const headH = cardHeadEl ? cardHeadEl.offsetHeight : 32;
-        const newH = Math.max(60, Math.round(contentH + headH + 8));
-        if(Math.abs(newH - block.pos.h) > 10){ block.pos.h = newH; card.style.height = newH + 'px'; adjustCanvasHeight(); }
+      const newH = fitHeightForCard(card);
+      if(newH != null && Math.abs(newH - block.pos.h) > 10){
+        block.pos.h = newH;
+        card.style.height = newH + 'px';
+        adjustCanvasHeight();
       }
     });
   }

@@ -1,5 +1,5 @@
 // ============================================================================
-// task-pane-bulk.js - Bulk operations on multi-selected canvas blocks:
+// task-pane-bulk.js: Bulk operations on multi-selected canvas blocks:
 // alignment, even distribution, duplicate, delete.
 // All functions take a ctx object built by task-pane.js.
 // ============================================================================

@@ -82,6 +82,7 @@
     svg.appendChild(createSvgElement('line', {x1:originX,y1:originY,x2:px,y2:py,stroke:'#1565ff','stroke-width':4}));
     svg.appendChild(createSvgElement('line', {x1:px,y1:originY,x2:px,y2:py,stroke:'#9bbdff','stroke-width':2,'stroke-dasharray':'5 4'}));
     svg.appendChild(createSvgElement('line', {x1:originX,y1:py,x2:px,y2:py,stroke:'#9bbdff','stroke-width':2,'stroke-dasharray':'5 4'}));
+    drawAngleArc(svg, point, width, height, pad);
     svg.appendChild(createSvgElement('circle', {cx:px,cy:py,r:7,fill:'#1565ff'}));
 
     const label = createSvgElement('text', {x:px+10,y:py-10,'font-size':16,fill:'#003b5c','font-weight':'700'});
@@ -89,6 +90,35 @@
     svg.appendChild(label);
 
     host.appendChild(svg);
+  }
+
+  function drawAngleArc(svg, point, width, height, pad){
+    if(!point || !Number.isFinite(point.r) || point.r <= 0.001) return;
+    const rawPhi = normalizeAngle(point.phi != null ? point.phi : Math.atan2(point.b, point.a));
+    const phi = Math.abs(rawPhi) < 1e-6 ? 0.001 : rawPhi;
+    const radius = Math.min(Math.max(point.r * 0.36, 0.65), (PLANE_MAX - PLANE_MIN) * 0.16);
+    const steps = Math.max(12, Math.ceil(Math.abs(phi) / (Math.PI / 36)));
+    const pts = [];
+    for(let i = 0; i <= steps; i++){
+      const t = phi * (i / steps);
+      pts.push([radius * Math.cos(t), radius * Math.sin(t)]);
+    }
+    const d = pts.map((p, i) => (i === 0 ? 'M' : 'L') + planeX(p[0], width, pad) + ' ' + planeY(p[1], height, pad)).join(' ');
+    svg.appendChild(createSvgElement('path', {d,fill:'none',stroke:'#d4a72a','stroke-width':3,'stroke-linecap':'round'}));
+
+    const mid = phi / 2;
+    const labelR = radius + 0.38;
+    const label = createSvgElement('text', {
+      x: planeX(labelR * Math.cos(mid), width, pad),
+      y: planeY(labelR * Math.sin(mid), height, pad),
+      'font-size':16,
+      fill:'#8a6a00',
+      'font-weight':'700',
+      'text-anchor':'middle',
+      'dominant-baseline':'middle'
+    });
+    label.textContent = 'φ';
+    svg.appendChild(label);
   }
 
   function showSection(name){
@@ -197,6 +227,17 @@
     renderComplexPlane(host, currentTask, {showCircle:false});
   }
 
+  function sameTask(a, b){
+    return !!a && !!b && a.a === b.a && a.b === b.b;
+  }
+
+  function pickDifferentTask(){
+    if(taskPool.length <= 1) return taskPool[0];
+    const candidates = taskPool.filter(task => !sameTask(task, currentTask));
+    const source = candidates.length ? candidates : taskPool;
+    return source[Math.floor(Math.random() * source.length)];
+  }
+
   function updateFinishButton(){
     const btn = document.getElementById('finishBtn');
     if(!btn) return;
@@ -206,7 +247,7 @@
   }
 
   function chooseNewTask(){
-    currentTask = taskPool[Math.floor(Math.random() * taskPool.length)];
+    currentTask = pickDifferentTask();
     achievedBest = 0;
     document.getElementById('taskRealInput').value = '';
     document.getElementById('taskImagInput').value = '';

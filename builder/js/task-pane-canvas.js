@@ -1,5 +1,5 @@
 // ============================================================================
-// task-pane-canvas.js - Canvas rendering for the task editor and the
+// task-pane-canvas.js: Canvas rendering for the task editor and the
 // direct-manipulation handlers (drag-to-move, drag-to-resize) with snap
 // guides and history snapshots.
 // ============================================================================
@@ -8,7 +8,7 @@ import { pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } f
 import {
   CANVAS_WIDTH, ensurePos,
   applySnap, applyResizeSnap, showSnapGuides, hideSnapGuides,
-  autoFitBlock
+  autoFitBlock, fitHeightForCard
 } from './canvas.js';
 import { renderBlockPreview } from './preview.js';
 import { renderTaskList } from './panes.js';
@@ -17,6 +17,7 @@ import { posLabel } from './task-pane-config.js';
 export function renderCanvas(ctx){
   const { task, canvas, selectedBlockIds } = ctx;
   canvas.querySelectorAll('.canvas-block-card, .canvas-block-empty').forEach(c => c.remove());
+  scheduleTemplateAutofitPass(ctx);
   task.blocks.forEach(block => {
     ensurePos(block, task.blocks);
     const def = window.Blocks.get(block.type);
@@ -188,5 +189,47 @@ export function installResizeHandler(ctx, handle, card, block){
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
+  });
+}
+
+// Auto-fit pass for newly-instantiated template blocks.
+// Templates ship with hardcoded default heights that rarely match the
+// rendered output for a given config. After the canvas DOM is built and the
+// shadow-DOM mounts have run, this measures each flagged block, updates
+// pos.h, and re-packs the column so nothing overlaps.
+function scheduleTemplateAutofitPass(ctx){
+  const { task, canvas } = ctx;
+  const flagged = (task.blocks || []).filter(b => b && b._needsAutofit);
+  if(flagged.length === 0) return;
+  // Two RAFs: the first lets the cards render, the second waits for any
+  // shadow-DOM mounts (preview.js renders block.mount() inside a shadow).
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    let changed = false;
+    flagged.forEach(block => {
+      delete block._needsAutofit;
+      if(!block.pos) return;
+      const card = canvas.querySelector('.canvas-block-card[data-block-id="' + cssEscape(block.id) + '"]');
+      const newH = fitHeightForCard(card);
+      if(newH != null && Math.abs(newH - block.pos.h) > 10){
+        block.pos.h = newH;
+        changed = true;
+      }
+    });
+    if(changed){
+      repackBlocksVertically(task.blocks);
+      renderCanvas(ctx);
+      ctx.adjustCanvasHeight();
+    }
+  }));
+}
+
+// Re-stack blocks vertically (x=20, snug vertical layout) preserving current Y order.
+function repackBlocksVertically(blocks){
+  const sorted = (blocks || []).filter(b => b && b.pos).slice().sort((a, b) => a.pos.y - b.pos.y);
+  let y = 20;
+  sorted.forEach(b => {
+    b.pos.x = 20;
+    b.pos.y = y;
+    y += b.pos.h + 16;
   });
 }

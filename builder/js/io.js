@@ -1,5 +1,5 @@
 // ============================================================================
-// io.js - Import/export: JSON config, SCORM-1.2 ZIP packaging, and the
+// io.js: Import/export: JSON config, SCORM-1.2 ZIP packaging, and the
 // in-browser preview iframe construction.
 // ============================================================================
 import {
@@ -71,9 +71,12 @@ function buildManifest(template, courseTitle, fileList){
     .replace(/__COURSE_TITLE__/g, escapeXml(courseTitle || 'SCORM Lerneinheit'))
     .replace('__RESOURCE_FILES__', fileXml);
 }
-function buildIndexHtml(template, blockFiles){
+function buildIndexHtml(template, blockFiles, themeJson, tasksJson){
   const tags = blockFiles.map(f => '  <script src="' + f + '"></script>').join('\n');
-  return template.replace('<!-- BLOCK_SCRIPTS -->', tags);
+  const dataScript = '<script>window.__SCORM_THEME__=' + themeJson + ';window.__SCORM_TASKS__=' + tasksJson + ';<\/script>';
+  return template
+    .replace('<!-- BLOCK_SCRIPTS -->', tags)
+    .replace('<!-- DATA_SCRIPT -->', dataScript);
 }
 async function gatherTemplateFiles(usedBlocks){
   const files = {};
@@ -96,7 +99,6 @@ async function buildZip(){
   const tmpl = await gatherTemplateFiles(used);
   const manifestTpl = await fetchTextRel('imsmanifest.xml');
   const blockFiles = used.map(b => 'blocks/' + BLOCK_FILES[b]).filter(Boolean);
-  const indexHtml = buildIndexHtml(tmpl['index.html'], blockFiles);
   const tasksJson = JSON.stringify({
     courseTitle: state.course.courseTitle,
     courseSubtitle: state.course.courseSubtitle,
@@ -107,6 +109,7 @@ async function buildZip(){
     })
   }, null, 2);
   const themeJson = JSON.stringify(state.theme, null, 2);
+  const indexHtml = buildIndexHtml(tmpl['index.html'], blockFiles, themeJson, tasksJson);
 
   let logoBlob = null, logoFilename = null;
   if(state.theme.logoUrl && !/^(https?:|data:)/i.test(state.theme.logoUrl)){

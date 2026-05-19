@@ -8,6 +8,7 @@
     graded: true,
     defaultConfig(){
       return {
+        blockTitle: '',
         src: '',
         zones: [],
         prompt: 'Klicke auf alle markierten Bereiche.',
@@ -17,16 +18,24 @@
     },
     builderSchema(){
       return [
+        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Hotzone' },
+        // Frage
+        { type:'section', label:'Frage', key:'_sec_q' },
         { key:'prompt', label:'Aufgabentext', type:'math-textarea', rows:2 },
-        { key:'src', label:'Bild', type:'image', help:'Lade ein Bild hoch oder gib eine URL ein.' },
-        { key:'zones', label:'Hotzonen markieren', type:'zone-editor',
-          help:'Ziehe auf dem Bild ein Rechteck, um eine Zone zu markieren. Klicke eine Zone an, um sie zu löschen.' },
+        // Bild & Zonen
+        { type:'section', label:'Bild & Zonen', key:'_sec_zones' },
+        { key:'src',   label:'Bild', type:'image',
+          help:'Bild hochladen oder URL eingeben.' },
+        { key:'zones', label:'Hotzonen einzeichnen', type:'zone-editor',
+          help:'Rechteck auf dem Bild ziehen → Zone hinzufügen. Zone anklicken → löschen.' },
+        // Einstellungen & Bewertung
+        { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
         { key:'showZonesAfterCheck', label:'Nicht gefundene Zonen nach Korrektur anzeigen', type:'boolean' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];
     },
     mount(host, config, api){
-      const ui = api.utils.simpleQuestionCard(host, { title:'Aufgabe', question: config.prompt || '' });
+      const ui = api.utils.simpleQuestionCard(host, { title: config.blockTitle || 'Aufgabe', qBoxTitle: 'Aufgabe', question: config.prompt || '' });
       const { content, buttons, fb } = ui;
 
       if(!config.src){
@@ -49,7 +58,7 @@
       overlay.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
       stage.appendChild(overlay);
 
-      // clicks made by user - each entry: {x, y, dot}
+      // clicks made by user: each entry: {x, y, dot}
       const clicks = [];
       const maxClicks = (config.zones || []).length;
 

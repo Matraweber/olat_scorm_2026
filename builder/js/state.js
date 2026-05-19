@@ -1,5 +1,5 @@
 // ============================================================================
-// state.js - Global app state, defaults, history (undo/redo), clipboard.
+// state.js: Global app state, defaults, history (undo/redo), clipboard.
 // `render` and `renderActivePane` are set by main.js to break circular imports.
 // ============================================================================
 import { toast } from './util.js';
@@ -19,10 +19,39 @@ export function defaultTheme(){
   };
 }
 
+const THEME_STORAGE_KEY = 'scorm-builder-persistent-theme';
+
+export function mergeTheme(theme){
+  return Object.assign(defaultTheme(), theme || {});
+}
+
+export function loadPersistentTheme(){
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    return raw ? mergeTheme(JSON.parse(raw)) : defaultTheme();
+  } catch(e){
+    return defaultTheme();
+  }
+}
+
+export function savePersistentTheme(theme){
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(mergeTheme(theme)));
+    return true;
+  } catch(e){
+    return false;
+  }
+}
+
+export function clearPersistentTheme(){
+  try { localStorage.removeItem(THEME_STORAGE_KEY); }
+  catch(e){}
+}
+
 export const state = {
   course: defaultCourse(),
-  theme: defaultTheme(),
-  selected: { kind: 'course' },  // {kind:'course'|'theme'} or {kind:'task', idx}
+  theme: loadPersistentTheme(),
+  selected: { kind: 'welcome' },  // {kind:'welcome'|'course'|'theme'} or {kind:'task', idx}
   jsonMode: false,
   userTemplates: []
 };

@@ -8,23 +8,41 @@
     graded: true,
     defaultConfig(){
       return {
-        question: 'Bringe die Schritte in die richtige Reihenfolge.',
-        items: ['Erster Schritt', 'Zweiter Schritt', 'Dritter Schritt', 'Letzter Schritt'],
+        blockTitle: '',
+        preset: 'custom',
+        question: '',
+        items: [],
         maxPoints: 1
       };
     },
     builderSchema(){
+      const isCustom = c => (c.preset || 'custom') === 'custom';
       return [
-        { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2 },
-        { key:'items', label:'Items in der korrekten Reihenfolge', type:'list', itemLabel:'Item',
-          itemSchema:[ { key:'value', label:'Text', type:'text' } ] },
+        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Sortierliste' },
+        { key:'preset', label:'Vorlage', type:'select', options:[
+          {value:'custom',          label:'Manuell (leer)'},
+          {value:'example-se',      label:'Beispiel: Informatik - Wasserfallmodell'},
+          {value:'example-science', label:'Beispiel: Wissenschaft - Wissenschaftliche Methode'},
+          {value:'example-algo',    label:'Beispiel: Algorithmus - Merge-Sort-Phasen'}
+        ], help:'Items werden in der eingegebenen Reihenfolge als korrekt gewertet. Beim Start zufällig gemischt.' },
+        { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
+        // Frage & Items
+        { type:'section', label:'Frage & Items', key:'_sec_q', showIf: isCustom },
+        { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom },
+        { key:'items', label:'Items', type:'list', itemLabel:'Item',
+          showIf: isCustom,
+          help:'Items in der richtigen Reihenfolge eingeben. Beim Start werden sie zufällig gemischt.',
+          itemSummary: item => (item.value || '…').slice(0, 70),
+          itemSchema:[ { key:'value', label:'Text', type:'text', fullWidth:true } ] },
+        // Bewertung
+        { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];
     },
     mount(host, config, api){
       const u = api.utils;
-      // Items can be array of strings or array of {value:string}
-      const correct = (config.items || []).map(it => typeof it === 'string' ? it : (it && it.value) || '');
+      const generated = sortListPreset(config);
+      const correct = generated.items.filter(Boolean);
       // Shuffle for display
       const order = correct.map((_, i) => i);
       for(let i = order.length - 1; i > 0; i--){
@@ -32,7 +50,7 @@
         [order[i], order[j]] = [order[j], order[i]];
       }
 
-      const ui = u.simpleQuestionCard(host, { title:'Sortieren', question: config.question || '' });
+      const ui = u.simpleQuestionCard(host, { title: config.blockTitle || 'Aufgabe', qBoxTitle: 'Sortieren', question: generated.question || config.question || '' });
       const { content, buttons, fb } = ui;
 
       const list = document.createElement('div');
@@ -101,23 +119,41 @@
     preview(host, config){
       const u = window.BlockUtils;
       const wrap = u.tagPreview(host, { icon:'↕', label:'Sortieren (D&D)', fillHeight:true });
-      if(config.question){
-        const q = document.createElement('div'); q.textContent = config.question;
+      const generated = sortListPreset(config);
+      if(generated.question){
+        const q = document.createElement('div'); q.textContent = generated.question;
         q.style.cssText = 'color:#003b5c; font-weight:700; margin-bottom:0.4rem; font-size:0.82rem;';
         wrap.appendChild(q);
       }
-      const items = (config.items || []).slice(0, 5);
-      items.forEach((it, i) => {
-        const txt = typeof it === 'string' ? it : (it && it.value) || '';
+      const items = generated.items.slice(0, 5);
+      items.forEach((txt, i) => {
         const li = document.createElement('div');
         li.style.cssText = 'display:flex; align-items:center; gap:0.4rem; padding:0.25rem 0.5rem; margin-bottom:0.2rem; background:#fff; border:1px solid #d8e0e6; border-radius:6px;';
         li.innerHTML = '<span style="color:#5d6872;">☰</span><span style="color:#003b5c; font-weight:700;">' + (i+1) + '.</span><span>' + (txt.length > 40 ? txt.slice(0,40) + '…' : txt) + '</span>';
         wrap.appendChild(li);
       });
-      if((config.items || []).length > 5){
-        const m = document.createElement('div'); m.textContent = '… +' + (config.items.length - 5) + ' weitere'; m.style.cssText = 'color:#888; font-size:0.78rem; padding-left:1rem; font-style:italic;';
+      if(generated.items.length > 5){
+        const m = document.createElement('div'); m.textContent = '… +' + (generated.items.length - 5) + ' weitere'; m.style.cssText = 'color:#888; font-size:0.78rem; padding-left:1rem; font-style:italic;';
         wrap.appendChild(m);
       }
     }
   });
+
+  function sortListPreset(config){
+    const preset = config.preset || 'custom';
+    const manual = (config.items || []).map(it => typeof it === 'string' ? it : (it && it.value) || '').filter(Boolean);
+    if(preset === 'example-se'){
+      return { question:'Ordnen Sie die Phasen des Wasserfallmodells in der richtigen Reihenfolge.',
+        items:['Anforderungsanalyse','Systemdesign','Implementierung','Testen','Abnahme','Wartung'] };
+    }
+    if(preset === 'example-science'){
+      return { question:'Ordnen Sie die Schritte der wissenschaftlichen Methode.',
+        items:['Beobachtung formulieren','Fragestellung entwickeln','Hypothese aufstellen','Experiment planen und durchführen','Daten auswerten','Schlussfolgerung ziehen'] };
+    }
+    if(preset === 'example-algo'){
+      return { question:'Ordnen Sie die Phasen des Merge-Sort-Algorithmus.',
+        items:['Liste in zwei Hälften teilen','Jede Hälfte rekursiv sortieren','Beide sortierten Hälften zusammenführen (merge)','Sortierte Gesamtliste zurückgeben'] };
+    }
+    return { question: config.question || '', items: manual };
+  }
 })();

@@ -1,5 +1,5 @@
 // Built-in task templates. The builder consumes window.BUILTIN_TEMPLATES.
-// Each template's blocks omit `id` - the builder generates fresh IDs on instantiation.
+// Each template's blocks omit `id`: the builder generates fresh IDs on instantiation.
 // `config` may be partial; for keys that aren't set the block's defaultConfig() applies.
 (function(){
   'use strict';
@@ -83,7 +83,7 @@
       id: 'tpl-match',
       label: 'Begriffe zuordnen',
       category: 'Frage',
-      description: 'Drag &amp; Drop oder Klick, linke Begriffe zu rechten Antworten verbinden.',
+      description: 'Drag & Drop oder Klick, linke Begriffe zu rechten Antworten verbinden.',
       task: {
         title: 'Zuordnung',
         blocks: [
@@ -142,7 +142,7 @@
       id: 'tpl-function',
       label: 'Funktion ablesen',
       category: 'Mathematik',
-      description: 'Funktion plotten und Wert / Nullstelle / Extremum ablesen lassen.',
+      description: 'Funktion plotten und Funktionswerte, Nullstellen oder Extrempunkte ablesen lassen.',
       task: {
         title: 'Funktionsanalyse',
         blocks: [

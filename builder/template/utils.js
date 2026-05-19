@@ -1,5 +1,5 @@
 // ============================================================================
-// utils.js - Shared helpers passed into every block's mount() as `api.utils`.
+// utils.js: Shared helpers passed into every block's mount() as `api.utils`.
 // Provides: DOM/SVG element builders, number/angle parsing, a safe math-
 // expression evaluator, two ready-made question-card layouts (questionCard /
 // simpleQuestionCard), a coordinate-plane renderer (renderPlane), a feedback
@@ -70,11 +70,23 @@
       return utils.sanitizeZero(x, 1e-9);
     },
     angleEqual(a, b, tol){ return Math.abs(utils.normalizeAngle(a - b)) <= (tol == null ? 0.06 : tol); },
+    normalizePowerSyntax(expr){
+      return String(expr || '').replace(/\^/g, '**').replace(/(^|[+\-*/(,])-([A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?)\*\*([A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?)/g, '$1-($2**$3)');
+    },
+    pickDifferent(list, current, isSame){
+      const arr = Array.isArray(list) ? list.filter(Boolean) : [];
+      if(!arr.length) return null;
+      if(arr.length === 1 || current == null) return arr[Math.floor(Math.random() * arr.length)];
+      const same = typeof isSame === 'function' ? isSame : (item, cur) => item === cur;
+      const candidates = arr.filter(item => !same(item, current));
+      const source = candidates.length ? candidates : arr;
+      return source[Math.floor(Math.random() * source.length)];
+    },
     safeMathExpr(expr, vars){
       const allowedFns = ['sin','cos','tan','asin','acos','atan','atan2','sinh','cosh','tanh','exp','log','log2','log10','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
       let s = String(expr || '').replace(/\s+/g, '').replace(/,/g, '.');
       if(!s) return null;
-      s = s.replace(/\^/g, '**');
+      s = utils.normalizePowerSyntax(s);
       const varNames = Object.keys(vars || {});
       const tokens = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
       for(const t of tokens){
@@ -174,14 +186,17 @@
     /**
      * Simpler question-card layout used by blocks where the answer area is
      * not a single text input (multiple-choice, sort-list, text-input, hotzone).
-     * Builds: section.section-card.block-question > h3 > [p with question] > content > button-cluster > feedback-box
+     * Layout matches questionCard / numeric-input visually: section-card > h3 >
+     * formula-box (Frage label + question text) > content > button-cluster > feedback.
      *
      * opts: {
-     *   title?: string         // h3 text (default 'Frage')
-     *   question?: string      // textual question; rendered into a <p>
-     *   questionHtml?: string  // HTML question; rendered into a <p> (overrides question)
+     *   title?: string         // h3 text (block-level title; default 'Aufgabe')
+     *   qBoxTitle?: string     // formula-box title (default 'Frage')
+     *   question?: string      // textual question; rendered into formula-text
+     *   questionHtml?: string  // HTML question; rendered into formula-text (overrides question)
      * }
-     * Returns: { card, content, buttons, fb }
+     * Returns: { card, qText, content, buttons, fb }
+     *   qText:   the formula-text div (caller can update later)
      *   content: empty <div> placeholder where caller appends block-specific UI
      *   buttons: <div class="button-cluster"> for caller to append <button>s
      *   fb:      feedbackBox API
@@ -191,14 +206,26 @@
       const card = document.createElement('section');
       card.className = 'section-card block-question';
       const h = document.createElement('h3');
-      h.textContent = opts.title || 'Frage';
+      h.textContent = opts.title || 'Aufgabe';
       card.appendChild(h);
-      if(opts.questionHtml != null || opts.question != null){
-        const p = document.createElement('p');
-        if(opts.questionHtml != null) p.innerHTML = opts.questionHtml;
-        else p.textContent = opts.question || '';
-        card.appendChild(p);
-      }
+
+      // Wrap the question in a formula-box for visual consistency with numeric-input/questionCard
+      const hasQuestion = (opts.questionHtml != null && String(opts.questionHtml).trim() !== '') ||
+                          (opts.question != null && String(opts.question).trim() !== '');
+      const qBox = document.createElement('div');
+      qBox.className = 'formula-box';
+      qBox.style.marginBottom = '1rem';
+      const qBoxTitle = document.createElement('div');
+      qBoxTitle.className = 'formula-title';
+      qBoxTitle.textContent = opts.qBoxTitle || 'Frage';
+      qBox.appendChild(qBoxTitle);
+      const qText = document.createElement('div');
+      qText.className = 'formula-text';
+      if(opts.questionHtml != null) qText.innerHTML = opts.questionHtml;
+      else if(opts.question != null) qText.textContent = opts.question;
+      qBox.appendChild(qText);
+      if(hasQuestion) card.appendChild(qBox);
+
       const content = document.createElement('div');
       content.className = 'block-content';
       card.appendChild(content);
@@ -207,7 +234,7 @@
       card.appendChild(buttons);
       const fb = utils.feedbackBox(card);
       host.appendChild(card);
-      return { card, content, buttons, fb };
+      return { card, qText, content, buttons, fb };
     },
     /**
      * Standard preview wrapper used in the builder canvas: a small padded div
@@ -219,7 +246,7 @@
      *   label?: string       // label text after the icon
      *   fillHeight?: boolean // set height:100%; overflow:hidden on wrap
      * }
-     * Returns: the wrap element (also the body - caller appends content to it).
+     * Returns: the wrap element (also the body: caller appends content to it).
      */
     tagPreview(host, opts){
       opts = opts || {};
@@ -290,6 +317,30 @@
       if(l.dash) el.setAttribute('stroke-dasharray', l.dash);
       svg.appendChild(el);
     });
+    (opts.arcs || []).forEach(a => {
+      const cx = a.cx == null ? 0 : Number(a.cx);
+      const cy = a.cy == null ? 0 : Number(a.cy);
+      const r = Math.abs(Number(a.r) || 0);
+      const start = Number(a.start) || 0;
+      const end = Number(a.end) || 0;
+      if(!r || Math.abs(end - start) < 1e-6) return;
+      const steps = Math.max(12, Math.ceil(Math.abs(end - start) / (Math.PI / 36)));
+      const pts = [];
+      for(let i = 0; i <= steps; i++){
+        const t = start + (end - start) * (i / steps);
+        pts.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+      }
+      const d = pts.map((pt, i) => (i === 0 ? 'M' : 'L') + sx(pt[0]) + ' ' + sy(pt[1])).join(' ');
+      const path = utils.svg('path', {d, stroke: a.stroke || '#d4a72a', fill:'none', 'stroke-width': a.strokeWidth || 3, 'stroke-linecap':'round'});
+      if(a.dash) path.setAttribute('stroke-dasharray', a.dash);
+      svg.appendChild(path);
+      if(a.label){
+        const mid = start + (end - start) / 2;
+        const labelR = r + (a.labelOffset == null ? 0.28 : Number(a.labelOffset));
+        const t = utils.svg('text', {x:sx(cx + labelR * Math.cos(mid)), y:sy(cy + labelR * Math.sin(mid)), 'font-size':a.labelSize || 16, fill:a.labelColor || '#8a6a00', 'font-weight':'700', 'text-anchor':'middle', 'dominant-baseline':'middle'});
+        t.textContent = a.label; svg.appendChild(t);
+      }
+    });
     (opts.points || []).forEach(p => {
       svg.appendChild(utils.svg('circle', {cx:sx(p.x), cy:sy(p.y), r: p.size || 7, fill: p.color || '#1565ff'}));
       if(p.label){
@@ -302,7 +353,7 @@
 
   // Auto-render LaTeX math inside an element using KaTeX (loaded via <script> in index.html).
   // Recognised delimiters: $...$, $$...$$, \(...\), \[...\]. No-op if KaTeX isn't loaded yet
-  // (will be re-rendered once it does load - see retryQueue below).
+  // (will be re-rendered once it does load: see retryQueue below).
   const _mathRetryQueue = [];
   let _katexWatcher = null;
   function _runMathRenderOn(root){
@@ -325,7 +376,7 @@
       _runMathRenderOn(root);
       return;
     }
-    // KaTeX not loaded yet - queue and re-attempt every 100ms until it arrives.
+    // KaTeX not loaded yet: queue and re-attempt every 100ms until it arrives.
     _mathRetryQueue.push(root);
     if(_katexWatcher) return;
     _katexWatcher = setInterval(() => {

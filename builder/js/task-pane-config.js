@@ -1,5 +1,5 @@
 // ============================================================================
-// task-pane-config.js - Renders the right-hand block-configuration pane.
+// task-pane-config.js: Renders the right-hand block-configuration pane.
 // Handles three states: empty selection, multi-select (bulk actions), and
 // single-block edit (schema-driven config form + validation warnings).
 // ============================================================================
@@ -103,16 +103,42 @@ function renderSingleBlockPane(ctx, sel){
   }
 
   if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
+
+  // Reset handler: fired by type:'action' buttons with action:'reset'
+  const prevHandler = configHost._blockActionHandler;
+  if(prevHandler) configHost.removeEventListener('block-field-action', prevHandler);
+  const actionHandler = e => {
+    if(e.detail && e.detail.action === 'reset'){
+      sel.config = def.defaultConfig ? def.defaultConfig() : {};
+      pushHistoryDebounced();
+      ctx.scheduleBlockPreviewRefresh(sel);
+      renderTaskList();
+      renderConfigPane(ctx);
+    }
+  };
+  configHost._blockActionHandler = actionHandler;
+  configHost.addEventListener('block-field-action', actionHandler);
+
   const schema = def.builderSchema ? def.builderSchema() : [];
   if(schema.length === 0){
     configHost.appendChild(el('div', {className:'field-help', text:'Dieser Block hat keine Konfiguration.'}));
   } else {
-    schema.forEach(spec => configHost.appendChild(renderField(spec, () => sel.config, (k, v) => {
-      pushHistoryDebounced();
-      sel.config[k] = v;
-      ctx.scheduleBlockPreviewRefresh(sel);
-      renderTaskList();
-    })));
+    const topConditionals = [];
+    function evalTopConditionals(){
+      topConditionals.forEach(c => { c.el.style.display = c.showIf(sel.config) ? '' : 'none'; });
+    }
+    schema.forEach(spec => {
+      const fieldEl = renderField(spec, () => sel.config, (k, v) => {
+        pushHistoryDebounced();
+        sel.config[k] = v;
+        ctx.scheduleBlockPreviewRefresh(sel);
+        renderTaskList();
+        evalTopConditionals();
+      });
+      configHost.appendChild(fieldEl);
+      if(spec.showIf) topConditionals.push({ el: fieldEl, showIf: spec.showIf });
+    });
+    evalTopConditionals();
   }
   const warnings = validateBlock(sel);
   if(warnings.length > 0){
