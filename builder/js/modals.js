@@ -2,9 +2,9 @@
 // modals.js: Block-type picker, task-create (Leer + Vorlagen),
 // save-template, preview modal open/close logic.
 // ============================================================================
-import { el, uid, toast } from './util.js';
+import { el, uid, toast, confirmDialog } from './util.js';
 import { state, pushHistory, render } from './state.js';
-import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates } from './tasks.js';
+import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates, captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
 
 // ===== Task-create modal =====
 export function openTaskCreateModal(){
@@ -87,9 +87,14 @@ function makeTplRow(tpl, isUser){
     });
 
     const delBtn = el('button', { className: 'btn btn-danger btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Löschen' });
-    delBtn.addEventListener('click', e => {
+    delBtn.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm('Vorlage "' + tpl.label + '" wirklich löschen?')) return;
+      if(!await confirmDialog({
+        title: 'Vorlage löschen?',
+        message: '„' + tpl.label + '" wird endgültig aus den Aufgaben-Vorlagen entfernt.',
+        confirmLabel: 'Löschen',
+        danger: true
+      })) return;
       const i = state.userTemplates.findIndex(x => x.id === tpl.id);
       if (i >= 0) { state.userTemplates.splice(i, 1); saveUserTemplates(); renderTemplateList(); }
     });
@@ -131,11 +136,20 @@ export function openSaveTemplateModal(task){
 }
 
 // ===== Block-type modal =====
+// `onPick` is called with either:
+//   • a block-type id (string)   for built-in blocks
+//   • a block-template object    for user-saved block-vorlagen
+// Callers in task-pane.js inspect the shape and instantiate accordingly.
 export function openBlockTypeModal(onPick){
-  const nav  = document.getElementById('blockCatNav');
-  const list = document.getElementById('blockTypeList');
+  const nav    = document.getElementById('blockCatNav');
+  const list   = document.getElementById('blockTypeList');
+  // Note: `search` is reassigned below after we cloneNode-swap the element
+  // to drop stale listeners from a previous modal open. Functions in this
+  // closure that read `search.value` must reference the up-to-date binding.
+  let   search = document.getElementById('blockPickerSearch');
   nav.innerHTML  = '';
   list.innerHTML = '';
+  if(search) search.value = '';
 
   const all = window.Blocks.all().slice().sort((a, b) =>
     (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label)
@@ -146,8 +160,89 @@ export function openBlockTypeModal(onPick){
     (byCat[cat] = byCat[cat] || []).push(def);
   });
 
+  // Block-Vorlagen (user-saved snippets)
+  // Each is represented as a synthetic "def" with `isTemplate=true` and the
+  // original template object attached as `tpl`. The renderRow function
+  // checks the flag and routes the click to onPick with the template object
+  // instead of a block id.
+  const userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
+  if(userBlockTemplates.length > 0){
+    byCat['Eigene Vorlagen'] = userBlockTemplates.map(tpl => {
+      const baseDef = window.Blocks.get(tpl.blockType);
+      return {
+        id: tpl.id,
+        label: tpl.label,
+        description: tpl.description || ('Vorlage basiert auf: ' + (baseDef ? baseDef.label : tpl.blockType)),
+        icon: baseDef ? baseDef.icon : null,
+        category: 'Eigene Vorlagen',
+        isTemplate: true,
+        tpl: tpl
+      };
+    });
+  }
+
   const cats = Object.keys(byCat);
   let activeCat = cats[0];
+
+  function renderRow(def){
+    const row = el('button', { className: 'block-type-row', attrs: { type: 'button' } });
+    if(def.isTemplate) row.classList.add('block-type-row-template');
+    const ico = el('span', { className: 'block-type-ico' });
+    // For templates: use the base block's icon if available
+    const iconKey = def.isTemplate
+      ? (window.Blocks.get(def.tpl.blockType)?.id || def.tpl.blockType)
+      : def.id;
+    const svgIcon = window.BlockIcons && window.BlockIcons.get(iconKey);
+    if(svgIcon){ ico.innerHTML = svgIcon; }
+    else { ico.textContent = def.icon || '?'; }
+    row.appendChild(ico);
+    const body = el('div', { className: 'block-type-body' });
+    const labelEl = el('span', { className: 'block-type-label', text: def.label });
+    if(def.isTemplate){
+      // Show a "Vorlage" badge so users can distinguish saved snippets
+      // from built-in block types.
+      labelEl.appendChild(el('span', { className: 'block-type-badge block-type-badge-template', text: 'Vorlage' }));
+    } else if(def.graded){
+      labelEl.appendChild(el('span', { className: 'block-type-badge', text: 'gewertet' }));
+    }
+    body.appendChild(labelEl);
+    if (def.description) body.appendChild(el('span', { className: 'block-type-desc', text: def.description }));
+    row.appendChild(body);
+
+    // Templates also get a small "✕" delete control on hover
+    if(def.isTemplate){
+      const del = el('button', {
+        className: 'block-type-template-delete',
+        attrs: { type:'button', title:'Vorlage löschen', 'aria-label':'Vorlage löschen' },
+        text: '✕'
+      });
+      del.addEventListener('click', async e => {
+        e.stopPropagation();
+        if(!await confirmDialog({
+          title: 'Block-Vorlage löschen?',
+          message: '„' + def.label + '" wird endgültig aus den eigenen Block-Vorlagen entfernt.',
+          confirmLabel: 'Löschen',
+          danger: true
+        })) return;
+        const idx = (state.userBlockTemplates || []).findIndex(t => t.id === def.tpl.id);
+        if(idx >= 0){
+          state.userBlockTemplates.splice(idx, 1);
+          import('./tasks.js').then(m => m.saveUserBlockTemplates());
+          // Re-render the picker so the row disappears
+          openBlockTypeModal(onPick);
+        }
+      });
+      row.appendChild(del);
+    }
+
+    row.addEventListener('click', () => {
+      document.getElementById('blockTypeModal').classList.add('hidden');
+      // Built-in blocks: pass the id string. Templates: pass the template
+      // object so the caller can deep-clone the config.
+      onPick(def.isTemplate ? def.tpl : def.id);
+    });
+    return row;
+  }
 
   function showCat(cat){
     activeCat = cat;
@@ -155,25 +250,37 @@ export function openBlockTypeModal(onPick){
       btn.classList.toggle('active', btn.dataset.cat === cat);
     });
     list.innerHTML = '';
-    (byCat[cat] || []).forEach(def => {
-      const row = el('button', { className: 'block-type-row', attrs: { type: 'button' } });
+    (byCat[cat] || []).forEach(def => list.appendChild(renderRow(def)));
+  }
 
-      const ico = el('span', { className: 'block-type-ico', text: def.icon || '?' });
-      row.appendChild(ico);
-
-      const body = el('div', { className: 'block-type-body' });
-      const labelEl = el('span', { className: 'block-type-label', text: def.label });
-      if (def.graded) labelEl.appendChild(el('span', { className: 'block-type-badge', text: 'gewertet' }));
-      body.appendChild(labelEl);
-      if (def.description) body.appendChild(el('span', { className: 'block-type-desc', text: def.description }));
-      row.appendChild(body);
-
-      row.addEventListener('click', () => {
-        document.getElementById('blockTypeModal').classList.add('hidden');
-        onPick(def.id);
-      });
-      list.appendChild(row);
+  // Live search: as the user types, replace the category-filtered list with
+  // a global flat list of matches. An empty query restores the category view.
+  function applySearch(){
+    if(!search) return;
+    const q = search.value.trim().toLowerCase();
+    if(!q){
+      // Re-enable nav clickability and restore the active category.
+      nav.classList.remove('search-active');
+      showCat(activeCat);
+      return;
+    }
+    nav.classList.add('search-active');
+    // Search across built-in blocks AND user templates so both are findable.
+    const allRows = all.concat(byCat['Eigene Vorlagen'] || []);
+    const matches = allRows.filter(def => {
+      const hay = (def.label + ' ' + (def.description || '') + ' ' + (def.category || '')).toLowerCase();
+      return hay.includes(q);
     });
+    list.innerHTML = '';
+    if(matches.length === 0){
+      const empty = el('div', {
+        className: 'block-picker-empty',
+        text: 'Kein Block-Typ entspricht „' + search.value + '".'
+      });
+      list.appendChild(empty);
+      return;
+    }
+    matches.forEach(def => list.appendChild(renderRow(def)));
   }
 
   cats.forEach(cat => {
@@ -183,9 +290,38 @@ export function openBlockTypeModal(onPick){
       attrs: { type: 'button' }
     });
     btn.dataset.cat = cat;
-    btn.addEventListener('click', () => showCat(cat));
+    btn.addEventListener('click', () => {
+      // Clicking a category clears the search and shows that category.
+      if(search) search.value = '';
+      nav.classList.remove('search-active');
+      showCat(cat);
+    });
     nav.appendChild(btn);
   });
+
+  if(search){
+    // Avoid stacking listeners across modal opens by replacing the input.
+    // Update the outer `search` binding so other closures (applySearch,
+    // category-click handler, etc.) read from the live element.
+    const fresh = search.cloneNode(true);
+    search.replaceWith(fresh);
+    search = fresh;
+    fresh.addEventListener('input', applySearch);
+    fresh.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape' && fresh.value){
+        e.preventDefault();
+        fresh.value = '';
+        applySearch();
+      }
+      // Enter picks the first match.
+      if(e.key === 'Enter'){
+        const first = list.querySelector('.block-type-row');
+        if(first){ e.preventDefault(); first.click(); }
+      }
+    });
+    // Focus the search field on open so the user can immediately type.
+    setTimeout(() => fresh.focus({ preventScroll: true }), 0);
+  }
 
   showCat(cats[0]);
   document.getElementById('blockTypeModal').classList.remove('hidden');

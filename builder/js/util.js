@@ -86,3 +86,70 @@ export function toast(msg, type){
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
 }
+
+// Styled confirmation dialog - replaces the native `confirm()` modal so
+// the visual matches the rest of the builder. Returns a Promise<boolean>.
+// Options:
+//   • title         optional bold heading line
+//   • message       primary body text (required)
+//   • confirmLabel  button text for "OK" (default: "OK")
+//   • cancelLabel   button text for "Cancel" (default: "Abbrechen")
+//   • danger        if true, the confirm button gets a red destructive style
+//
+// Falls back to native `confirm()` if the DOM isn't available (e.g. SSR /
+// very early call before <body> exists).
+export function confirmDialog(opts){
+  if(typeof document === 'undefined' || !document.body){
+    return Promise.resolve(window.confirm(opts && opts.message ? opts.message : 'OK?'));
+  }
+  const {
+    title = '',
+    message = '',
+    confirmLabel = 'OK',
+    cancelLabel = 'Abbrechen',
+    danger = false
+  } = opts || {};
+  return new Promise(resolve => {
+    const prevFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal confirm-dialog';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    const titleHtml = title ? '<h2 class="confirm-dialog-title">' + escapeHtml(title) + '</h2>' : '';
+    overlay.innerHTML =
+      '<div class="modal-card confirm-dialog-card">' +
+        titleHtml +
+        '<p class="confirm-dialog-message">' + escapeHtml(message) + '</p>' +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-secondary confirm-dialog-cancel" type="button">' + escapeHtml(cancelLabel) + '</button>' +
+          '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + ' confirm-dialog-ok" type="button">' + escapeHtml(confirmLabel) + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const okBtn = overlay.querySelector('.confirm-dialog-ok');
+    const cancelBtn = overlay.querySelector('.confirm-dialog-cancel');
+    function cleanup(result){
+      document.removeEventListener('keydown', onKey, true);
+      overlay.removeEventListener('mousedown', onBackdrop);
+      overlay.remove();
+      if(prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus({ preventScroll: true });
+      resolve(result);
+    }
+    function onKey(e){
+      if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); cleanup(false); }
+      else if(e.key === 'Enter' && e.target !== cancelBtn){ e.preventDefault(); cleanup(true); }
+    }
+    function onBackdrop(e){
+      // Click on backdrop (the overlay itself) cancels. Click on card does not.
+      if(e.target === overlay) cleanup(false);
+    }
+    okBtn.addEventListener('click', () => cleanup(true));
+    cancelBtn.addEventListener('click', () => cleanup(false));
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', onBackdrop);
+    // Focus the confirm button so Enter submits and screen readers announce
+    // the modal. Use setTimeout so the layout settles first.
+    setTimeout(() => okBtn.focus({ preventScroll: true }), 0);
+  });
+}
+

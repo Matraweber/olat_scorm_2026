@@ -154,7 +154,7 @@
     {value:'ex-data',    label:'Beispiel: Datenmenge  (GiB ↔ GB, MiB ↔ MB)'},
     {value:'ex-power',   label:'Beispiel: Leistung  (hp, kW, W)'},
     {value:'ex-length',  label:'Beispiel: Länge  (nm, μm, km, mi, in)'},
-    {value:'ex-mixed',   label:'Beispiel: Gemischt - alle Kategorien'}
+    {value:'ex-mixed',   label:'Beispiel: Gemischt, alle Kategorien'}
   ];
 
   const EXAMPLE_PRESETS = {

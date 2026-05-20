@@ -7,11 +7,24 @@
     icon: '☑',
     graded: true,
     defaultConfig(){
-      // Sensible starting content so a freshly created block (and the
-      // welcome-page live preview) shows a complete, editable example.
+      // Fresh block on the canvas starts empty - the user fills it in.
+      // For the welcome-page preview we expose `previewConfig` below with a
+      // populated example so the modal isn't blank.
       return {
         blockTitle: '',
         preset: 'custom',
+        question: '',
+        choices: [],
+        multi: false,
+        shuffle: true,
+        maxPoints: 1,
+        partialCredit: true,
+        penalizeWrong: true
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '', preset: 'custom',
         question: 'Welche Hauptstadt gehört zu Deutschland?',
         choices: [
           { text: 'Berlin',  correct: true  },
@@ -19,11 +32,8 @@
           { text: 'Wien',    correct: false },
           { text: 'Hamburg', correct: false }
         ],
-        multi: false,
-        shuffle: true,
-        maxPoints: 1,
-        partialCredit: true,
-        penalizeWrong: true
+        multi: false, shuffle: true, maxPoints: 1,
+        partialCredit: true, penalizeWrong: true
       };
     },
     builderSchema(){
@@ -32,9 +42,9 @@
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Multiple Choice' },
         { key:'preset', label:'Vorlage', type:'select', options:[
           {value:'custom',         label:'Manuell (leer)'},
-          {value:'example-single', label:'Beispiel: Informatik - Zeitkomplexität (Einfachauswahl)'},
-          {value:'example-multi',  label:'Beispiel: Informatik - OOP-Konzepte (Mehrfachauswahl)'},
-          {value:'example-math',   label:'Beispiel: Mathematik - Ableitungsregeln (Einfachauswahl)'}
+          {value:'example-single', label:'Beispiel: Informatik, Zeitkomplexität (Einfachauswahl)'},
+          {value:'example-multi',  label:'Beispiel: Informatik, OOP-Konzepte (Mehrfachauswahl)'},
+          {value:'example-math',   label:'Beispiel: Mathematik, Ableitungsregeln (Einfachauswahl)'}
         ], help:'Beispiele zeigen die Möglichkeiten des Blocks. Eigene Inhalte unter „Manuell" eingeben.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
         // Frage

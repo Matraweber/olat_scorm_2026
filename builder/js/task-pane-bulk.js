@@ -3,7 +3,7 @@
 // alignment, even distribution, duplicate, delete.
 // All functions take a ctx object built by task-pane.js.
 // ============================================================================
-import { uid } from './util.js';
+import { uid, confirmDialog } from './util.js';
 import { renderTaskList } from './panes.js';
 
 export function bulkAlign(ctx, edge){
@@ -64,9 +64,17 @@ export function bulkDuplicate(ctx){
   ctx.renderCanvas(); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
 }
 
-export function bulkDelete(ctx){
+export async function bulkDelete(ctx){
   const sel = ctx.selectedBlocks(); if(sel.length === 0) return;
-  if(!confirm(sel.length === 1 ? 'Block löschen?' : sel.length + ' Blöcke löschen?')) return;
+  const ok = await confirmDialog({
+    title: sel.length === 1 ? 'Block löschen?' : sel.length + ' Blöcke löschen?',
+    message: sel.length === 1
+      ? 'Der markierte Block wird von der Canvas entfernt.'
+      : 'Alle ' + sel.length + ' markierten Blöcke werden von der Canvas entfernt.',
+    confirmLabel: 'Löschen',
+    danger: true
+  });
+  if(!ok) return;
   const ids = sel.map(b => b.id);
   // In-place removal keeps task.blocks and task.tabs[i].blocks pointing at the same array
   for(let bi = ctx.task.blocks.length - 1; bi >= 0; bi--){

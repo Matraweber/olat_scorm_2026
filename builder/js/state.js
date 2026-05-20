@@ -19,7 +19,9 @@ export function defaultTheme(){
   };
 }
 
-const THEME_STORAGE_KEY = 'scorm-builder-persistent-theme';
+const THEME_STORAGE_KEY    = 'scorm-builder-persistent-theme';
+const AUTOSAVE_KEY         = 'scorm-builder-autosave-course';
+const AUTOSAVE_META_KEY    = 'scorm-builder-autosave-meta';
 
 export function mergeTheme(theme){
   return Object.assign(defaultTheme(), theme || {});
@@ -46,6 +48,96 @@ export function savePersistentTheme(theme){
 export function clearPersistentTheme(){
   try { localStorage.removeItem(THEME_STORAGE_KEY); }
   catch(e){}
+}
+
+// ============================================================================
+// Autosave: every change to `state.course` is mirrored to localStorage so the
+// browser tab can be closed without losing work. On next load main.js asks the
+// user whether to restore the saved course or start fresh.
+// ============================================================================
+let _autosaveTimer = null;
+let _onAutosave = null;     // optional callback for UI ("Gespeichert vor 3 s")
+let _onAutosavePending = null; // optional callback when a save was just scheduled
+
+export function setAutosaveListener(fn){ _onAutosave = typeof fn === 'function' ? fn : null; }
+export function setAutosavePendingListener(fn){ _onAutosavePending = typeof fn === 'function' ? fn : null; }
+
+// Returns true iff the saved course is non-empty (= has at least one task or
+// a non-default title). Lets main.js skip the recovery prompt for pristine
+// snapshots that wouldn't add anything.
+function courseHasContent(c){
+  if(!c) return false;
+  const def = defaultCourse();
+  if(Array.isArray(c.tasks) && c.tasks.length > 0) return true;
+  if(c.courseTitle && c.courseTitle !== def.courseTitle) return true;
+  if(c.courseSubtitle && c.courseSubtitle.trim() !== '') return true;
+  return false;
+}
+
+export function isAutosaveAvailable(){
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if(!raw) return false;
+    const c = JSON.parse(raw);
+    return courseHasContent(c);
+  } catch(e){ return false; }
+}
+
+export function loadAutosave(){
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+export function loadAutosaveMeta(){
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_META_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+// Write through immediately (no debounce). Caller decides timing.
+export function saveAutosave(course){
+  try {
+    if(!courseHasContent(course)){
+      // Avoid littering localStorage with empty defaults.
+      localStorage.removeItem(AUTOSAVE_KEY);
+      localStorage.removeItem(AUTOSAVE_META_KEY);
+      return;
+    }
+    const ts = Date.now();
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(course));
+    localStorage.setItem(AUTOSAVE_META_KEY, JSON.stringify({
+      ts,
+      taskCount: Array.isArray(course.tasks) ? course.tasks.length : 0,
+      courseTitle: course.courseTitle || ''
+    }));
+    if(_onAutosave) try { _onAutosave({ ts }); } catch(e){}
+  } catch(e){
+    // Quota exceeded or private-mode browser - silently ignore so we never
+    // disrupt the user. The user can still manually export via the SCORM ZIP.
+  }
+}
+
+export function clearAutosave(){
+  try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_META_KEY); } catch(e){}
+}
+
+// Debounced variant for hot paths (typing, dragging). 800 ms after the last
+// call we write through. A flush-on-unload safety net catches the last edit
+// (registered by main.js). We also notify the pending listener (UI shows
+// "Wird gespeichert …") so the indicator reflects the in-flight state.
+export function scheduleAutosave(){
+  if(!_autosaveTimer && _onAutosavePending){
+    try { _onAutosavePending(); } catch(e){}
+  }
+  if(_autosaveTimer) clearTimeout(_autosaveTimer);
+  _autosaveTimer = setTimeout(() => { _autosaveTimer = null; saveAutosave(state.course); }, 800);
+}
+export function flushAutosave(){
+  if(_autosaveTimer){ clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+  saveAutosave(state.course);
 }
 
 export const state = {
@@ -88,6 +180,7 @@ export function pushHistory(){
   history.past.push(snapshotState());
   if(history.past.length > HISTORY_LIMIT) history.past.shift();
   history.future = [];
+  scheduleAutosave();
 }
 
 let _pendingHistorySnap = null;
@@ -98,6 +191,7 @@ export function commitHistorySnap(){
   if(history.past.length > HISTORY_LIMIT) history.past.shift();
   history.future = [];
   _pendingHistorySnap = null;
+  scheduleAutosave();
 }
 export function discardHistorySnap(){ _pendingHistorySnap = null; }
 
@@ -112,12 +206,14 @@ export function undo(){
   if(history.past.length === 0){ toast('Nichts zum Rückgängigmachen.'); return; }
   history.future.push(snapshotState());
   applySnapshot(history.past.pop());
+  scheduleAutosave();
   toast('Rückgängig');
 }
 export function redo(){
   if(history.future.length === 0){ toast('Nichts zum Wiederherstellen.'); return; }
   history.past.push(snapshotState());
   applySnapshot(history.future.pop());
+  scheduleAutosave();
   toast('Wiederherstellen');
 }
 

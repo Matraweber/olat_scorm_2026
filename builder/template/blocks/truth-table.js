@@ -22,11 +22,11 @@
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Wahrheitstabelle' },
         { key:'expressionPreset', label:'Vorlage', type:'select', options:[
           {value:'custom',     label:'Manuell (leer)'},
-          {value:'basics-2',   label:'Beispiel: Logik - AND, OR, NOT  (2 Variablen)'},
-          {value:'mixed-2',    label:'Beispiel: Logik - Gemischt  (2 Variablen)'},
-          {value:'mixed-3',    label:'Beispiel: Logik - Gemischt  (3 Variablen)'},
-          {value:'de-morgan',  label:'Beispiel: Logik - De-Morgan-Gesetze'},
-          {value:'xor',        label:'Beispiel: Logik - XOR / Entweder-oder'}
+          {value:'basics-2',   label:'Beispiel: AND, OR, NOT (2 Variablen)'},
+          {value:'mixed-2',    label:'Beispiel: Gemischte Logik (2 Variablen)'},
+          {value:'mixed-3',    label:'Beispiel: Gemischte Logik (3 Variablen)'},
+          {value:'de-morgan',  label:'Beispiel: De-Morgan-Gesetze'},
+          {value:'xor',        label:'Beispiel: XOR / Entweder-oder'}
         ]},
         { type:'action', label:'↺ Zurücksetzen', action:'reset',
           showIf: c => (c.expressionPreset || 'custom') === 'custom' },

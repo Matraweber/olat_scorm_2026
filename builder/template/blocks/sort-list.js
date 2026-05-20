@@ -8,14 +8,17 @@
     graded: true,
     defaultConfig(){
       return {
-        blockTitle: '',
-        preset: 'custom',
+        blockTitle: '', preset: 'custom',
+        question: '', items: [], maxPoints: 1
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '', preset: 'custom',
         question: 'Bringen Sie die Planeten in die richtige Reihenfolge (sonnennah zu sonnenfern).',
         items: [
-          { value: 'Merkur' },
-          { value: 'Venus'  },
-          { value: 'Erde'   },
-          { value: 'Mars'   }
+          { value: 'Merkur' }, { value: 'Venus' },
+          { value: 'Erde'   }, { value: 'Mars'  }
         ],
         maxPoints: 4
       };
@@ -26,9 +29,9 @@
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Sortierliste' },
         { key:'preset', label:'Vorlage', type:'select', options:[
           {value:'custom',          label:'Manuell (leer)'},
-          {value:'example-se',      label:'Beispiel: Informatik - Wasserfallmodell'},
-          {value:'example-science', label:'Beispiel: Wissenschaft - Wissenschaftliche Methode'},
-          {value:'example-algo',    label:'Beispiel: Algorithmus - Merge-Sort-Phasen'}
+          {value:'example-se',      label:'Beispiel: Informatik, Wasserfallmodell'},
+          {value:'example-science', label:'Beispiel: Wissenschaft, Wissenschaftliche Methode'},
+          {value:'example-algo',    label:'Beispiel: Algorithmus, Merge-Sort-Phasen'}
         ], help:'Items werden in der eingegebenen Reihenfolge als korrekt gewertet. Beim Start zufällig gemischt.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
         // Frage & Items

@@ -564,7 +564,7 @@
       }
       mkToolBtn('move',  'Verschieben-Werkzeug (V)',
         '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path d="M10 2 L13 5 L11 5 L11 9 L15 9 L15 7 L18 10 L15 13 L15 11 L11 11 L11 15 L13 15 L10 18 L7 15 L9 15 L9 11 L5 11 L5 13 L2 10 L5 7 L5 9 L9 9 L9 5 L7 5 Z"/></svg>');
-      mkToolBtn('select','Auswahl-Werkzeug (S) - Rahmen aufziehen für Mehrfachauswahl',
+      mkToolBtn('select','Auswahl-Werkzeug (S): Rahmen aufziehen für Mehrfachauswahl',
         '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1" stroke-dasharray="3 2"/><path d="M9 9 L13 13 M11 13 L13 13 L13 11" fill="currentColor"/></svg>');
       bar.appendChild(toolGroup);
 
@@ -632,7 +632,7 @@
           const noBtn = document.createElement('button');
           noBtn.type = 'button';
           noBtn.className = 'comp-tool-btn comp-tool-btn-sm' + (transparent ? ' comp-tool-btn-active' : '');
-          noBtn.title = transparent ? 'Transparent ein - klick für Farbe' : 'Auf transparent setzen';
+          noBtn.title = transparent ? 'Transparent ein: klick für Farbe' : 'Auf transparent setzen';
           noBtn.innerHTML = ACTION_ICONS.transparent;
           noBtn.addEventListener('click', e => {
             e.stopPropagation();
@@ -742,7 +742,7 @@
         const dashSel = document.createElement('select');
         dashSel.className = 'comp-tool-select';
         dashSel.title = 'Linienstil';
-        [['solid','- durchgezogen'], ['dashed','┄ gestrichelt'], ['dotted','┈ gepunktet']].forEach(([v, lbl]) => {
+        [['solid','─ durchgezogen'], ['dashed','┄ gestrichelt'], ['dotted','┈ gepunktet']].forEach(([v, lbl]) => {
           const o = document.createElement('option'); o.value = v; o.textContent = lbl;
           dashSel.appendChild(o);
         });
@@ -1712,8 +1712,28 @@
         return;
       }
 
-      // All remaining shortcuts require at least one selected shape.
+      // Ctrl+A and Delete are handled by the composition even with zero
+      // shapes - otherwise they bubble to main.js and start operating on
+      // the outer block card (selecting/deleting the whole composition),
+      // which is rarely what the user means when focus is inside this
+      // editor. Ctrl+A with zero shapes is a harmless no-op; Delete with
+      // zero shapes does nothing but does NOT delete the host block.
       const sels = selIndices();
+      if(mod && (key === 'a' || key === 'A')){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setSelection((block.config.shapes || []).map((_, i) => i));
+        render();
+        return;
+      }
+      if(key === 'Delete' || key === 'Backspace'){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if(sels.length > 0) deleteSelected();
+        return;
+      }
+
+      // All remaining shortcuts require at least one selected shape.
       if(sels.length === 0) return;
 
       if(mod && (key === 'c' || key === 'C')){
@@ -1741,20 +1761,6 @@
         commit();
         return;
       }
-      if(key === 'Delete' || key === 'Backspace'){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        deleteSelected();
-        return;
-      }
-      // ⌘/Ctrl + A: select all shapes in this composition.
-      if(mod && (key === 'a' || key === 'A')){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setSelection((block.config.shapes || []).map((_, i) => i));
-        render();
-        return;
-      }
       if(key === 'Escape'){
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -1764,14 +1770,16 @@
     }
     // Register in the CAPTURE phase so this listener fires before main.js's
     // bubble-phase global shortcut handler (and can stopImmediatePropagation it).
-    // Re-mounting the editor (e.g. on every commit) would otherwise stack
-    // listeners on document. Remove any previously registered handler before
-    // adding the new one.
-    if(host._compKeyHandler){
-      document.removeEventListener('keydown', host._compKeyHandler, true);
+    // Re-mounting the editor would otherwise stack listeners on document.
+    // The previous handler reference is stored on the BLOCK (not the host
+    // element) because a full task-pane re-render swaps out the host node -
+    // a host-scoped reference would orphan the old listener and let it
+    // intercept future keydowns from a detached DOM tree.
+    if(block._compKeyHandler){
+      document.removeEventListener('keydown', block._compKeyHandler, true);
     }
     document.addEventListener('keydown', onKeyDown, true);
-    host._compKeyHandler = onKeyDown;
+    block._compKeyHandler = onKeyDown;
 
     render();
   }
@@ -1832,7 +1840,7 @@
     const btn = document.createElement('button');
     btn.className = 'primary';
     btn.type = 'button';
-    btn.textContent = 'Verstanden - ' + maxPoints + ' Pkt.';
+    btn.textContent = 'Verstanden (' + maxPoints + ' Pkt.)';
     let done = false;
     btn.addEventListener('click', () => {
       if(done) return;
@@ -2146,6 +2154,15 @@
         prompt: '',
         // For 'click' mode: penalize wrong clicks?
         penalizeWrong: false,
+        shapes: []
+      };
+    },
+    previewConfig(){
+      // Used by the welcome-page modal - shows what a composition can look
+      // like without forcing every new block to start populated.
+      return {
+        blockTitle: '', canvasWidth: 600, canvasHeight: 360, background: '#ffffff',
+        gradingMode: 'none', maxPoints: 1, prompt: '', penalizeWrong: false,
         shapes: [
           { type:'rect',  x: 60, y: 80, w:480, h:200, color:'#003b5c', fill:'#eef5f8', strokeWidth: 2, dash:'solid' },
           { type:'label', x:100, y:160, text:'Beispiel-Komposition', color:'#003b5c', fontSize:28, fontWeight:'700' },

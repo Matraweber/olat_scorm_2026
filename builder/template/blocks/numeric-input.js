@@ -2,10 +2,10 @@
   'use strict';
   const PRESET_OPTIONS = [
     {value:'custom',         label:'Manuell (leer)'},
-    {value:'pythagoras',     label:'Beispiel: Mathematik - Pythagoras  (c = √(a²+b²))'},
-    {value:'rectangle-area', label:'Beispiel: Mathematik - Rechteckfläche  (A = a·b)'},
-    {value:'circle-area',    label:'Beispiel: Mathematik - Kreisfläche  (A = π·r²)'},
-    {value:'ohm',            label:'Beispiel: Physik - Ohmsches Gesetz  (U = R·I)'}
+    {value:'pythagoras',     label:'Beispiel: Pythagoras (c = √(a²+b²))'},
+    {value:'rectangle-area', label:'Beispiel: Rechteckfläche (A = a·b)'},
+    {value:'circle-area',    label:'Beispiel: Kreisfläche (A = π·r²)'},
+    {value:'ohm',            label:'Beispiel: Ohmsches Gesetz (U = R·I)'}
   ];
 
   Blocks.register('numeric-input', {
@@ -18,15 +18,23 @@
       return {
         blockTitle: '',
         preset: 'custom',
+        questionTemplate: '',
+        variables: [],
+        formula: '',
+        tolerance: 0.01,
+        unit: '',
+        maxPoints: 1
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '', preset: 'custom',
         questionTemplate: 'Wie viel ist {a} + {b}?',
         variables: [
           { name: 'a', min: 1, max: 10, step: 1 },
           { name: 'b', min: 1, max: 10, step: 1 }
         ],
-        formula: 'a + b',
-        tolerance: 0.01,
-        unit: '',
-        maxPoints: 1
+        formula: 'a + b', tolerance: 0.01, unit: '', maxPoints: 1
       };
     },
     builderSchema(){

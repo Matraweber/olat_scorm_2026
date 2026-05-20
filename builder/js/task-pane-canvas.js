@@ -3,8 +3,9 @@
 // direct-manipulation handlers (drag-to-move, drag-to-resize) with snap
 // guides and history snapshots.
 // ============================================================================
-import { el, uid, cssEscape } from './util.js';
-import { pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
+import { el, uid, cssEscape, toast, confirmDialog } from './util.js';
+import { state, pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
+import { captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
 import {
   CANVAS_WIDTH, ensurePos,
   applySnap, applyResizeSnap, showSnapGuides, hideSnapGuides,
@@ -15,7 +16,7 @@ import { renderTaskList } from './panes.js';
 import { posLabel } from './task-pane-config.js';
 
 export function renderCanvas(ctx){
-  const { task, canvas, selectedBlockIds } = ctx;
+  const { task, canvas, selectedBlockIds, seenBlockIds } = ctx;
   canvas.querySelectorAll('.canvas-block-card, .canvas-block-empty').forEach(c => c.remove());
   scheduleTemplateAutofitPass(ctx);
   task.blocks.forEach(block => {
@@ -23,6 +24,14 @@ export function renderCanvas(ctx){
     const def = window.Blocks.get(block.type);
     const card = el('div', {className:'canvas-block-card', attrs:{'data-block-id': block.id}});
     if(selectedBlockIds.has(block.id)) card.classList.add('selected');
+    // First time this block id has been seen on the canvas → mark it as
+    // new so the CSS fade-in animation runs. Subsequent re-renders of the
+    // same block don't get the class so the animation doesn't replay on
+    // every state mutation (typing, dragging, autosave, etc.).
+    if(seenBlockIds && !seenBlockIds.has(block.id)){
+      card.classList.add('is-new');
+      seenBlockIds.add(block.id);
+    }
     Object.assign(card.style, {
       left: block.pos.x + 'px', top: block.pos.y + 'px',
       width: block.pos.w + 'px', height: block.pos.h + 'px'
@@ -35,6 +44,11 @@ export function renderCanvas(ctx){
     const ctrls = el('div', {className:'canvas-block-controls'});
     const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Höhe an Inhalt anpassen'}, text:'↕'});
     const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Duplizieren'}, text:'⧉'});
+    // ★ Save as Block-Vorlage. Prompts for a name + optional description,
+    // captures the block's config (deep-cloned), and prepends it to
+    // state.userBlockTemplates so it appears in the picker's "Eigene
+    // Vorlagen" category. The block itself is not modified.
+    const tplBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Als Block-Vorlage speichern'}, text:'★'});
     const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
     fitBtn.addEventListener('click', e => { e.stopPropagation(); autoFitBlock(block); });
     dupBtn.addEventListener('click', e => {
@@ -47,16 +61,49 @@ export function renderCanvas(ctx){
       selectedBlockIds.clear(); selectedBlockIds.add(copy.id); ctx.persistSelection();
       renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
     });
-    rmBtn.addEventListener('click', e => {
+    tplBtn.addEventListener('click', e => {
       e.stopPropagation();
-      if(!confirm('Block "' + ((def && def.label) || block.type) + '" entfernen?')) return;
-      pushHistory();
-      const i = task.blocks.findIndex(b => b.id === block.id);
-      if(i >= 0) task.blocks.splice(i, 1);
-      selectedBlockIds.delete(block.id); ctx.persistSelection();
-      renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
+      const defaultName = (def && def.label) || block.type;
+      const name = prompt('Name der Block-Vorlage:', defaultName);
+      if(name === null) return; // cancelled
+      const trimmed = String(name).trim();
+      if(!trimmed){ toast('Vorlage wurde nicht gespeichert (kein Name angegeben).', 'error'); return; }
+      const description = prompt('Beschreibung (optional):', '') || '';
+      const tpl = captureBlockAsTemplate(block, trimmed, description);
+      state.userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
+      state.userBlockTemplates.unshift(tpl);
+      saveUserBlockTemplates();
+      toast('Block-Vorlage "' + trimmed + '" gespeichert.');
     });
-    ctrls.appendChild(fitBtn); ctrls.appendChild(dupBtn); ctrls.appendChild(rmBtn);
+    rmBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      if(!await confirmDialog({
+        title: 'Block löschen?',
+        message: '„' + ((def && def.label) || block.type) + '" wird von der Canvas entfernt. Diese Aktion kann mit Strg + Z rückgängig gemacht werden.',
+        confirmLabel: 'Löschen',
+        danger: true
+      })) return;
+      pushHistory();
+      // Animate the card out before splicing it from state. The CSS
+      // `.is-removing` class triggers a quick fade + shrink (180 ms);
+      // after that we run the actual removal + re-render.
+      const i = task.blocks.findIndex(b => b.id === block.id);
+      const animate = !window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const doRemove = () => {
+        if(i >= 0) task.blocks.splice(i, 1);
+        // Drop from seen-set so a re-added block-id (undo!) animates back in.
+        if(ctx.seenBlockIds) ctx.seenBlockIds.delete(block.id);
+        selectedBlockIds.delete(block.id); ctx.persistSelection();
+        renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
+      };
+      if(animate){
+        card.classList.add('is-removing');
+        setTimeout(doRemove, 180);
+      } else {
+        doRemove();
+      }
+    });
+    ctrls.appendChild(fitBtn); ctrls.appendChild(dupBtn); ctrls.appendChild(tplBtn); ctrls.appendChild(rmBtn);
     cardHead.appendChild(ctrls);
     card.appendChild(cardHead);
 
@@ -73,10 +120,37 @@ export function renderCanvas(ctx){
     canvas.appendChild(card);
   });
   if(task.blocks.length === 0){
-    canvas.appendChild(el('div', {
-      className:'canvas-block-empty',
-      html:'<strong>Leere Canvas.</strong><br>Klicke <strong>+ Block</strong> oben rechts, um Inhalte hinzuzufügen.'
+    // Richer empty state: a friendly illustration + headline + primary CTA
+    // that opens the block picker directly. The user no longer has to scan
+    // the toolbar for the "+ Block" button - the path forward is obvious.
+    const empty = el('div', { className:'canvas-block-empty' });
+    // SVG illustration - a stack of three card silhouettes hinting at
+    // "compose a page out of blocks". Uses `currentColor` so it picks up
+    // the surrounding muted-foreground color and stays calm.
+    const svg = '<svg class="canvas-empty-art" viewBox="0 0 120 64" width="96" height="51" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="10"  y="10" width="58" height="18" rx="3" opacity="0.55"/>' +
+      '<rect x="22"  y="24" width="74" height="18" rx="3" opacity="0.75"/>' +
+      '<rect x="40"  y="38" width="58" height="18" rx="3"/>' +
+      '<path d="M58 46 L58 52 M54 49 L62 49" stroke-width="2.5"/>' +
+    '</svg>';
+    empty.innerHTML =
+      svg +
+      '<h3 class="canvas-empty-title">Bereit für den ersten Block?</h3>' +
+      '<p class="canvas-empty-body">Wählen Sie einen Block-Typ (z. B. Bild, Text oder Frage) und platzieren Sie ihn frei auf der Canvas.</p>';
+    const cta = el('button', {
+      className:'btn btn-primary canvas-empty-cta',
+      attrs:{type:'button'},
+      text:'+ Block hinzufügen'
+    });
+    cta.addEventListener('click', () => {
+      if(typeof ctx.openAddBlockPicker === 'function') ctx.openAddBlockPicker();
+    });
+    empty.appendChild(cta);
+    empty.appendChild(el('p', {
+      className:'canvas-empty-hint',
+      html:'Tipp: <kbd>Strg</kbd> + Mausrad zum Zoomen · <kbd>Pfeiltasten</kbd> zum Verschieben'
     }));
+    canvas.appendChild(empty);
   }
 }
 
@@ -114,7 +188,15 @@ export function installDragHandlers(ctx, card, block){
 
     function onMove(ev){
       const sdx = ev.clientX - startX, sdy = ev.clientY - startY;
-      if(!dragged && (Math.abs(sdx) > 3 || Math.abs(sdy) > 3)) dragged = true;
+      if(!dragged && (Math.abs(sdx) > 3 || Math.abs(sdy) > 3)){
+        dragged = true;
+        // Flip the card to "grabbing" while the drag is active so the cursor
+        // gives clear feedback. Removed on mouseup.
+        movingBlocks.forEach(b => {
+          const c = canvas.querySelector('[data-block-id="' + cssEscape(b.id) + '"]');
+          if(c) c.classList.add('dragging');
+        });
+      }
       if(!dragged) return;
       const z = ctx.zoom;
       const dx = sdx / z, dy = sdy / z;
@@ -138,6 +220,11 @@ export function installDragHandlers(ctx, card, block){
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       hideSnapGuides(canvas);
+      // Clear the grabbing cursor state on every moved card.
+      movingBlocks.forEach(b => {
+        const c = canvas.querySelector('[data-block-id="' + cssEscape(b.id) + '"]');
+        if(c) c.classList.remove('dragging');
+      });
       if(dragged) commitHistorySnap();
       else discardHistorySnap();
       if(!dragged && !shift && wasSelected && selectedBlockIds.size > 1){

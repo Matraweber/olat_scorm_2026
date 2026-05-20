@@ -3,10 +3,10 @@
 // in-browser preview iframe construction.
 // ============================================================================
 import {
-  el, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast
+  el, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
 } from './util.js';
-import { state, render, defaultTheme } from './state.js';
-import { migrateTaskIfNeeded, cleanTaskForExport } from './tasks.js';
+import { state, render, defaultTheme, scheduleAutosave } from './state.js';
+import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
 
 // ---- File fetchers (cache-busted) ----
@@ -90,23 +90,126 @@ async function gatherTemplateFiles(usedBlocks){
 }
 
 // ---- ZIP build / download / load ----
+// MIME → file-extension mapping used when extracting data-URLs to separate
+// binary files. Only common media types need explicit entries; everything
+// else falls back to the right-of-slash subtype (e.g. application/pdf → pdf).
+const MIME_EXT = {
+  'image/jpeg': 'jpg',
+  'image/jpg':  'jpg',
+  'image/png':  'png',
+  'image/gif':  'gif',
+  'image/svg+xml': 'svg',
+  'image/webp': 'webp',
+  'audio/mpeg': 'mp3',
+  'audio/mp3':  'mp3',
+  'audio/wav':  'wav',
+  'audio/ogg':  'ogg',
+  'audio/webm': 'webm',
+  'video/mp4':  'mp4',
+  'video/webm': 'webm',
+  'video/ogg':  'ogg',
+  'application/pdf': 'pdf',
+  'application/zip': 'zip',
+  'application/json': 'json',
+  'text/plain': 'txt'
+};
+function extFromMime(mime){
+  if(!mime) return 'bin';
+  if(MIME_EXT[mime]) return MIME_EXT[mime];
+  const sub = mime.split('/')[1] || '';
+  return sub.split(';')[0].split('+')[0] || 'bin';
+}
+
+// Convert a base64 string to a Uint8Array. Used by the data-URL extractor
+// below - atob() decodes per-character, so we pack the codes into bytes.
+function base64ToBytes(b64){
+  const bin = atob(b64);
+  const len = bin.length;
+  const out = new Uint8Array(len);
+  for(let i = 0; i < len; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// Walk every block in a clean task list, replace any string config field
+// starting with "data:" by a `media/{blockId}_{key}.{ext}` path, and return
+// the new task list plus the binary files that need to be added to the ZIP.
+//
+// Why: embedding multi-MB videos/audio as base64 in tasks.json inflates the
+// payload by ~33% and gets bundled twice (once in tasks.json, once in
+// index.html via window.__SCORM_TASKS__). Splitting them out keeps the JSON
+// small and lets the browser stream the media files normally.
+function extractMediaFromTasks(tasks){
+  // Map<string, Uint8Array> - path → binary
+  const mediaFiles = new Map();
+  // Counter for filename collisions within a single block (multiple fields)
+  function maybeExtract(value, blockId, key){
+    if(typeof value !== 'string' || !value.startsWith('data:')) return value;
+    const m = value.match(/^data:([^;,]+)(?:;base64)?,(.+)$/);
+    if(!m) return value;
+    const mime = m[1].trim();
+    const body = m[2];
+    // Only base64-encoded payloads need extraction. Plain (url-encoded)
+    // data-URLs are typically tiny (small SVGs, fragments) - leave them.
+    const isBase64 = /;base64,/.test(value);
+    if(!isBase64) return value;
+    const ext = extFromMime(mime);
+    const safeId = String(blockId || 'b').replace(/[^A-Za-z0-9_-]/g, '_');
+    const safeKey = String(key || 'data').replace(/[^A-Za-z0-9_-]/g, '_');
+    const path = 'media/' + safeId + '_' + safeKey + '.' + ext;
+    if(!mediaFiles.has(path)){
+      mediaFiles.set(path, base64ToBytes(body));
+    }
+    return path;
+  }
+  function processBlock(b){
+    if(!b || !b.config || typeof b.config !== 'object') return b;
+    const newCfg = {};
+    for(const k of Object.keys(b.config)){
+      newCfg[k] = maybeExtract(b.config[k], b.id, k);
+    }
+    return Object.assign({}, b, { config: newCfg });
+  }
+  const out = tasks.map(t => {
+    if(t.tabs && Array.isArray(t.tabs) && t.tabs.length){
+      return Object.assign({}, t, {
+        tabs: t.tabs.map(tb => Object.assign({}, tb, {
+          blocks: (tb.blocks || []).map(processBlock)
+        }))
+      });
+    }
+    return Object.assign({}, t, { blocks: (t.blocks || []).map(processBlock) });
+  });
+  return { tasks: out, mediaFiles };
+}
+
 async function buildZip(){
   if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return null; }
   if(state.course.tasks.length === 0){
-    if(!confirm('Das Paket enthält keine Aufgaben. Trotzdem erzeugen?')) return null;
+    const ok = await confirmDialog({
+      title: 'Leeres Paket erzeugen?',
+      message: 'Das SCORM-Paket enthält keine Aufgaben. Beim Import in OLAT erscheint nur ein leerer Kurs. Trotzdem fortfahren?',
+      confirmLabel: 'Trotzdem erzeugen'
+    });
+    if(!ok) return null;
   }
   const used = usedBlockTypes();
   const tmpl = await gatherTemplateFiles(used);
   const manifestTpl = await fetchTextRel('imsmanifest.xml');
   const blockFiles = used.map(b => 'blocks/' + BLOCK_FILES[b]).filter(Boolean);
+
+  // First pass: clean tasks for export (drops UI-only fields, migrates legacy).
+  // Second pass: extract any data-URLs to separate files in media/.
+  const cleanedTasks = state.course.tasks.map(t => {
+    const clean = cleanTaskForExport(t);
+    return { id: t.id, title: t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
+  });
+  const { tasks: tasksWithPaths, mediaFiles } = extractMediaFromTasks(cleanedTasks);
+
   const tasksJson = JSON.stringify({
     courseTitle: state.course.courseTitle,
     courseSubtitle: state.course.courseSubtitle,
     passThreshold: state.course.passThreshold,
-    tasks: state.course.tasks.map(t => {
-      const clean = cleanTaskForExport(t);
-      return { id: t.id, title: t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
-    })
+    tasks: tasksWithPaths
   }, null, 2);
   const themeJson = JSON.stringify(state.theme, null, 2);
   const indexHtml = buildIndexHtml(tmpl['index.html'], blockFiles, themeJson, tasksJson);
@@ -122,6 +225,7 @@ async function buildZip(){
     'index.html', 'styles.css', 'scorm12.js', 'utils.js', 'runtime.js',
     'theme.json', 'tasks.json', 'blocks/_registry.js',
     ...blockFiles, ...katexZipFileList(),
+    ...Array.from(mediaFiles.keys()),
     ...(logoFilename ? [logoFilename] : [])
   ];
   const manifestXml = buildManifest(manifestTpl, state.course.courseTitle, fileList);
@@ -141,16 +245,95 @@ async function buildZip(){
     zip.file(rel, tmpl[rel]);
   });
   await addKatexToZip(zip);
+  // Add the extracted media binaries. JSZip stores Uint8Array as-is, no
+  // base64 indirection, so the on-disk size matches the original file.
+  for(const [path, bytes] of mediaFiles){
+    zip.file(path, bytes);
+  }
   if(logoFilename && logoBlob) zip.file(logoFilename, logoBlob);
   return zip;
 }
 
+// Pre-export validation gate. Runs validateCourse() and, if any issues are
+// found, shows a modal listing them with two choices: "Trotzdem exportieren"
+// or "Korrigieren". Returns a promise that resolves with true (proceed) or
+// false (cancel).
+function confirmExportWithIssues(report){
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal export-gate';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    const courseLines = report.courseIssues.map(c =>
+      '<li class="export-gate-issue export-gate-issue-course">' + escapeHtml(c.message) + '</li>'
+    ).join('');
+    const blockLines = report.issues.map(w =>
+      '<li class="export-gate-issue">' +
+        '<span class="export-gate-issue-task">' + escapeHtml(w.taskTitle) + '</span>' +
+        '<span class="export-gate-issue-block">' + escapeHtml(w.blockLabel) + '</span>' +
+        '<span class="export-gate-issue-msg">' + escapeHtml(w.message) + '</span>' +
+      '</li>'
+    ).join('');
+    const total = report.issues.length + report.courseIssues.length;
+    overlay.innerHTML = `
+      <div class="modal-card export-gate-card">
+        <h2>Bereit zum Export?</h2>
+        <p>Beim Prüfen wurde${total === 1 ? '' : 'n'} <strong>${total}</strong> Punkt${total === 1 ? '' : 'e'} gefunden, die Sie ansehen sollten:</p>
+        <ul class="export-gate-list">
+          ${courseLines}${blockLines}
+        </ul>
+        <p class="hint">Sie können das Paket trotzdem exportieren, die Lerneinheit könnte für Lernende aber unvollständig wirken.</p>
+        <div class="modal-actions">
+          <button id="exportGateFix" class="btn btn-secondary" type="button">Korrigieren</button>
+          <button id="exportGateProceed" class="btn btn-primary" type="button">Trotzdem exportieren</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    function cleanup(result){
+      overlay.remove();
+      document.removeEventListener('keydown', onKey, true);
+      resolve(result);
+    }
+    function onKey(e){
+      if(e.key === 'Escape'){ e.preventDefault(); cleanup(false); }
+    }
+    overlay.querySelector('#exportGateFix').addEventListener('click', () => cleanup(false));
+    overlay.querySelector('#exportGateProceed').addEventListener('click', () => cleanup(true));
+    document.addEventListener('keydown', onKey, true);
+    overlay.querySelector('#exportGateFix').focus({ preventScroll: true });
+  });
+}
+function escapeHtml(s){
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 export async function downloadZip(){
   try {
-    toast('Paket wird erzeugt …');
+    // Validate before doing any work. If issues, show the gate. The user can
+    // either close it and fix things, or proceed anyway.
+    const report = validateCourse(state.course);
+    if(report.issues.length || report.courseIssues.length){
+      const proceed = await confirmExportWithIssues(report);
+      if(!proceed) return;
+    }
+    toast('Paket wird erzeugt … 0 %');
     const zip = await buildZip();
     if(!zip) return;
-    const blob = await zip.generateAsync({type:'blob'});
+    // JSZip emits an onUpdate callback during generation with a `percent`
+    // (0-100). We surface that in the toast so the user sees the package
+    // actually building - important for courses with many images where the
+    // operation can take several seconds. The toast call resets the
+    // 3-second auto-dismiss timer each time, so it stays visible throughout.
+    let lastPercent = -1;
+    const blob = await zip.generateAsync({ type:'blob' }, (metadata) => {
+      const p = metadata && typeof metadata.percent === 'number'
+        ? Math.round(metadata.percent) : null;
+      // Only repaint when the integer percent actually changes - avoids
+      // burning frames on identical strings (JSZip calls this very often).
+      if(p == null || p === lastPercent) return;
+      lastPercent = p;
+      toast('Paket wird erzeugt … ' + p + ' %');
+    });
     const filename = sanitizeFilename(state.course.courseTitle || 'scorm') + '.zip';
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -164,25 +347,94 @@ export async function downloadZip(){
   }
 }
 
+// Walk a task list and re-embed any `media/...` path references back as
+// data-URLs. This is the inverse of extractMediaFromTasks: it lets the
+// builder edit videos/audio loaded from a SCORM-ZIP without losing the
+// payload (the in-memory state always works with data-URLs so save/edit
+// flows stay simple).
+async function reembedMediaInTasks(tasks, zip){
+  // Common media file extensions → MIME for re-encoding to data-URL.
+  const EXT_MIME = {
+    jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
+    svg:'image/svg+xml', webp:'image/webp',
+    mp3:'audio/mpeg', wav:'audio/wav', ogg:'audio/ogg',
+    mp4:'video/mp4', webm:'video/webm',
+    pdf:'application/pdf', zip:'application/zip', txt:'text/plain'
+  };
+  async function readAsDataUrl(path){
+    const f = zip.file(path);
+    if(!f) return null;
+    const ext = (path.split('.').pop() || '').toLowerCase();
+    const mime = EXT_MIME[ext] || 'application/octet-stream';
+    const b64 = await f.async('base64');
+    return 'data:' + mime + ';base64,' + b64;
+  }
+  async function processBlock(b){
+    if(!b || !b.config || typeof b.config !== 'object') return b;
+    const newCfg = Object.assign({}, b.config);
+    for(const k of Object.keys(newCfg)){
+      const v = newCfg[k];
+      if(typeof v === 'string' && /^media\/.+\.[A-Za-z0-9]+$/.test(v)){
+        const dataUrl = await readAsDataUrl(v);
+        if(dataUrl) newCfg[k] = dataUrl;
+      }
+    }
+    return Object.assign({}, b, { config: newCfg });
+  }
+  const out = [];
+  for(const t of tasks){
+    if(t.tabs && Array.isArray(t.tabs) && t.tabs.length){
+      const tabs = [];
+      for(const tb of t.tabs){
+        const blocks = [];
+        for(const b of (tb.blocks || [])) blocks.push(await processBlock(b));
+        tabs.push(Object.assign({}, tb, { blocks }));
+      }
+      out.push(Object.assign({}, t, { tabs }));
+    } else {
+      const blocks = [];
+      for(const b of (t.blocks || [])) blocks.push(await processBlock(b));
+      out.push(Object.assign({}, t, { blocks }));
+    }
+  }
+  return out;
+}
+
 export async function loadZipFile(file){
   if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return; }
+  // Surface progress immediately so the user knows the click registered,
+  // parsing a multi-MB ZIP can take a couple of seconds without any visual
+  // feedback otherwise.
+  toast('Paket wird gelesen …');
   try {
     const buf = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(buf);
     const tasksFile = zip.file('tasks.json');
     const themeFile = zip.file('theme.json');
     if(!tasksFile){
-      if(!confirm('Diese ZIP enthält keine tasks.json. Trotzdem versuchen?')) return;
+      const ok = await confirmDialog({
+        title: 'Unbekanntes ZIP-Format?',
+        message: 'Diese ZIP-Datei enthält keine tasks.json. Wahrscheinlich wurde sie nicht mit dem SCORM Builder erzeugt. Trotzdem versuchen, sie zu laden?',
+        confirmLabel: 'Trotzdem versuchen'
+      });
+      if(!ok) return;
     }
     if(tasksFile){
+      toast('Aufgaben werden geladen …');
       const tasksTxt = await tasksFile.async('string');
       const cfg = JSON.parse(tasksTxt);
       const { uid } = await import('./util.js');
+      const rawTasks = (cfg.tasks || []).map(t =>
+        migrateTaskIfNeeded(Object.assign({id: t.id || uid('t_')}, t))
+      );
+      // Re-embed media files (if any) so the builder can edit them.
+      toast('Medien werden eingebettet …');
+      const tasks = await reembedMediaInTasks(rawTasks, zip);
       state.course = {
         courseTitle: cfg.courseTitle || '',
         courseSubtitle: cfg.courseSubtitle || '',
         passThreshold: cfg.passThreshold != null ? cfg.passThreshold : 0.5,
-        tasks: (cfg.tasks || []).map(t => migrateTaskIfNeeded(Object.assign({id: t.id || uid('t_')}, t)))
+        tasks
       };
     }
     if(themeFile){
@@ -191,6 +443,7 @@ export async function loadZipFile(file){
     }
     state.selected = {kind:'course'};
     render();
+    scheduleAutosave();
     toast('SCORM-Paket geladen.');
   } catch(err){ console.error(err); toast('ZIP-Fehler: ' + err.message, 'error'); }
 }
@@ -216,6 +469,7 @@ export async function loadJsonFile(file){
     if(parsed.theme) state.theme = Object.assign(defaultTheme(), parsed.theme);
     state.selected = {kind:'course'};
     render();
+    scheduleAutosave();
     toast('JSON-Konfiguration geladen.');
   } catch(err){ toast('Fehler: ' + err.message, 'error'); }
 }
@@ -278,6 +532,7 @@ export function applyJsonEditor(){
     if(parsed.course){ state.course = parsed.course; state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
     if(parsed.theme) state.theme = parsed.theme;
     const s = document.getElementById('jsonStatus'); s.textContent = 'Übernommen.'; s.className = 'json-status ok';
+    scheduleAutosave();
     // render() would replace the textarea; use renderActivePane-equivalent indirectly via state-only update
     import('./panes.js').then(m => m.renderTaskList());
   } catch(err){

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCORM Builder - Umwelt-Campus Birkenfeld</title>
-  <link rel="stylesheet" href="builder.css?v=81" />
+  <link rel="stylesheet" href="builder.css?v=103" />
   <link rel="stylesheet" href="lib/katex/katex.min.css" />
   <script defer src="lib/katex/katex.min.js"></script>
   <script defer src="lib/katex/contrib/auto-render.min.js"></script>
@@ -12,19 +12,63 @@
 <body>
   <div class="builder-shell">
     <header class="builder-header">
+      <button id="btnSidebarToggle" class="header-icon-btn sidebar-toggle" type="button" aria-label="Aufgabenleiste ein-/ausblenden" title="Aufgabenleiste ein-/ausblenden">
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13 4 L7 10 L13 16" />
+        </svg>
+      </button>
       <div class="builder-brand">
         <span class="builder-kicker">SCORM Builder</span>
         <h1>OLAT-Lerneinheiten erstellen</h1>
-        <p class="builder-subtitle">Aufgaben zusammenstellen und als SCORM-1.2-Paket exportieren.</p>
       </div>
       <div class="builder-actions">
-        <button id="btnSidebarToggle" class="btn btn-secondary sidebar-toggle" type="button" title="Sidebar ein-/ausklappen">☰</button>
-        <button id="btnNew" class="btn btn-secondary" type="button">Neu</button>
-        <label class="btn btn-secondary" for="fileLoadZip">SCORM laden</label>
-        <input id="fileLoadZip" type="file" accept=".zip" hidden />
-        <label class="btn btn-secondary" for="fileLoadJson">JSON laden</label>
-        <input id="fileLoadJson" type="file" accept=".json" hidden />
-        <button id="btnExportJson" class="btn btn-secondary" type="button">JSON exportieren</button>
+        <!-- Datei dropdown groups all secondary file ops in one place. -->
+        <div class="header-menu" id="fileMenu">
+          <button id="btnFileMenu" class="btn btn-secondary header-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+            Datei
+            <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 8 L10 13 L15 8" />
+            </svg>
+          </button>
+          <div class="header-menu-popover" role="menu" aria-labelledby="btnFileMenu" hidden>
+            <div class="header-menu-section" role="presentation">
+              <div class="header-menu-section-label">Lerneinheit</div>
+              <button id="btnNew" class="header-menu-item" type="button" role="menuitem">
+                <span class="header-menu-label">Neu</span>
+                <span class="header-menu-hint">Leere Lerneinheit beginnen</span>
+              </button>
+            </div>
+            <div class="header-menu-divider" role="presentation"></div>
+            <div class="header-menu-section" role="presentation">
+              <div class="header-menu-section-label">Öffnen</div>
+              <label class="header-menu-item" for="fileLoadZip" role="menuitem" tabindex="0">
+                <span class="header-menu-label">SCORM-ZIP laden …</span>
+                <span class="header-menu-hint">.zip aus früherem Export öffnen</span>
+              </label>
+              <input id="fileLoadZip" type="file" accept=".zip" hidden />
+              <label class="header-menu-item" for="fileLoadJson" role="menuitem" tabindex="0">
+                <span class="header-menu-label">JSON laden …</span>
+                <span class="header-menu-hint">Konfigurationsdatei öffnen</span>
+              </label>
+              <input id="fileLoadJson" type="file" accept=".json" hidden />
+            </div>
+            <div class="header-menu-divider" role="presentation"></div>
+            <div class="header-menu-section" role="presentation">
+              <div class="header-menu-section-label">Exportieren</div>
+              <button id="btnExportJson" class="header-menu-item" type="button" role="menuitem">
+                <span class="header-menu-label">Als JSON exportieren</span>
+                <span class="header-menu-hint">Roh-Konfiguration herunterladen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <button id="btnCheatsheet" class="header-icon-btn header-help-btn" type="button" aria-label="Tastaturkürzel anzeigen" title="Tastaturkürzel (?)">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.5"/>
+            <path d="M7.8 7.7 C 7.8 6, 9 5.2, 10 5.2 C 11.6 5.2, 12.4 6.2, 12.4 7.3 C 12.4 8.4, 11.4 8.9, 10.4 9.5 C 10 9.8, 10 10.2, 10 10.6"/>
+            <circle cx="10" cy="14" r="0.6" fill="currentColor"/>
+          </svg>
+        </button>
         <button id="btnPreview" class="btn btn-secondary" type="button">Vorschau</button>
         <button id="btnDownload" class="btn btn-primary" type="button">SCORM-ZIP erzeugen</button>
       </div>
@@ -72,6 +116,14 @@
   <div id="blockTypeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card block-picker-card">
       <h2 id="modalTitle">Block hinzufügen</h2>
+      <div class="block-picker-search">
+        <span class="block-picker-search-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 L14 14"/>
+          </svg>
+        </span>
+        <input id="blockPickerSearch" type="search" placeholder="Block-Typ suchen (z. B. Bild, Frage, Code)" autocomplete="off" />
+      </div>
       <div class="block-picker-layout">
         <nav id="blockCatNav" class="block-cat-nav" aria-label="Kategorien"></nav>
         <div id="blockTypeList" class="block-type-list"></div>
@@ -114,6 +166,67 @@
     </div>
   </div>
 
+  <!-- Cheatsheet overlay: opens on "?" key, lists every shortcut in the app.
+       Categories mirror where each shortcut applies so users learn context. -->
+  <div id="cheatsheetModal" class="modal hidden cheatsheet" role="dialog" aria-modal="true" aria-labelledby="cheatsheetTitle">
+    <div class="modal-card cheatsheet-card">
+      <div class="cheatsheet-head">
+        <h2 id="cheatsheetTitle">Tastaturkürzel</h2>
+        <button id="cheatsheetClose" class="header-icon-btn cheatsheet-close" type="button" aria-label="Schließen">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M5 5 L15 15 M15 5 L5 15"/>
+          </svg>
+        </button>
+      </div>
+      <div class="cheatsheet-body">
+        <section class="cheatsheet-group">
+          <h3>Allgemein</h3>
+          <dl>
+            <dt><kbd>?</kbd></dt>                                         <dd>Diese Übersicht ein-/ausblenden</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>S</kbd></dt>                     <dd>Sofort speichern (Autosave-Flush)</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>⇧</kbd> + <kbd>S</kbd></dt>      <dd>SCORM-ZIP exportieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>Z</kbd></dt>                     <dd>Rückgängig</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>⇧</kbd> + <kbd>Z</kbd></dt>      <dd>Wiederherstellen</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>Y</kbd></dt>                     <dd>Wiederherstellen (alternativ)</dd>
+          </dl>
+        </section>
+        <section class="cheatsheet-group">
+          <h3>Aufgaben-Canvas</h3>
+          <dl>
+            <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></dt>  <dd>Markierte Blöcke 1 px verschieben</dd>
+            <dt><kbd>⇧</kbd> + Pfeil</dt>                                 <dd>Blöcke 10 px verschieben</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>A</kbd></dt>                     <dd>Alle Blöcke markieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>C</kbd></dt>                     <dd>Markierte Blöcke kopieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>V</kbd></dt>                     <dd>Blöcke einfügen</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>D</kbd></dt>                     <dd>Blöcke duplizieren</dd>
+            <dt><kbd>⌫</kbd> / <kbd>Entf</kbd></dt>                       <dd>Markierte Blöcke löschen</dd>
+            <dt><kbd>Esc</kbd></dt>                                       <dd>Auswahl aufheben</dd>
+          </dl>
+        </section>
+        <section class="cheatsheet-group">
+          <h3>Komposition (innerhalb des Editors)</h3>
+          <dl>
+            <dt><kbd>V</kbd></dt>                                          <dd>Verschieben-Werkzeug</dd>
+            <dt><kbd>S</kbd></dt>                                          <dd>Auswahl-Werkzeug (Rahmen aufziehen)</dd>
+            <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></dt>   <dd>Form 1 px verschieben</dd>
+            <dt><kbd>⇧</kbd> + Pfeil</dt>                                  <dd>Form 10 px verschieben</dd>
+            <dt><kbd>⌘/Strg</kbd> + Ziehen an Eckpunkt</dt>                <dd>Proportional skalieren (Ellipse, Rechteck, Polygon)</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>D</kbd></dt>                      <dd>Form duplizieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>C</kbd></dt>                      <dd>Form in Komposition-Clipboard kopieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>V</kbd></dt>                      <dd>Form aus Clipboard einfügen</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>A</kbd></dt>                      <dd>Alle Formen markieren</dd>
+            <dt><kbd>⌫</kbd> / <kbd>Entf</kbd></dt>                        <dd>Markierte Formen löschen</dd>
+            <dt><kbd>Esc</kbd></dt>                                        <dd>Auswahl aufheben</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>Z</kbd></dt>                      <dd>Innerhalb der Komposition rückgängig</dd>
+          </dl>
+        </section>
+      </div>
+      <div class="cheatsheet-foot">
+        <span>Tipp: <kbd>?</kbd> öffnet diese Übersicht jederzeit</span>
+      </div>
+    </div>
+  </div>
+
   <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-card preview-card">
       <div class="preview-head">
@@ -128,29 +241,35 @@
 
   <script src="lib/jszip.min.js"></script>
   <script src="template/utils.js?v=67"></script>
+  <script src="template/block-icons.js?v=94"></script>
   <script src="template/blocks/_registry.js?v=67"></script>
   <script src="template/blocks/heading.js?v=67"></script>
-  <script src="template/blocks/rich-text.js?v=80"></script>
+  <script src="template/blocks/rich-text.js?v=85"></script>
   <script src="template/blocks/note-box.js?v=79"></script>
-  <script src="template/blocks/image.js?v=76"></script>
+  <script src="template/blocks/image.js?v=85"></script>
+  <script src="template/blocks/audio.js?v=97"></script>
+  <script src="template/blocks/video.js?v=101"></script>
+  <script src="template/blocks/file-download.js?v=97"></script>
+  <script src="template/blocks/summary.js?v=94"></script>
+  <script src="template/blocks/survey.js?v=94"></script>
   <script src="template/blocks/divider.js?v=67"></script>
   <script src="template/blocks/code.js?v=67"></script>
-  <script src="template/blocks/multiple-choice.js?v=78"></script>
-  <script src="template/blocks/numeric-input.js?v=79"></script>
-  <script src="template/blocks/text-input.js?v=79"></script>
-  <script src="template/blocks/cloze.js?v=79"></script>
-  <script src="template/blocks/match-pairs.js?v=79"></script>
-  <script src="template/blocks/hotzone.js?v=79"></script>
-  <script src="template/blocks/sort-list.js?v=78"></script>
-  <script src="template/blocks/complex-question.js?v=67"></script>
+  <script src="template/blocks/multiple-choice.js?v=85"></script>
+  <script src="template/blocks/numeric-input.js?v=85"></script>
+  <script src="template/blocks/text-input.js?v=85"></script>
+  <script src="template/blocks/cloze.js?v=85"></script>
+  <script src="template/blocks/match-pairs.js?v=85"></script>
+  <script src="template/blocks/hotzone.js?v=85"></script>
+  <script src="template/blocks/sort-list.js?v=85"></script>
+  <script src="template/blocks/complex-question.js?v=97"></script>
   <script src="template/blocks/function-question.js?v=79"></script>
   <script src="template/blocks/vector-question.js?v=67"></script>
   <script src="template/blocks/number-base.js?v=79"></script>
   <script src="template/blocks/unit-convert.js?v=79"></script>
   <script src="template/blocks/truth-table.js?v=67"></script>
   <script src="template/blocks/function-sandbox.js?v=79"></script>
-  <script src="template/blocks/composition.js?v=79"></script>
+  <script src="template/blocks/composition.js?v=86"></script>
   <script src="templates.js?v=67"></script>
-  <script type="module" src="js/main.js?v=67"></script>
+  <script type="module" src="js/main.js?v=102"></script>
 </body>
 </html>

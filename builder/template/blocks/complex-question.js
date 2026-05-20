@@ -21,6 +21,22 @@
         maxPoints: 1
       };
     },
+    previewConfig(){
+      // For the welcome-modal "Live-Vorschau": pick a point with enough
+      // magnitude that the vector + angle arc read clearly. z = 3 + 2i
+      // sits comfortably inside ±5.5, gives a 33° angle (visible arc),
+      // and a vector that reaches ~60% of the plot's half-width.
+      return {
+        blockTitle: '',
+        pool: [{a:3, b:2}],
+        questionMode: 'all',
+        randomize: false,
+        fields: { real: true, imag: true, abs: true, arg: true },
+        tolerances: { real: 0.01, imag: 0.01, abs: 0.06, arg: 0.06 },
+        plotRange: 5.5,
+        maxPoints: 1
+      };
+    },
     builderSchema(){
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Komplexe Zahlen' },

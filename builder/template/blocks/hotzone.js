@@ -29,8 +29,15 @@
     defaultConfig(){
       return {
         blockTitle: '',
-        // Stock landscape + one zone over the tree so the exercise is
-        // self-explanatory the moment a hotzone block is created.
+        src: '', zones: [],
+        prompt: 'Klicken Sie auf alle markierten Bereiche.',
+        showZonesAfterCheck: true,
+        maxPoints: 1
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '',
         src: STOCK_LANDSCAPE_SVG,
         zones: [{ x: 0.41, y: 0.425, w: 0.19, h: 0.317 }],
         prompt: 'Klicken Sie auf den Baum.',

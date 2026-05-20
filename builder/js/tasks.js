@@ -130,6 +130,30 @@ export function validateTask(task){
   return out;
 }
 
+// Course-level validation rolls up per-block warnings and adds course-level
+// checks. Result shape:
+//   { issues: [{ taskIdx, taskTitle, blockId, blockLabel, message }],
+//     courseIssues: [{ message }] }
+// Used by the SCORM export modal to decide whether to gate or warn the user.
+export function validateCourse(course){
+  const issues = [];
+  const courseIssues = [];
+  if(!course) return { issues, courseIssues };
+  const tasks = course.tasks || [];
+  if(tasks.length === 0){
+    courseIssues.push({ message: 'Lerneinheit enthält keine Aufgaben.' });
+  }
+  if(!course.courseTitle || !String(course.courseTitle).trim()){
+    courseIssues.push({ message: 'Kurstitel ist leer.' });
+  }
+  tasks.forEach((t, idx) => {
+    const taskTitle = t.title || ('Aufgabe ' + (idx + 1));
+    const taskIssues = validateTask(t);
+    taskIssues.forEach(w => issues.push(Object.assign({ taskIdx: idx, taskTitle }, w)));
+  });
+  return { issues, courseIssues };
+}
+
 // ----- Template (built-in & user) ---------------------------------------
 const USER_TEMPLATES_KEY = 'scorm-builder-user-templates';
 export function loadUserTemplates(){
@@ -143,6 +167,41 @@ export function loadUserTemplates(){
 export function saveUserTemplates(){
   try { localStorage.setItem(USER_TEMPLATES_KEY, JSON.stringify(state.userTemplates)); }
   catch(e){ toast('Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
+}
+
+// ----- Block-level templates ("Block-Vorlagen") -------------------------
+// Each entry: { id, label, description?, blockType, config }.
+// `config` is deep-cloned from the source block at save time; instantiating
+// a template clones again so the new block doesn't share references.
+const USER_BLOCK_TEMPLATES_KEY = 'scorm-builder-user-block-templates';
+export function loadUserBlockTemplates(){
+  try {
+    const raw = localStorage.getItem(USER_BLOCK_TEMPLATES_KEY);
+    if(!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e){ return []; }
+}
+export function saveUserBlockTemplates(){
+  try { localStorage.setItem(USER_BLOCK_TEMPLATES_KEY, JSON.stringify(state.userBlockTemplates || [])); }
+  catch(e){ toast('Block-Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
+}
+export function captureBlockAsTemplate(block, label, description){
+  return {
+    id: uid('btpl_'),
+    label: String(label || '').trim() || 'Eigene Vorlage',
+    description: String(description || '').trim(),
+    blockType: block.type,
+    config: JSON.parse(JSON.stringify(block.config || {}))
+  };
+}
+export function instantiateBlockTemplate(tpl){
+  return {
+    id: uid('b_'),
+    type: tpl.blockType,
+    config: JSON.parse(JSON.stringify(tpl.config || {}))
+    // pos is set by ensurePos() when the new block is added to a task
+  };
 }
 export function instantiateTemplate(tpl){
   // Deep-clone, generate fresh IDs for task and every block

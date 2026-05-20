@@ -8,19 +8,21 @@
     graded: true,
     defaultConfig(){
       return {
-        blockTitle: '',
-        preset: 'custom',
+        blockTitle: '', preset: 'custom',
+        question: '', pairs: [],
+        imgHeight: 70, shuffle: true, maxPoints: 1
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '', preset: 'custom',
         question: 'Ordnen Sie die Hauptstädte den Ländern zu.',
-        // Three sample pairs so the welcome-page preview and a freshly added
-        // block both display real example content rather than an empty grid.
         pairs: [
           { left: 'Deutschland', right: 'Berlin' },
           { left: 'Frankreich',  right: 'Paris'  },
           { left: 'Italien',     right: 'Rom'    }
         ],
-        imgHeight: 70,
-        shuffle: true,
-        maxPoints: 3
+        imgHeight: 70, shuffle: true, maxPoints: 3
       };
     },
     builderSchema(){
@@ -29,10 +31,10 @@
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Zuordnung' },
         { key:'preset', label:'Vorlage', type:'select', options:[
           {value:'custom',        label:'Manuell (leer)'},
-          {value:'chemistry',     label:'Beispiel: Chemie - Elemente & Symbole'},
-          {value:'units',         label:'Beispiel: Physik - Einheiten zuordnen'},
-          {value:'number-bases',  label:'Beispiel: Informatik - Zahlensysteme'},
-          {value:'math-symbols',  label:'Beispiel: Mathematik - Symbole & Bedeutungen'}
+          {value:'chemistry',     label:'Beispiel: Chemie, Elemente & Symbole'},
+          {value:'units',         label:'Beispiel: Physik, Einheiten zuordnen'},
+          {value:'number-bases',  label:'Beispiel: Informatik, Zahlensysteme'},
+          {value:'math-symbols',  label:'Beispiel: Mathematik, Symbole & Bedeutungen'}
         ], help:'Beispiele zeigen typische Zuordnungsaufgaben. Bei „Manuell" eigene Paare eingeben.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
         // Frage

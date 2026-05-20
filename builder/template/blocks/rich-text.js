@@ -6,7 +6,8 @@
     category: 'Inhalt',
     icon: '¶',
     graded: false,
-    defaultConfig(){
+    defaultConfig(){ return { html: '' }; },
+    previewConfig(){
       return {
         html: '<p>Dieser Block enthält <strong>formatierten Text</strong>. Erlaubt sind unter anderem <em>kursive Auszeichnung</em>, Listen und Links.</p>'
       };

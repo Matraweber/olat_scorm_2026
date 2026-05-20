@@ -28,7 +28,10 @@ export function renderConfigPane(ctx){
             '• Shift + Klick: mehrere Blöcke auswählen<br>' +
             '• Pfeiltasten: pixelweise verschieben (Shift = 10 px)<br>' +
             '• Entf: Block löschen<br>' +
-            '• Strg + Mausrad: Zoom'
+            '• Strg + Mausrad: Zoom<br>' +
+            '• Strg + S: Sofort speichern<br>' +
+            '• Strg + ⇧ + S: SCORM-ZIP exportieren<br>' +
+            '• ?: alle Tastaturkürzel anzeigen'
     }));
     return;
   }

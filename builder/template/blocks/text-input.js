@@ -11,10 +11,18 @@
         blockTitle: '',
         preset: 'custom',
         answerMode: 'iexact',
-        question: 'Wie heißt die Hauptstadt von Deutschland?',
-        answers: ['Berlin'],
+        question: '',
+        answers: [],
         maxPoints: 1,
         partialKeywords: false
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '', preset: 'custom', answerMode: 'iexact',
+        question: 'Wie heißt die Hauptstadt von Deutschland?',
+        answers: ['Berlin'],
+        maxPoints: 1, partialKeywords: false
       };
     },
     builderSchema(){
@@ -24,9 +32,9 @@
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Text-Eingabe' },
         { key:'preset', label:'Vorlage', type:'select', options:[
           {value:'custom',          label:'Manuell (leer)'},
-          {value:'example-term',    label:'Beispiel: Physik - Fachbegriff (Ohmsches Gesetz)'},
-          {value:'example-keyword', label:'Beispiel: Informatik - Schlüsselwörter (Mehrere Begriffe)'},
-          {value:'example-regex',   label:'Beispiel: Regex - Muster (3-stellige Zahl)'}
+          {value:'example-term',    label:'Beispiel: Physik, Fachbegriff (Ohmsches Gesetz)'},
+          {value:'example-keyword', label:'Beispiel: Informatik, Schlüsselwörter (Mehrere Begriffe)'},
+          {value:'example-regex',   label:'Beispiel: Regex, Muster (3-stellige Zahl)'}
         ], help:'„Manuell" ist für eigene Fragen. Beispiele zeigen alle Auswertungsarten.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
         // Frage
@@ -37,10 +45,10 @@
         { key:'answerMode', label:'Auswertungsart (für alle Antworten)', type:'select',
           showIf: isCustom,
           options:[
-            {value:'iexact',   label:'Exakt - Groß-/Kleinschreibung egal  (Standard)'},
-            {value:'manual',   label:'Manuell - Vergleichsart je Eintrag wählen'},
-            {value:'regex',    label:'Regulärer Ausdruck - Muster wie \\d+ oder (A|B)'},
-            {value:'keywords', label:'Schlüsselwörter - Teilpunkte pro gefundenem Begriff'}
+            {value:'iexact',   label:'Exakt: Groß-/Kleinschreibung egal (Standard)'},
+            {value:'manual',   label:'Manuell: Vergleichsart je Eintrag wählen'},
+            {value:'regex',    label:'Regulärer Ausdruck: Muster wie \\d+ oder (A|B)'},
+            {value:'keywords', label:'Schlüsselwörter: Teilpunkte pro gefundenem Begriff'}
           ], help:'„Manuell" erlaubt unterschiedliche Vergleichsarten je Antworteintrag.' },
         { key:'answers', label:'Antworten', type:'list', itemLabel:'Antwort',
           showIf: isCustom,
@@ -175,7 +183,7 @@
     }
     if(config.preset === 'example-regex'){
       return Object.assign(base, {
-        question: 'Geben Sie eine dreistellige positive ganze Zahl ein (100-999).',
+        question: 'Geben Sie eine dreistellige positive ganze Zahl ein (100 bis 999).',
         answerMode: 'regex',
         answers: [
           { value:'[1-9]\\d{2}', mode:'regex' }

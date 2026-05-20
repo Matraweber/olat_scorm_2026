@@ -3,7 +3,7 @@
 // renderActivePaneImpl dispatches to course / theme / task-pane based on the
 // current selection. The task editor lives in task-pane.js + sibling modules.
 // ============================================================================
-import { el, toast } from './util.js';
+import { el, toast, confirmDialog } from './util.js';
 import { state, pushHistory, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme } from './state.js';
 import { renderField } from './form.js';
 import { renderTaskPane } from './task-pane.js';
@@ -12,8 +12,37 @@ import { renderTaskPane } from './task-pane.js';
 export function renderTaskList(){
   const list = document.getElementById('taskList');
   list.innerHTML = '';
+  // Empty-state: no tasks yet. Show a subtle hint pointing at the "+ Aufgabe"
+  // button so first-time users aren't staring at a blank sidebar.
+  if(state.course.tasks.length === 0){
+    const empty = el('li', { className: 'task-empty' });
+    empty.innerHTML =
+      '<svg class="task-empty-art" viewBox="0 0 64 48" width="56" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="6"  y="6"  width="40" height="10" rx="2" opacity="0.45"/>' +
+        '<rect x="10" y="20" width="40" height="10" rx="2" opacity="0.7"/>' +
+        '<rect x="14" y="34" width="40" height="10" rx="2"/>' +
+      '</svg>' +
+      '<p class="task-empty-title">Noch keine Aufgaben</p>' +
+      '<p class="task-empty-body">Erstelle die erste Aufgabe, um Lerninhalte hinzuzufügen.</p>';
+    const cta = el('button', {
+      className: 'btn btn-primary btn-sm task-empty-cta',
+      attrs: { type: 'button' },
+      text: '+ Erste Aufgabe'
+    });
+    cta.addEventListener('click', () => {
+      const btn = document.getElementById('btnAddTask');
+      if(btn) btn.click();
+    });
+    empty.appendChild(cta);
+    list.appendChild(empty);
+    document.querySelectorAll('.sidebar-link').forEach(b => {
+      b.classList.toggle('active', state.selected.kind === b.dataset.target);
+    });
+    return;
+  }
   state.course.tasks.forEach((task, idx) => {
-    const li = el('li');
+    const li = el('li', { attrs: { draggable: 'true' } });
+    li.dataset.taskIdx = String(idx);
     const btn = el('button', {className: 'task-btn' + (state.selected.kind === 'task' && state.selected.idx === idx ? ' active' : ''), attrs:{type:'button'}});
     const titleSpan = el('span', {text: task.title || 'Aufgabe ' + (idx+1)});
     btn.appendChild(titleSpan);
@@ -31,8 +60,13 @@ export function renderTaskList(){
     up.disabled = idx === 0; dn.disabled = idx === state.course.tasks.length - 1;
     up.addEventListener('click', () => swapTasks(idx, idx-1));
     dn.addEventListener('click', () => swapTasks(idx, idx+1));
-    rm.addEventListener('click', () => {
-      if(!confirm('Aufgabe "' + (task.title || '') + '" entfernen?')) return;
+    rm.addEventListener('click', async () => {
+      if(!await confirmDialog({
+        title: 'Aufgabe löschen?',
+        message: '„' + (task.title || 'Aufgabe ' + (idx + 1)) + '" wird mit allen darin enthaltenen Blöcken gelöscht. Diese Aktion kann mit Strg + Z rückgängig gemacht werden.',
+        confirmLabel: 'Löschen',
+        danger: true
+      })) return;
       pushHistory();
       state.course.tasks.splice(idx, 1);
       if(state.selected.kind === 'task'){
@@ -45,17 +79,92 @@ export function renderTaskList(){
     li.appendChild(ctrls);
     list.appendChild(li);
   });
+  installTaskDnD(list);
   document.querySelectorAll('.sidebar-link').forEach(b => {
     b.classList.toggle('active', state.selected.kind === b.dataset.target);
   });
 }
 
+// Drag-and-drop reorder for the sidebar task list. Up/down arrow buttons
+// still work - DnD is just a faster path for non-adjacent moves. A 2 px
+// accent-coloured indicator line previews the drop position.
+function installTaskDnD(list){
+  let fromIdx = null;
+  function clearMarkers(){
+    list.querySelectorAll('.drop-before, .drop-after, .dragging').forEach(el =>
+      el.classList.remove('drop-before', 'drop-after', 'dragging')
+    );
+  }
+  list.querySelectorAll('li').forEach(li => {
+    // Drag must NOT start from the icon buttons (up/down/delete) - those
+    // get their own click handlers and shouldn't be hijacked.
+    li.addEventListener('mousedown', (e) => {
+      const onBtn = e.target.closest('.task-controls');
+      li.draggable = !onBtn;
+    });
+    li.addEventListener('dragstart', (e) => {
+      fromIdx = parseInt(li.dataset.taskIdx, 10);
+      e.dataTransfer.effectAllowed = 'move';
+      // Some browsers refuse to start the drag without setData.
+      try { e.dataTransfer.setData('text/plain', String(fromIdx)); } catch(_){}
+      li.classList.add('dragging');
+    });
+    li.addEventListener('dragend', () => {
+      fromIdx = null;
+      clearMarkers();
+    });
+    li.addEventListener('dragover', (e) => {
+      if(fromIdx == null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.querySelectorAll('.drop-before, .drop-after').forEach(el =>
+        el.classList.remove('drop-before', 'drop-after')
+      );
+      const rect = li.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      li.classList.add(after ? 'drop-after' : 'drop-before');
+    });
+    li.addEventListener('drop', (e) => {
+      if(fromIdx == null) return;
+      e.preventDefault();
+      const rect = li.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      let toIdx = parseInt(li.dataset.taskIdx, 10) + (after ? 1 : 0);
+      moveTask(fromIdx, toIdx);
+      fromIdx = null;
+      clearMarkers();
+    });
+  });
+}
+
 function swapTasks(a, b){
   if(b < 0 || b >= state.course.tasks.length) return;
+  pushHistory();
   [state.course.tasks[a], state.course.tasks[b]] = [state.course.tasks[b], state.course.tasks[a]];
   if(state.selected.kind === 'task'){
     if(state.selected.idx === a) state.selected.idx = b;
     else if(state.selected.idx === b) state.selected.idx = a;
+  }
+  render();
+}
+
+// Move task `from` to position `to`, treating `to` as the desired *post-move*
+// index. This is the semantics drag-and-drop callers want: dropping after
+// item 3 means "land at index 4".
+function moveTask(from, to){
+  const tasks = state.course.tasks;
+  if(from < 0 || from >= tasks.length) return;
+  // Dropping onto the same slot or directly after itself is a no-op.
+  if(to === from || to === from + 1) return;
+  pushHistory();
+  const [moved] = tasks.splice(from, 1);
+  // After removal, indices above `from` shift down by 1.
+  const adjusted = to > from ? to - 1 : to;
+  tasks.splice(adjusted, 0, moved);
+  if(state.selected.kind === 'task'){
+    if(state.selected.idx === from) state.selected.idx = adjusted;
+    else if(from < state.selected.idx && adjusted >= state.selected.idx) state.selected.idx -= 1;
+    else if(from > state.selected.idx && adjusted <= state.selected.idx) state.selected.idx += 1;
   }
   render();
 }
@@ -130,7 +239,7 @@ function renderWelcomePane(host){
   heroBody.insertAdjacentHTML('afterbegin',
     '<span class="welcome-kicker">SCORM Builder · Umwelt-Campus Birkenfeld</span>'
   );
-  heroBody.appendChild(el('p', {className:'welcome-lede', text:'Mit dem SCORM Builder erstellen Sie Lerneinheiten für OLAT - direkt im Browser, ohne Installation. Diese Seite erklärt den Ablauf in fünf Kapiteln.'}));
+  heroBody.appendChild(el('p', {className:'welcome-lede', text:'Mit dem SCORM Builder erstellen Sie Lerneinheiten für OLAT direkt im Browser, ohne Installation. Diese Seite erklärt den Ablauf in fünf Kapiteln.'}));
   const heroCta = el('div', {className:'welcome-cta-row'});
   const newTaskBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
   newTaskBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
@@ -195,7 +304,7 @@ function renderWelcomePane(host){
     ['3', 'Konfigurations-Pane', 'Rechts: Eigenschaften des markierten Blocks. Vorlagen, Texte, Antworten und Bewertung werden hier eingestellt.']
   ].forEach(([n, k, v]) => {
     const li = el('li');
-    li.innerHTML = '<span class="welcome-legend-num">' + n + '</span><strong>' + k + '</strong> - ' + v;
+    li.innerHTML = '<span class="welcome-legend-num">' + n + '</span><strong>' + k + '</strong> ' + v;
     layoutLegend.appendChild(li);
   });
   oberflaeche.appendChild(layoutLegend);
@@ -222,13 +331,17 @@ function renderWelcomePane(host){
       // affordance, and screen readers announce it as clickable.
       const card = el('button', {
         className:'welcome-block-card' + (def.graded ? ' graded' : ''),
-        attrs:{ type:'button', 'data-block-id': id, 'aria-label': (def.label || id) + ' - Details ansehen' }
+        attrs:{ type:'button', 'data-block-id': id, 'aria-label': (def.label || id) + ': Details ansehen' }
       });
       // "bewertet" badge sits INLINE after the title so it can never overlap
       // the title text. If the title wraps to multiple lines, the badge stays
-      // visually attached to the last word.
+      // visually attached to the last word. The icon comes from the canonical
+      // SVG registry (window.BlockIcons) when available; legacy string icons
+      // are still rendered as fallback.
+      const svgIcon = window.BlockIcons && window.BlockIcons.get(id);
+      const iconHtml = svgIcon || escapeHtml(def.icon || '◧');
       card.innerHTML =
-        '<div class="welcome-block-icon">' + escapeHtml(def.icon || '◧') + '</div>' +
+        '<div class="welcome-block-icon">' + iconHtml + '</div>' +
         '<div class="welcome-block-name">' + escapeHtml(def.label || id) +
           (def.graded ? ' <span class="welcome-block-graded">bewertet</span>' : '') +
         '</div>' +
@@ -420,7 +533,7 @@ function openBlockDetailModal(id, def){
 
   const modal = el('div', {
     className:'welcome-block-modal',
-    attrs:{ role:'dialog', 'aria-modal':'true', 'aria-label': (def.label || id) + ' - Details' }
+    attrs:{ role:'dialog', 'aria-modal':'true', 'aria-label': (def.label || id) + ': Details' }
   });
   const backdrop = el('div', {className:'welcome-block-modal-backdrop'});
   const card     = el('div', {className:'welcome-block-modal-card'});
@@ -434,8 +547,10 @@ function openBlockDetailModal(id, def){
 
   // Header: large icon + label + category badge + graded badge.
   const head = el('div', {className:'welcome-block-modal-head'});
+  const svgIcon = window.BlockIcons && window.BlockIcons.get(id);
+  const modalIcon = svgIcon || escapeHtml(def.icon || '◧');
   head.innerHTML =
-    '<div class="welcome-block-modal-icon">' + escapeHtml(def.icon || '◧') + '</div>' +
+    '<div class="welcome-block-modal-icon">' + modalIcon + '</div>' +
     '<div class="welcome-block-modal-titles">' +
       '<h3 class="welcome-block-modal-title">' + escapeHtml(def.label || id) + '</h3>' +
       '<div class="welcome-block-modal-meta">' +
@@ -470,15 +585,19 @@ function openBlockDetailModal(id, def){
   });
   left.appendChild(factList);
 
-  // Right side: live preview rendered with the block's defaultConfig.
-  // The preview is the same one the builder canvas shows - it doubles as a
-  // visual screenshot without us having to maintain static images.
+  // Right side: live preview rendered with the block's previewConfig (if
+  // declared - for question blocks where defaultConfig is intentionally
+  // empty) or defaultConfig as fallback. The preview is the same one the
+  // builder canvas shows - it doubles as a visual screenshot without us
+  // having to maintain static images.
   const right = el('div', {className:'welcome-block-modal-preview'});
   right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text:'Live-Vorschau'}));
   const previewHost = el('div', {className:'welcome-block-modal-preview-host'});
   right.appendChild(previewHost);
   try {
-    const cfg = (def.defaultConfig ? def.defaultConfig() : {}) || {};
+    const cfg = (def.previewConfig ? def.previewConfig() : null)
+             || (def.defaultConfig ? def.defaultConfig() : {})
+             || {};
     if(typeof def.preview === 'function'){
       def.preview(previewHost, cfg);
     } else if(typeof def.mount === 'function' && window.BlockUtils){
@@ -600,7 +719,7 @@ function mockPresetDropdown(){
   wrap.innerHTML =
     '<div class="mm-field"><label>Überschrift</label><div class="mm-inp">Aufgabe</div></div>' +
     '<div class="mm-field"><label>Vorlage</label>' +
-      '<div class="mm-select mm-pulse">Beispiel: Mathematik - Pythagoras ▾</div></div>' +
+      '<div class="mm-select mm-pulse">Beispiel: Mathematik, Pythagoras ▾</div></div>' +
     '<div class="mm-section">Frage</div>' +
     '<div class="mm-field"><label>Frage-Vorlage</label><div class="mm-inp mm-inp-mono">Berechnen Sie {a}² + {b}².</div></div>';
   return wrap;
@@ -658,8 +777,12 @@ function renderThemePane(host){
   const t = state.theme;
   const actions = el('div', {className:'button-cluster', style:{marginBottom:'1rem'}});
   const resetBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text:'Standard-Branding wiederherstellen'});
-  resetBtn.addEventListener('click', () => {
-    if(!confirm('Branding / Theme auf die ursprünglichen Standardwerte zurücksetzen?')) return;
+  resetBtn.addEventListener('click', async () => {
+    if(!await confirmDialog({
+      title: 'Branding zurücksetzen?',
+      message: 'Farben, Logo und Footer-Einstellungen werden auf die ursprünglichen UCB-Standardwerte zurückgesetzt.',
+      confirmLabel: 'Zurücksetzen'
+    })) return;
     pushHistory();
     clearPersistentTheme();
     state.theme = defaultTheme();

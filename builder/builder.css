@@ -16,6 +16,37 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; }
 body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: linear-gradient(180deg, #eef5f8 0%, #f8fbfc 100%); }
+
+/* Global keyboard focus ring
+ * Browsers fire :focus-visible only when the focus came from keyboard
+ * navigation (Tab) or programmatic focus(), NOT mouse clicks. So this
+ * rule polishes accessibility without making mouse interactions noisier.
+ * The 3 px outer ring uses a brand-colour at 35 % opacity so it shows
+ * over any background. Specific elements can still override below. */
+:focus-visible {
+  outline: 2px solid rgba(0, 59, 92, 0.55);
+  outline-offset: 2px;
+}
+button:focus-visible,
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid rgba(0, 59, 92, 0.55);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 59, 92, 0.15);
+}
+/* For elements on the dark header (icon buttons, kicker, autosave pill,
+ * etc.) use a lighter ring so it shows over the navy background. */
+.builder-header :focus-visible {
+  outline-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  :focus-visible { transition: none !important; }
+}
 .builder-shell { display: flex; flex-direction: column; min-height: 100vh; }
 .builder-header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: #fff; padding: 0.6rem 1.2rem; display:flex; justify-content:space-between; align-items: center; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
 .builder-brand { display: flex; align-items: center; gap: 0.7rem; }
@@ -33,12 +64,61 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .section-head h2 { margin: 0; }
 .section-head .btn { align-self: stretch; text-align: center; }
 .task-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
-.task-list li { display: flex; align-items: center; gap: 0.4rem; }
+.task-list li { display: flex; align-items: center; gap: 0.4rem; position: relative; }
+/* Drag-and-drop reorder: the whole row is the drag handle, but icon-btns
+   stay clickable. The cursor signals affordance without being noisy. */
+.task-list li[draggable="true"] .task-btn { cursor: grab; }
+.task-list li.dragging { opacity: 0.5; }
+.task-list li.dragging .task-btn { cursor: grabbing; }
+/* Drop-position indicator - a 2 px accent line above or below the target. */
+.task-list li.drop-before::before,
+.task-list li.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 3px;
+  background: var(--accent-dark);
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(132,191,102,0.25);
+  pointer-events: none;
+}
+.task-list li.drop-before::before { top: -3px; }
+.task-list li.drop-after::after  { bottom: -3px; }
 .task-list .task-btn { flex: 1; text-align: left; padding: 0.55rem 0.7rem; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font: inherit; color: var(--primary); font-weight: 700; }
 .task-list .task-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .task-list .task-btn .task-meta { display:block; font-size: 0.75rem; color: var(--muted); font-weight: normal; margin-top: 0.15rem; }
 .task-list .task-btn.active .task-meta { color: rgba(255,255,255,0.85); }
 .task-list .task-controls { display: flex; flex-direction: column; gap: 0.15rem; }
+/* Empty-state shown when state.course.tasks is empty (e.g. fresh course or
+ * after deleting the last task). A muted SVG hint + one-tap CTA so the
+ * sidebar never looks abandoned. */
+.task-list .task-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.45rem;
+  padding: 1.4rem 0.6rem 1.1rem;
+  background: var(--panel-soft);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+}
+.task-list .task-empty-art { color: var(--primary); opacity: 0.5; }
+.task-list .task-empty-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--primary);
+}
+.task-list .task-empty-body {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+  max-width: 18ch;
+}
+.task-list .task-empty-cta { margin-top: 0.3rem; }
 .icon-btn { width: 24px; height: 22px; border:1px solid var(--line); background:#fff; color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.75rem; padding: 0; line-height: 1; display:flex; align-items:center; justify-content:center; }
 .icon-btn:hover { background: var(--panel-soft); }
 .icon-btn.danger:hover { background: #fde7e3; color: var(--danger); border-color: #f0bbb3; }
@@ -100,8 +180,48 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .preview-head .btn:hover { background: #8c1c12; border-color: #8c1c12; }
 /* Block-type picker (two-panel: category nav + list) */
 .block-picker-card { overflow: hidden; display: flex; flex-direction: column; }
+.block-picker-search {
+  position: relative;
+  margin: 0.55rem 0 0;
+}
+.block-picker-search-icon {
+  position: absolute;
+  left: 0.7rem; top: 50%; transform: translateY(-50%);
+  color: var(--muted);
+  display: flex; align-items: center;
+  pointer-events: none;
+}
+.block-picker-search input {
+  width: 100%;
+  padding: 0.55rem 0.7rem 0.55rem 2.2rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  transition: border-color 0.12s, box-shadow 0.12s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.block-picker-search input::placeholder { color: var(--muted); }
+.block-picker-search input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0,59,92,0.10);
+}
+/* When a search is active the category nav fades - it's not actionable
+   in a flat-match view (matches come from multiple categories). */
+.block-cat-nav.search-active .block-cat-btn { opacity: 0.45; }
+.block-cat-nav.search-active .block-cat-btn:hover { opacity: 1; }
+.block-picker-empty {
+  padding: 1.2rem 0.6rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
 .block-picker-layout { display: flex; height: 54vh; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 0.7rem 0 0; }
-.block-cat-nav { width: 148px; flex: 0 0 148px; background: var(--panel-soft); border-right: 1px solid var(--line); padding: 0.4rem; display: flex; flex-direction: column; gap: 0.1rem; overflow-y: auto; }
+.block-cat-nav { width: 168px; flex: 0 0 168px; background: var(--panel-soft); border-right: 1px solid var(--line); padding: 0.4rem; display: flex; flex-direction: column; gap: 0.1rem; overflow-y: auto; }
 .block-cat-btn { background: none; border: none; border-radius: 7px; text-align: left; padding: 0.45rem 0.65rem; font: inherit; font-size: 0.86rem; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .block-cat-btn:hover { background: rgba(0,59,92,0.07); }
 .block-cat-btn.active { background: var(--primary); color: #fff; font-weight: 700; }
@@ -113,10 +233,77 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .block-type-label { font-weight: 700; color: var(--primary); font-size: 0.87rem; display: block; }
 .block-type-desc { color: var(--muted); font-size: 0.77rem; display: block; }
 .block-type-badge { background: var(--accent); color: var(--primary); padding: 0.04rem 0.38rem; border-radius: 999px; font-size: 0.63rem; font-weight: 700; margin-left: 0.35rem; vertical-align: middle; }
+/* User-saved block templates get a distinct neutral badge so they don't read
+   like "gewertet" (a property of the underlying block, not the template). */
+.block-type-badge.block-type-badge-template {
+  background: #dbe5ec;
+  color: var(--primary);
+}
+.block-type-row-template { position: relative; }
+.block-type-template-delete {
+  position: absolute;
+  top: 50%; right: 0.6rem; transform: translateY(-50%);
+  width: 24px; height: 24px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.block-type-row-template:hover .block-type-template-delete { opacity: 0.8; }
+.block-type-template-delete:hover {
+  opacity: 1 !important;
+  color: #a82015;
+  border-color: rgba(168,32,21,0.45);
+}
 .preview-card { max-width: 95vw; max-height: 95vh; width: 95vw; display:flex; flex-direction: column; }
 .preview-head { display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.6rem; }
 #previewFrame { flex:1; min-height: 80vh; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--primary); color: #fff; padding: 0.7rem 1.2rem; border-radius: 999px; box-shadow: var(--shadow); z-index: 200; font-size: 0.92rem; }
+
+/* Styled confirm dialog (replaces the native confirm()). */
+.confirm-dialog .confirm-dialog-card {
+  max-width: 440px;
+  padding: 1.3rem 1.4rem 1.1rem;
+  animation: confirmAppear 180ms ease-out;
+}
+.confirm-dialog-title {
+  margin: 0 0 0.6rem 0;
+  color: var(--primary);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.confirm-dialog-message {
+  margin: 0 0 1.1rem 0;
+  color: var(--text);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+.confirm-dialog .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+}
+.confirm-dialog .btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.confirm-dialog .btn-danger:hover { background: #8c1c12; border-color: #8c1c12; }
+@keyframes confirmAppear {
+  from { opacity: 0; transform: scale(0.95) translateY(-6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirm-dialog .confirm-dialog-card { animation: none; }
+}
 .toast.hidden { display: none; }
 .toast.error { background: var(--danger); }
 .toast.warn { background: var(--warn); }
@@ -156,15 +343,52 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-  cursor: move;
+  cursor: grab;
   user-select: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
-.canvas-block-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+.canvas-block-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+  border-color: rgba(0,59,92,0.35);
+}
 .canvas-block-card.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,59,92,0.2), 0 4px 14px rgba(0,0,0,0.12); }
+/* While being dragged: closed-hand cursor, slightly stronger shadow, and
+ * a 1-degree rotation so the card visibly "lifts" off the canvas. */
+.canvas-block-card.dragging {
+  cursor: grabbing !important;
+  box-shadow: 0 10px 22px rgba(0,28,47,0.22), 0 0 0 2px rgba(0,59,92,0.25);
+  transform: rotate(-0.6deg);
+  z-index: 5;
+}
+.canvas-block-card.dragging * { cursor: grabbing !important; }
+/* Fade-in + small bounce when a brand-new block is first rendered. The
+ * `.is-new` class is added by task-pane-canvas.js on first sight of a
+ * block id; it sticks for the lifetime of the card but the animation
+ * only runs once. */
+.canvas-block-card.is-new {
+  animation: blockAppear 320ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+@keyframes blockAppear {
+  0%   { opacity: 0; transform: scale(0.94) translateY(-4px); }
+  60%  { opacity: 1; transform: scale(1.02) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* Exit animation when the user removes a block. JS adds `.is-removing`
+ * 180 ms before splicing - the card briefly fades + shrinks. */
+.canvas-block-card.is-removing {
+  animation: blockRemove 180ms ease-in forwards;
+  pointer-events: none;
+}
+@keyframes blockRemove {
+  to { opacity: 0; transform: scale(0.92) translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce){
+  .canvas-block-card.is-new,
+  .canvas-block-card.is-removing { animation: none; }
+}
 .canvas-block-head {
   display: flex; justify-content: space-between; align-items: center; gap: 0.4rem;
   padding: 0.35rem 0.55rem;
@@ -174,6 +398,9 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
   color: var(--primary);
   font-weight: 700;
   flex: 0 0 auto;
+  /* The header is the obvious drag handle. Keep the cursor explicit even
+   * when text inside changes (e.g. position labels). */
+  cursor: inherit;
 }
 .canvas-block-type { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .canvas-block-controls { display: flex; gap: 0.2rem; opacity: 0; transition: opacity 0.15s ease; }
@@ -202,9 +429,52 @@ body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: 
 .canvas-block-card.selected .canvas-block-resize { opacity: 1; background: linear-gradient(135deg, transparent 50%, var(--primary) 50%); color: #fff; }
 .canvas-block-empty {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  text-align: center; color: var(--muted); padding: 1.5rem 2rem;
-  border: 2px dashed var(--line); border-radius: 12px; background: rgba(255,255,255,0.7);
-  font-size: 0.95rem; max-width: 460px;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  text-align: center; color: var(--muted);
+  padding: 1.25rem 2rem 1.1rem;
+  border: 2px dashed var(--line); border-radius: 14px;
+  background: rgba(255,255,255,0.85);
+  max-width: 460px;
+}
+.canvas-block-empty .canvas-empty-art {
+  color: var(--primary);
+  opacity: 0.6;
+  margin-bottom: 0.05rem;
+}
+.canvas-block-empty .canvas-empty-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.01em;
+}
+.canvas-block-empty .canvas-empty-body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--muted);
+  max-width: 42ch;
+}
+.canvas-block-empty .canvas-empty-cta {
+  margin-top: 0.3rem;
+  padding: 0.5rem 1.15rem;
+  font-size: 0.92rem;
+}
+.canvas-block-empty .canvas-empty-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.85;
+}
+.canvas-block-empty .canvas-empty-hint kbd {
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 0.72rem;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--primary);
 }
 .snap-guide { position: absolute; pointer-events: none; z-index: 50; background: var(--accent-dark); }
 .snap-guide.v { top: 0; bottom: 0; width: 1px; box-shadow: 0 0 0 1px rgba(132,191,102,0.35); }
@@ -1083,3 +1353,379 @@ html.welcome-active {
 .welcome-block-modal-preview-empty {
   color: var(--muted); font-size: 0.85rem; padding: 1rem; text-align: center;
 }
+
+/* Autosave indicator + recovery dialog */
+.autosave-status {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  height: 28px; padding: 0 0.7rem;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.78rem; font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+}
+.autosave-status::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.45);
+  flex-shrink: 0;
+}
+.autosave-status[data-state="saved"]::before { background: var(--accent); }
+.autosave-status[data-state="saved"]       { color: #ffffff; }
+@media (max-width: 900px) { .autosave-status { display: none; } }
+
+.autosave-recovery .modal-card { padding: 1.4rem 1.5rem; }
+.autosave-recovery h2 { margin-top: 0; color: var(--primary); }
+.autosave-recovery .autosave-summary {
+  margin: 0.7rem 0 0.4rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.autosave-recovery .autosave-summary strong { color: var(--primary); font-size: 1rem; }
+.autosave-recovery .autosave-summary span { color: var(--muted); font-size: 0.85rem; }
+.autosave-recovery .hint { color: var(--muted); font-size: 0.8rem; margin: 0.2rem 0 0.6rem; }
+
+/* Pre-export validation gate */
+.export-gate .export-gate-card { max-width: 620px; padding: 1.4rem 1.5rem; }
+.export-gate h2 { margin-top: 0; color: var(--primary); }
+.export-gate .hint { color: var(--muted); font-size: 0.85rem; margin: 0.7rem 0 0; }
+.export-gate-list {
+  list-style: none; margin: 1rem 0 0; padding: 0;
+  max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel-soft);
+}
+.export-gate-issue {
+  display: grid;
+  grid-template-columns: minmax(110px, max-content) minmax(110px, max-content) 1fr;
+  gap: 0.4rem 0.8rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+.export-gate-issue:last-child { border-bottom: none; }
+.export-gate-issue-task  { font-weight: 700; color: var(--primary); }
+.export-gate-issue-block { color: var(--muted); font-size: 0.78rem; }
+.export-gate-issue-msg   { color: var(--danger); }
+.export-gate-issue-course {
+  display: block; grid-template-columns: none;
+  color: var(--warn);
+  background: rgba(163, 114, 43, 0.06);
+}
+
+/* Responsive: tablet + mobile */
+/* The desktop layout uses a fixed 220 px sidebar + flexible main pane and a
+ * top-bar with seven action buttons. Below ~1100 px the side-by-side starts
+ * to feel cramped; below ~720 px the action row needs to wrap, and modals
+ * should claim more of the viewport so they stay readable. */
+
+@media (max-width: 1100px) {
+  .builder-main { grid-template-columns: 200px 1fr; gap: 0.7rem; padding: 0.7rem; }
+  .builder-actions .btn { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+}
+
+@media (max-width: 900px) {
+  /* Stack sidebar above main pane - override the 200 px column from the
+   * 1100 px breakpoint earlier in this stylesheet. */
+  .builder-main { grid-template-columns: 1fr !important; }
+  .builder-header { padding: 0.5rem 0.8rem; gap: 0.6rem; }
+  .builder-actions { gap: 0.3rem; }
+  .builder-actions .btn { padding: 0.32rem 0.6rem; font-size: 0.78rem; }
+  .builder-subtitle { display: none; }
+  .builder-brand h1 { font-size: 0.95rem; }
+  /* Two-column welcome block grid stays compact */
+  .welcome-blocks-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.4rem; }
+}
+
+@media (max-width: 720px) {
+  /* Action row wraps to two lines; primary export button stays on the right.
+   * Hide "Vorschau" + "JSON exportieren" - they're secondary actions, the
+   * essentials are New / Load / Export-ZIP. */
+  #btnPreview, #btnExportJson, #btnSidebarToggle {
+    display: none;
+  }
+  .builder-header { flex-direction: column; align-items: stretch; }
+  .builder-brand { justify-content: center; }
+  .builder-actions { justify-content: stretch; }
+  .builder-actions .btn { flex: 1 1 auto; min-width: 0; text-align: center; }
+  /* Sidebar slides on top of canvas at <720 px - full-width sections. */
+  .builder-main { gap: 0.5rem; padding: 0.5rem; }
+  .builder-pane { padding: 0.7rem 0.8rem; }
+  /* Welcome page: tighter chapter padding */
+  .welcome-chapter-body { padding: 0; }
+  .welcome-tips-grid { grid-template-columns: 1fr; }
+  /* Modals: claim the viewport */
+  .modal-card { max-width: calc(100vw - 1rem) !important; max-height: calc(100vh - 1rem); overflow: auto; }
+  .welcome-block-modal-card { width: calc(100vw - 1rem); max-height: calc(100vh - 1rem); }
+  .welcome-block-modal-body { grid-template-columns: 1fr; padding: 0.9rem 1rem 1.1rem; }
+}
+
+@media (max-width: 480px) {
+  /* Mobile portrait. Header brand text shrinks further, welcome block grid
+   * collapses to a single column so cards aren't only ~140 px wide. */
+  .builder-brand h1 { font-size: 0.9rem; }
+  .builder-kicker { display: none; }
+  .welcome-blocks-grid { grid-template-columns: 1fr; }
+  .welcome-chapter-title { font-size: 1.5rem !important; }
+  .welcome-chapter-hero .welcome-chapter-title { font-size: 1.8rem !important; }
+  /* Composition canvas: allow horizontal scroll if the SVG is too wide */
+  .comp-canvas-wrap { overflow-x: auto; }
+  /* Welcome modal: vertical layout */
+  .welcome-block-modal-head { flex-direction: row; }
+  .welcome-block-modal-titles { flex: 1; min-width: 0; }
+}
+
+/* SVG icons inside the icon chips scale to fill their container while
+ * keeping a small inner padding. Uses `stroke: currentColor` so the icon
+ * follows the chip's color (primary on the cards, white on hover). */
+.welcome-block-icon  svg { width: 18px; height: 18px; display: block; }
+.welcome-tip-icon    svg { width: 18px; height: 18px; display: block; }
+.welcome-block-modal-icon { padding: 0.45rem; }
+.welcome-block-modal-icon svg { width: 100%; height: 100%; display: block; }
+
+/* Header redesign (v87) */
+/* Layout: [sidebar-toggle] [brand] ………… [actions]
+ * The grid pattern guarantees actions sit flush-right at any width. */
+.builder-header {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.55rem 1rem;
+}
+/* Brand grows to push actions to the right. */
+.builder-header .builder-brand { flex: 1; min-width: 0; }
+.builder-header .builder-brand h1 { font-size: 1.02rem; }
+
+/* Compact 32 px icon-only button for the sidebar toggle. The chevron
+ * rotates 180 ° when the sidebar is collapsed so it visually flips from
+ * "hide" to "show". */
+.header-icon-btn {
+  appearance: none;
+  width: 32px; height: 32px; padding: 0;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: #fff; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 140ms ease, border-color 140ms ease;
+  flex-shrink: 0;
+}
+.header-icon-btn:hover, .header-icon-btn:focus-visible {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.32);
+  outline: none;
+}
+.header-icon-btn svg { transition: transform 200ms cubic-bezier(0.4, 0.2, 0.2, 1); }
+.builder-shell.sidebar-collapsed .header-icon-btn svg { transform: rotate(180deg); }
+
+/* Datei dropdown */
+.header-menu { position: relative; }
+.header-menu-trigger {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding-right: 0.7rem !important;
+}
+.header-menu-trigger svg { opacity: 0.85; transition: transform 160ms ease; }
+.header-menu[data-open="true"] .header-menu-trigger svg { transform: rotate(180deg); }
+.header-menu-popover {
+  position: absolute; top: calc(100% + 0.45rem); right: 0;
+  min-width: 270px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 28, 47, 0.18);
+  padding: 0.35rem;
+  z-index: 200;
+  display: flex; flex-direction: column;
+}
+.header-menu-popover[hidden] { display: none; }
+/* Section grouping inside the file menu - a tiny uppercase label plus
+   the items belonging to that group. Sections are separated by a 1 px
+   divider rule. */
+.header-menu-section { display: flex; flex-direction: column; gap: 0.1rem; }
+.header-menu-section-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  padding: 0.4rem 0.7rem 0.15rem;
+}
+.header-menu-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 0.3rem 0.35rem;
+}
+.header-menu-item {
+  appearance: none;
+  background: transparent; border: none;
+  text-align: left;
+  font: inherit; color: var(--primary);
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 0.15rem;
+  transition: background 100ms ease;
+}
+.header-menu-item:hover, .header-menu-item:focus-visible {
+  background: var(--panel-soft);
+  outline: none;
+}
+.header-menu-item:focus-visible { box-shadow: 0 0 0 2px rgba(0,59,92,0.18); }
+.header-menu-label { font-weight: 700; font-size: 0.88rem; }
+.header-menu-hint  { font-size: 0.74rem; color: var(--muted); font-weight: 400; }
+
+/* Autosave indicator: small, quiet, inline. No background pill. */
+.autosave-status {
+  /* override the old pill styles */
+  background: transparent !important;
+  border: none !important;
+  padding: 0 0.35rem 0 0 !important;
+  height: auto !important;
+  font-size: 0.74rem !important;
+  font-weight: 500 !important;
+  color: rgba(255,255,255,0.6) !important;
+  letter-spacing: 0.01em;
+  transition: color 200ms ease;
+}
+.autosave-status::before {
+  width: 7px !important; height: 7px !important;
+  background: rgba(255,255,255,0.4) !important;
+  box-shadow: 0 0 0 0 rgba(161,216,132,0); /* prep for transition */
+  transition: background 220ms ease, box-shadow 220ms ease;
+}
+.autosave-status[data-state="saved"] {
+  color: rgba(255,255,255,0.85) !important;
+}
+.autosave-status[data-state="saved"]::before {
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(161,216,132,0.18);
+}
+/* Saving in-flight: amber dot, slightly more prominent text. */
+.autosave-status[data-state="saving"] {
+  color: rgba(255,255,255,0.85) !important;
+}
+.autosave-status[data-state="saving"]::before {
+  background: #f5c14d !important;
+  box-shadow: 0 0 0 3px rgba(245,193,77,0.20);
+  animation: autosave-pending-pulse 1.1s ease-in-out infinite;
+}
+@keyframes autosave-pending-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.82); }
+}
+/* Just-saved pulse: a brief expanding ring on the dot to confirm the write
+ * landed. The class is toggled by main.js for ~700 ms and then removed. */
+.autosave-status.just-saved::before {
+  animation: autosave-success-pulse 700ms ease-out 1;
+}
+@keyframes autosave-success-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(161,216,132,0.55); }
+  60%  { box-shadow: 0 0 0 10px rgba(161,216,132,0);   }
+  100% { box-shadow: 0 0 0 3px rgba(161,216,132,0.18); }
+}
+@media (prefers-reduced-motion: reduce){
+  .autosave-status[data-state="saving"]::before,
+  .autosave-status.just-saved::before { animation: none; }
+}
+
+/* Sidebar-collapsed: the sidebar slides out; main pane reclaims the space. */
+.builder-shell.sidebar-collapsed .builder-sidebar { display: none; }
+
+/* Subtle separator before primary actions to give them visual weight */
+.builder-actions { gap: 0.45rem; }
+
+/* Mobile: hide hints inside the Datei menu so the popover stays compact. */
+@media (max-width: 560px) {
+  .header-menu-hint { display: none; }
+  .header-menu-item { gap: 0; }
+}
+
+/* Cheatsheet overlay (? key) */
+.cheatsheet { z-index: 220; }
+.cheatsheet-card {
+  width: min(880px, calc(100vw - 2rem));
+  max-height: min(720px, calc(100vh - 2rem));
+  display: flex; flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.cheatsheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.3rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.cheatsheet-head h2 {
+  margin: 0; color: var(--primary); font-size: 1.1rem;
+}
+.cheatsheet-close {
+  /* Reuse the header-icon-btn look but adapt to the white modal background. */
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.cheatsheet-close:hover {
+  background: var(--panel-soft); color: var(--primary);
+  border-color: var(--line);
+}
+.cheatsheet-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 1rem 1.3rem 0.4rem;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.2rem 1.6rem;
+}
+.cheatsheet-group h3 {
+  margin: 0 0 0.6rem; color: var(--primary);
+  font-size: 0.78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--line);
+}
+.cheatsheet-group dl {
+  margin: 0;
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 0.4rem 0.9rem;
+  align-items: baseline;
+  font-size: 0.86rem;
+}
+.cheatsheet-group dt {
+  display: inline-flex; align-items: center; gap: 0.18rem;
+  flex-wrap: wrap;
+  color: var(--primary);
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+.cheatsheet-group dd {
+  margin: 0; color: var(--text); line-height: 1.4;
+}
+.cheatsheet-group kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font: inherit;
+  font-family: "Courier New", monospace; font-weight: 700;
+  font-size: 0.74rem;
+  color: var(--primary);
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: inset 0 -1px 0 0 var(--line);
+  line-height: 1.2;
+}
+.cheatsheet-foot {
+  padding: 0.7rem 1.3rem;
+  border-top: 1px solid var(--line);
+  background: var(--panel-soft);
+  font-size: 0.78rem; color: var(--muted);
+  display: flex; align-items: center; justify-content: flex-end;
+}
+.cheatsheet-foot kbd {
+  display: inline-block; padding: 0.06rem 0.36rem;
+  font-family: "Courier New", monospace; font-weight: 700; font-size: 0.72rem;
+  background: #fff; border: 1px solid var(--line); border-radius: 4px;
+  color: var(--primary);
+}
+/* Help button styled like the sidebar-toggle */
+.header-help-btn { margin-right: 0.15rem; }

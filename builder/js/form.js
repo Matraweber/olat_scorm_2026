@@ -7,6 +7,102 @@
 import { el } from './util.js';
 import { MATH_CATS, FORMULA_FN_BTNS } from './math-toolbar-data.js';
 
+// ============================================================================
+// Upload validation shared between image / audio / video / file fields.
+//
+// Two-tier limits:
+//   • UPLOAD_WARN_THRESHOLDS - soft yellow warning. Upload still works but
+//     the browser autosave (localStorage, ~5-10 MB quota) will likely fail,
+//     meaning a page reload loses unsaved edits. The final SCORM-ZIP still
+//     ships the file correctly because media-extraction writes it as a
+//     separate binary file.
+//   • UPLOAD_SIZE_LIMITS - hard cap. Above this, FileReader risks running
+//     the tab out of memory. Reject with a friendly error pointing the
+//     user at YouTube/Vimeo for huge videos.
+//
+// The MIME check rejects obviously-wrong types (e.g. PDF in an image slot).
+// ============================================================================
+const UPLOAD_SIZE_LIMITS = {
+  image:  50 * 1024 * 1024,   //  50 MB - hard cap
+  audio: 200 * 1024 * 1024,   // 200 MB
+  video: 500 * 1024 * 1024,   // 500 MB
+  file:  500 * 1024 * 1024
+};
+const UPLOAD_WARN_THRESHOLDS = {
+  image:  2 * 1024 * 1024,    //  2 MB → warning
+  audio:  5 * 1024 * 1024,    //  5 MB
+  video: 10 * 1024 * 1024,    // 10 MB
+  file:  10 * 1024 * 1024
+};
+function humanSize(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if(bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+}
+function validateUpload(file, kind){
+  if(!file) return { ok: false, error: 'Keine Datei ausgewählt.' };
+  const limit = UPLOAD_SIZE_LIMITS[kind] || UPLOAD_SIZE_LIMITS.file;
+  if(file.size > limit){
+    const suggestion = kind === 'video'
+      ? ' Tipp: YouTube oder Vimeo unterstützen beliebig große Videos - einfach den Link einfügen.'
+      : '';
+    return { ok:false, error:'Datei ist zu groß (' + humanSize(file.size) + '). Maximum: ' + humanSize(limit) + '.' + suggestion };
+  }
+  const mime = file.type || '';
+  if(kind === 'image' && !mime.startsWith('image/')){
+    return { ok:false, error:'Diese Datei ist kein Bild' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
+  }
+  if(kind === 'audio' && !mime.startsWith('audio/')){
+    return { ok:false, error:'Diese Datei ist keine Audiodatei' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
+  }
+  if(kind === 'video' && !mime.startsWith('video/')){
+    return { ok:false, error:'Diese Datei ist kein Video' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
+  }
+  // Soft warning for files that may break the browser autosave.
+  const warnThresh = UPLOAD_WARN_THRESHOLDS[kind];
+  let warning = null;
+  if(warnThresh && file.size > warnThresh){
+    const suggestion = kind === 'video'
+      ? ' Für sehr lange Videos kann ein YouTube-/Vimeo-Link sinnvoller sein.'
+      : '';
+    warning = 'Sehr große Datei - der Auto-Save im Browser kann scheitern, d. h. bei Reload wäre die Datei weg. Der SCORM-Export funktioniert weiterhin.' + suggestion;
+  }
+  return { ok: true, sizeHuman: humanSize(file.size), warning };
+}
+// Render an inline status row below an upload input. Returns an object with
+// .showError(msg) / .showSuccess(msg) / .showWarning(msg) / .clear() -
+// the renderer uses these to communicate validation outcomes without
+// disrupting the layout.
+//
+//   error   → red, rejected upload
+//   warning → amber, upload succeeded but caveat applies (large file)
+//   success → green, upload accepted with no caveats
+function makeUploadStatus(){
+  const el = document.createElement('div');
+  el.className = 'upload-status';
+  el.style.cssText = 'min-height:1.1rem; margin-top:0.4rem; font-size:0.78rem; line-height:1.35;';
+  return {
+    el,
+    showError(msg){
+      el.textContent = '⚠ ' + msg;
+      el.style.color = '#a82015';
+    },
+    showSuccess(msg){
+      el.textContent = '✓ ' + msg;
+      el.style.color = '#2c7a3f';
+    },
+    showWarning(msg){
+      el.textContent = '⚠ ' + msg;
+      el.style.color = '#a3722b';
+    },
+    clear(){
+      el.textContent = '';
+      el.style.color = '';
+    }
+  };
+}
+
 export function renderField(spec, getObj, setObj){
   const obj = getObj() || {};
 
@@ -230,6 +326,12 @@ export function renderField(spec, getObj, setObj){
     return wrap;
   } else if(spec.type === 'image'){
     return renderImageField(spec, getObj, setObj, wrap);
+  } else if(spec.type === 'audio'){
+    return renderAudioField(spec, getObj, setObj, wrap);
+  } else if(spec.type === 'video'){
+    return renderVideoField(spec, getObj, setObj, wrap);
+  } else if(spec.type === 'file'){
+    return renderFileField(spec, getObj, setObj, wrap);
   } else if(spec.type === 'math-textarea') {
     return renderMathTextarea(spec, getObj, setObj, wrap);
   } else if(spec.type === 'formula-text') {
@@ -256,15 +358,32 @@ function renderImageField(spec, getObj, setObj, wrap){
   const fileRow = el('div', {className:'field-row'});
   const fileInp = el('input', {attrs:{type:'file', accept:'image/*'}});
   const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Bild entfernen'});
+  const status = makeUploadStatus();
   fileInp.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
+    const v = validateUpload(f, 'image');
+    if(!v.ok){
+      status.showError(v.error);
+      fileInp.value = '';  // reset so the same file can be re-tried after correction
+      return;
+    }
     const r = new FileReader();
-    r.onload = () => { setObj(spec.key, r.result); rerenderImagePreview(); };
+    r.onload = () => {
+      setObj(spec.key, r.result);
+      status.showSuccess('Bild eingebettet (' + v.sizeHuman + ')');
+      rerenderImagePreview();
+    };
+    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
     r.readAsDataURL(f);
   });
-  clearBtn.addEventListener('click', () => { setObj(spec.key, ''); rerenderImagePreview(); });
+  clearBtn.addEventListener('click', () => {
+    setObj(spec.key, '');
+    status.clear();
+    rerenderImagePreview();
+  });
   fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
   inner.appendChild(fileRow);
+  inner.appendChild(status.el);
   const urlInp = el('input', {attrs:{type:'text', placeholder:'oder URL/Pfad eingeben'}});
   urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
   urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderImagePreview(); });
@@ -279,6 +398,186 @@ function renderImageField(spec, getObj, setObj, wrap){
   }
   inner.appendChild(previewWrap);
   rerenderImagePreview();
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ---------- audio field (file upload OR URL) ----------
+// Mirrors renderImageField. Accepts mp3/wav/ogg via a file picker; the file
+// is read as a Data-URL and stored in config.src so it travels with the
+// SCORM-ZIP without needing a separate /media folder.
+function renderAudioField(spec, getObj, setObj, wrap){
+  const obj = getObj() || {};
+  const inner = el('div');
+  const fileRow = el('div', {className:'field-row'});
+  const fileInp = el('input', {attrs:{type:'file', accept:'audio/*'}});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Audio entfernen'});
+  const status = makeUploadStatus();
+  fileInp.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const v = validateUpload(f, 'audio');
+    if(!v.ok){ status.showError(v.error); fileInp.value = ''; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      setObj(spec.key, r.result);
+      status.showSuccess('Audio eingebettet (' + v.sizeHuman + ')');
+      rerenderAudioPreview();
+    };
+    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.readAsDataURL(f);
+  });
+  clearBtn.addEventListener('click', () => { setObj(spec.key, ''); status.clear(); rerenderAudioPreview(); });
+  fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
+  inner.appendChild(fileRow);
+  inner.appendChild(status.el);
+  const urlInp = el('input', {attrs:{type:'text', placeholder:'oder URL/Pfad eingeben (z. B. https://example.org/clip.mp3)'}});
+  urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
+  urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderAudioPreview(); });
+  inner.appendChild(urlInp);
+  const previewWrap = el('div', {style:{marginTop:'0.5rem'}});
+  function rerenderAudioPreview(){
+    previewWrap.innerHTML = '';
+    const v = (getObj() || {})[spec.key];
+    if(!v) return;
+    const a = document.createElement('audio');
+    a.controls = true; a.preload = 'metadata';
+    a.src = v;
+    a.style.cssText = 'width:100%; display:block;';
+    previewWrap.appendChild(a);
+  }
+  inner.appendChild(previewWrap);
+  rerenderAudioPreview();
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ---------- video field (file upload OR URL) ----------
+// Same shape as renderAudioField but accepts video/* and previews with
+// a <video controls> element so the user can verify the clip in-place
+// before saving.
+function renderVideoField(spec, getObj, setObj, wrap){
+  const obj = getObj() || {};
+  const inner = el('div');
+  const fileRow = el('div', {className:'field-row'});
+  const fileInp = el('input', {attrs:{type:'file', accept:'video/*'}});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Video entfernen'});
+  const status = makeUploadStatus();
+  fileInp.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const v = validateUpload(f, 'video');
+    if(!v.ok){ status.showError(v.error); fileInp.value = ''; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      setObj(spec.key, r.result);
+      status.showSuccess('Video eingebettet (' + v.sizeHuman + ')');
+      rerenderVideoPreview();
+    };
+    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.readAsDataURL(f);
+  });
+  clearBtn.addEventListener('click', () => { setObj(spec.key, ''); status.clear(); rerenderVideoPreview(); });
+  fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
+  inner.appendChild(fileRow);
+  inner.appendChild(status.el);
+  const urlInp = el('input', {attrs:{type:'text', placeholder:'YouTube-/Vimeo-Link oder direkte Video-URL (z. B. https://youtu.be/abc12345678)'}});
+  urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
+  urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderVideoPreview(); });
+  inner.appendChild(urlInp);
+  const previewWrap = el('div', {style:{marginTop:'0.5rem'}});
+  function rerenderVideoPreview(){
+    previewWrap.innerHTML = '';
+    const v = (getObj() || {})[spec.key];
+    if(!v) return;
+    // Detect platform embeds via the video block's helper. Mirrors the
+    // runtime so the editor preview matches what the learner will see.
+    const def = window.Blocks && window.Blocks.get('video');
+    const info = def && typeof def.detectVideoSource === 'function' ? def.detectVideoSource(v) : null;
+    if(info && (info.kind === 'youtube' || info.kind === 'vimeo')){
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative; width:100%; aspect-ratio:16/9; max-width:320px; border-radius:6px; overflow:hidden; background:#000;';
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('frameborder','0');
+      iframe.setAttribute('allow','accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture');
+      iframe.setAttribute('allowfullscreen','true');
+      iframe.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; border:0;';
+      iframe.src = info.kind === 'youtube'
+        ? 'https://www.youtube-nocookie.com/embed/' + info.id + '?rel=0'
+        : 'https://player.vimeo.com/video/' + info.id + '?dnt=1';
+      wrap.appendChild(iframe);
+      previewWrap.appendChild(wrap);
+      const hint = document.createElement('div');
+      hint.textContent = (info.kind === 'youtube' ? 'YouTube' : 'Vimeo') + '-Embed erkannt';
+      hint.style.cssText = 'font-size:0.78rem; color:#2c7a3f; margin-top:0.3rem;';
+      previewWrap.appendChild(hint);
+      return;
+    }
+    const video = document.createElement('video');
+    video.controls = true; video.preload = 'metadata';
+    video.src = v;
+    video.style.cssText = 'max-width:100%; max-height:180px; display:block; background:linear-gradient(135deg, #0f567d 0%, #003b5c 60%, #08293d 100%); border-radius:6px;';
+    previewWrap.appendChild(video);
+  }
+  inner.appendChild(previewWrap);
+  rerenderVideoPreview();
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ---------- generic file field (any extension) ----------
+// For Datei-Download block: accepts any MIME type, displays filename + size,
+// and auto-fills a sibling `filename` field when the user picks a file.
+function renderFileField(spec, getObj, setObj, wrap){
+  const obj = getObj() || {};
+  const inner = el('div');
+  const fileRow = el('div', {className:'field-row'});
+  const fileInp = el('input', {attrs:{type:'file'}});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Datei entfernen'});
+  const status = makeUploadStatus();
+  fileInp.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const v = validateUpload(f, 'file');
+    if(!v.ok){ status.showError(v.error); fileInp.value = ''; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      setObj(spec.key, r.result);
+      // If the owning object has a `filename` field and it's empty, seed it
+      // with the uploaded file's name so the download has a sensible default.
+      const cur = getObj() || {};
+      if('filename' in cur && !cur.filename) setObj('filename', f.name);
+      status.showSuccess('Datei eingebettet (' + v.sizeHuman + ')');
+      rerenderFilePreview();
+    };
+    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.readAsDataURL(f);
+  });
+  clearBtn.addEventListener('click', () => { setObj(spec.key, ''); status.clear(); rerenderFilePreview(); });
+  fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
+  inner.appendChild(fileRow);
+  inner.appendChild(status.el);
+  const urlInp = el('input', {attrs:{type:'text', placeholder:'oder URL/Pfad eingeben'}});
+  urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
+  urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderFilePreview(); });
+  inner.appendChild(urlInp);
+  const previewWrap = el('div', {style:{marginTop:'0.5rem', fontSize:'0.85rem', color:'var(--muted)'}});
+  function rerenderFilePreview(){
+    previewWrap.innerHTML = '';
+    const v = (getObj() || {})[spec.key];
+    if(!v) return;
+    if(v.startsWith('data:')){
+      const b64 = v.split(',')[1] || '';
+      const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+      const bytes = Math.max(0, (b64.length * 3 / 4) - padding);
+      const human = bytes < 1024 ? bytes + ' B' :
+                    bytes < 1024*1024 ? (bytes/1024).toFixed(1) + ' KB' :
+                    bytes < 1024*1024*1024 ? (bytes/1024/1024).toFixed(1) + ' MB' :
+                    (bytes/1024/1024/1024).toFixed(2) + ' GB';
+      previewWrap.textContent = '✓ Datei eingebettet (' + human + ')';
+    } else {
+      previewWrap.textContent = '✓ URL: ' + v;
+    }
+  }
+  inner.appendChild(previewWrap);
+  rerenderFilePreview();
   wrap.appendChild(inner);
   return wrap;
 }
@@ -470,7 +769,7 @@ function renderZoneEditor(spec, getObj, setObj, wrap){
       const r = el('div', {className:'zone-editor-rect'});
       r.style.left = (z.x*100)+'%'; r.style.top = (z.y*100)+'%';
       r.style.width = (z.w*100)+'%'; r.style.height = (z.h*100)+'%';
-      r.title = 'Zone ' + (idx+1) + ' - klicken zum Löschen';
+      r.title = 'Zone ' + (idx+1) + ': klicken zum Löschen';
       r.addEventListener('mousedown', e => e.stopPropagation());
       r.addEventListener('click', e => {
         e.stopPropagation();

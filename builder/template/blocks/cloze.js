@@ -8,16 +8,20 @@
     graded: true,
     defaultConfig(){
       return {
-        blockTitle: '',
-        preset: 'custom',
+        blockTitle: '', preset: 'custom',
+        text: '',
+        ignoreCase: true, shuffleDropdown: true, maxPoints: 1
+      };
+    },
+    previewConfig(){
+      return {
+        blockTitle: '', preset: 'custom',
         // Three short blanks demonstrate all three input types:
         //   {{Berlin}}         = freie Texteingabe
         //   {{Wasser|H2O}}     = Alternativen
         //   {{=Saturn|Jupiter}}= Dropdown (erste Option = richtig)
         text: 'Die Hauptstadt Deutschlands heißt {{Berlin}}. Das chemische Symbol für Wasser ist {{H2O|Wasser}}. Der größte Planet im Sonnensystem ist {{=Jupiter|Saturn|Mars}}.',
-        ignoreCase: true,
-        shuffleDropdown: true,
-        maxPoints: 3
+        ignoreCase: true, shuffleDropdown: true, maxPoints: 3
       };
     },
     builderSchema(){
@@ -26,14 +30,14 @@
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Lückentext' },
         { key:'preset', label:'Vorlage', type:'select', options:[
           {value:'custom',     label:'Manuell (leer)'},
-          {value:'math-terms', label:'Beispiel: Mathematik - Quadratische Funktion'},
-          {value:'ohm-law',    label:'Beispiel: Physik - Ohmsches Gesetz'}
+          {value:'math-terms', label:'Beispiel: Mathematik, Quadratische Funktion'},
+          {value:'ohm-law',    label:'Beispiel: Physik, Ohmsches Gesetz'}
         ], help:'Lücken-Syntax: {{antwort}} = Texteingabe · {{a|b}} = Alternativen · {{=richtig|falsch}} = Dropdown.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
         // Lückentext
         { type:'section', label:'Lückentext', key:'_sec_text', showIf: isCustom },
         { key:'text', label:'Text mit Lücken', type:'textarea', rows:5, showIf: isCustom,
-          help:'Lücken-Syntax:\n• {{antwort}} - Texteingabe\n• {{a|b|c}} - Eingabe mit Alternativen (alle richtig)\n• {{=richtig|falsch1|falsch2}} - Dropdown (erste Option = richtig)' },
+          help:'Lücken-Syntax:\n• {{antwort}} → Texteingabe\n• {{a|b|c}} → Eingabe mit Alternativen (alle richtig)\n• {{=richtig|falsch1|falsch2}} → Dropdown (erste Option = richtig)' },
         // Einstellungen & Bewertung
         { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
         { key:'ignoreCase',      label:'Groß-/Kleinschreibung ignorieren', type:'boolean' },

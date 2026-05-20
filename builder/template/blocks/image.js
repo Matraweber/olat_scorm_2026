@@ -25,6 +25,9 @@
     icon: 'IMG',
     graded: false,
     defaultConfig(){
+      return { src: '', caption: '', width: 'auto', alt: '' };
+    },
+    previewConfig(){
       return {
         src: STOCK_LANDSCAPE_SVG,
         caption: 'Beispielbild: Landschaft',

@@ -6,7 +6,7 @@
 //   • task-pane-config.js: right-side block config pane + multi-select UI
 //   • task-pane-bulk.js: bulk align/distribute/duplicate/delete
 // ============================================================================
-import { el, uid, cssEscape } from './util.js';
+import { el, uid, cssEscape, confirmDialog } from './util.js';
 import { state, pushHistory, renderActivePane } from './state.js';
 import { CANVAS_WIDTH, ensurePos, ensureAllPos, fitHeightForCard } from './canvas.js';
 import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn } from './tasks.js';
@@ -58,10 +58,18 @@ export function renderTaskPane(host, idx){
     tabsBtn.title = hasTabs(task) ? 'Tabs entfernen (nur Tab 1 wird behalten)' : '2 Tabs aktivieren: Visualisierung + Aufgabe';
   }
   refreshTabsBtn();
-  tabsBtn.addEventListener('click', () => {
+  tabsBtn.addEventListener('click', async () => {
     if(hasTabs(task)){
       const tab2Count = (task.tabs[1] && task.tabs[1].blocks ? task.tabs[1].blocks.length : 0);
-      if(tab2Count > 0 && !confirm('Tab 2 enthält ' + tab2Count + ' Block/Blöcke. Beim Deaktivieren gehen diese verloren. Fortfahren?')) return;
+      if(tab2Count > 0){
+        const ok = await confirmDialog({
+          title: 'Tabs deaktivieren?',
+          message: 'Tab 2 enthält ' + tab2Count + ' Block' + (tab2Count === 1 ? '' : 'e') + '. Beim Deaktivieren gehen diese verloren.',
+          confirmLabel: 'Deaktivieren',
+          danger: true
+        });
+        if(!ok) return;
+      }
       disableTabsOn(task);
     } else {
       enableTabsOn(task);
@@ -138,7 +146,11 @@ export function renderTaskPane(host, idx){
   }, {passive: false});
 
   function adjustCanvasHeight(){
-    let maxBottom = 320;
+    // Empty canvas: stretch a bit so the empty-state card (illustration +
+    // headline + CTA + hint) has vertical breathing room and doesn't poke
+    // out at the top/bottom of the dashed grid. Filled canvas: snap to the
+    // bottom of the lowest block plus 80 px padding.
+    let maxBottom = task.blocks.length === 0 ? 420 : 320;
     task.blocks.forEach(b => { if(b.pos.y + b.pos.h + 80 > maxBottom) maxBottom = b.pos.y + b.pos.h + 80; });
     canvas.style.height = maxBottom + 'px';
     applyZoom();
@@ -184,10 +196,17 @@ export function renderTaskPane(host, idx){
     }, 250));
   }
 
+  // Track which block IDs have already been rendered at least once. New
+  // blocks (ids that aren't in the set yet) get a `.is-new` class on first
+  // mount so the CSS fade-in animation triggers - existing blocks don't
+  // re-animate on every re-render.
+  const seenBlockIds = new Set(task.blocks.map(b => b.id));
+
   // ===== Shared ctx passed to sibling modules =====
   const ctx = {
     task, canvas, configHost,
     selectedBlockIds,
+    seenBlockIds,
     get zoom(){ return zoom; },
     selectedBlocks(){ return task.blocks.filter(b => selectedBlockIds.has(b.id)); },
     persistSelection,
@@ -195,14 +214,31 @@ export function renderTaskPane(host, idx){
     updateSelectionVisuals,
     refreshTabCounts,
     scheduleBlockPreviewRefresh,
+    // Empty-state CTA needs a way to open the block picker. We expose the
+    // wired handler so the renderer doesn't have to re-import the modal.
+    openAddBlockPicker: () => openBlockTypeModal(addBlockOfType),
     renderCanvas: () => renderCanvas(ctx),
     renderConfigPane: () => renderConfigPane(ctx),
   };
 
-  function addBlockOfType(blockType){
+  // Called from the picker. Accepts either:
+  //   • a block-type id (string)         - built-in block, use defaultConfig()
+  //   • a user-saved block-template obj  - deep-clone the saved config
+  function addBlockOfType(blockTypeOrTemplate){
     pushHistory();
-    const def = window.Blocks.get(blockType);
-    const block = { id: uid('b_'), type: blockType, config: def && def.defaultConfig ? def.defaultConfig() : {} };
+    let block;
+    if(blockTypeOrTemplate && typeof blockTypeOrTemplate === 'object' && blockTypeOrTemplate.blockType){
+      const tpl = blockTypeOrTemplate;
+      block = {
+        id: uid('b_'),
+        type: tpl.blockType,
+        config: JSON.parse(JSON.stringify(tpl.config || {}))
+      };
+    } else {
+      const blockType = blockTypeOrTemplate;
+      const def = window.Blocks.get(blockType);
+      block = { id: uid('b_'), type: blockType, config: def && def.defaultConfig ? def.defaultConfig() : {} };
+    }
     ensurePos(block, task.blocks);
     task.blocks.push(block);
     selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
