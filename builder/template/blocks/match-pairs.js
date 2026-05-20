@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('match-pairs', {
     label: 'Zuordnung (Drag & Drop)',
-    description: 'Linke Begriffe per Drag & Drop oder Klick mit den richtigen rechten Antworten verbinden.',
+    description: 'Linke Begriffe per Drag-and-Drop mit den richtigen rechten verbinden.',
     category: 'Frage',
     icon: '⇄',
     graded: true,
@@ -10,11 +10,17 @@
       return {
         blockTitle: '',
         preset: 'custom',
-        question: '',
-        pairs: [],
+        question: 'Ordnen Sie die Hauptstädte den Ländern zu.',
+        // Three sample pairs so the welcome-page preview and a freshly added
+        // block both display real example content rather than an empty grid.
+        pairs: [
+          { left: 'Deutschland', right: 'Berlin' },
+          { left: 'Frankreich',  right: 'Paris'  },
+          { left: 'Italien',     right: 'Rom'    }
+        ],
         imgHeight: 70,
         shuffle: true,
-        maxPoints: 1
+        maxPoints: 3
       };
     },
     builderSchema(){
@@ -37,8 +43,8 @@
         { key:'pairs', label:'Paare', type:'list', itemLabel:'Paar',
           showIf: isCustom,
           itemSummary: item => {
-            const l = (item.left  || (item.leftImg  ? '🖼' : '')).slice(0, 35) || '…';
-            const r = (item.right || (item.rightImg ? '🖼' : '')).slice(0, 35) || '…';
+            const l = (item.left  || (item.leftImg  ? '(Bild)' : '')).slice(0, 35) || '…';
+            const r = (item.right || (item.rightImg ? '(Bild)' : '')).slice(0, 35) || '…';
             return l + '  ↔  ' + r;
           },
           itemSchema:[

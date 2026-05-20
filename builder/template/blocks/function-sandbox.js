@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('function-sandbox', {
     label: 'Funktionsplot-Sandbox',
-    description: 'Funktion mit Schiebereglern für Parameter, interaktive Visualisierung, nicht gewertet.',
+    description: 'Funktion mit Schiebereglern interaktiv erkunden, nicht bewertet.',
     category: 'Visualisierung',
     icon: 'ƒ',
     graded: false,

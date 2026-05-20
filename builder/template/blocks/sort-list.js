@@ -10,9 +10,14 @@
       return {
         blockTitle: '',
         preset: 'custom',
-        question: '',
-        items: [],
-        maxPoints: 1
+        question: 'Bringen Sie die Planeten in die richtige Reihenfolge (sonnennah zu sonnenfern).',
+        items: [
+          { value: 'Merkur' },
+          { value: 'Venus'  },
+          { value: 'Erde'   },
+          { value: 'Mars'   }
+        ],
+        maxPoints: 4
       };
     },
     builderSchema(){

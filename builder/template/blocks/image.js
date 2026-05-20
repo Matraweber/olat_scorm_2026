@@ -1,12 +1,37 @@
 (function(){
   'use strict';
+
+  // Same stock illustration used by hotzone.js - kept inline so each block
+  // module is self-contained and loads without network.
+  const STOCK_LANDSCAPE_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">' +
+      '<rect width="400" height="240" fill="#e7f3f8"/>' +
+      '<rect y="180" width="400" height="60" fill="#cde4b0"/>' +
+      '<circle cx="60" cy="60" r="30" fill="#f5c14d"/>' +
+      '<g fill="#ffffff">' +
+        '<ellipse cx="280" cy="70" rx="40" ry="20"/>' +
+        '<ellipse cx="310" cy="60" rx="25" ry="18"/>' +
+        '<ellipse cx="255" cy="65" rx="22" ry="15"/>' +
+      '</g>' +
+      '<rect x="195" y="150" width="15" height="40" fill="#7a4d28"/>' +
+      '<circle cx="202" cy="140" r="38" fill="#3f8a3f"/>' +
+    '</svg>'
+  );
+
   Blocks.register('image', {
     label: 'Bild',
     description: 'Bild mit optionaler Bildunterschrift. Quelle: hochladen oder URL.',
     category: 'Inhalt',
     icon: 'IMG',
     graded: false,
-    defaultConfig(){ return { src: '', caption: '', width: 'auto', alt: '' }; },
+    defaultConfig(){
+      return {
+        src: STOCK_LANDSCAPE_SVG,
+        caption: 'Beispielbild: Landschaft',
+        width: 'auto',
+        alt: 'Landschaft mit Sonne, Wolke und Baum'
+      };
+    },
     builderSchema(){
       return [
         { key:'src', label:'Bildquelle (Data-URL oder URL/Pfad)', type:'image', help:'Hochgeladene Bilder werden als Data-URL eingebettet und reisen mit ins SCORM-Paket.' },

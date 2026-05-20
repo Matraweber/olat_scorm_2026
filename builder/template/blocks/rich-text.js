@@ -2,11 +2,15 @@
   'use strict';
   Blocks.register('rich-text', {
     label: 'Fließtext',
-    description: 'Absatz mit HTML-Formatierung (z. B. <strong>fett</strong>, <em>kursiv</em>).',
+    description: 'Absatz mit Formatierung (fett, kursiv, Listen, Links).',
     category: 'Inhalt',
     icon: '¶',
     graded: false,
-    defaultConfig(){ return { html: '<p>Erklärungstext eingeben …</p>' }; },
+    defaultConfig(){
+      return {
+        html: '<p>Dieser Block enthält <strong>formatierten Text</strong>. Erlaubt sind unter anderem <em>kursive Auszeichnung</em>, Listen und Links.</p>'
+      };
+    },
     builderSchema(){
       return [
         { key:'html', label:'Inhalt (HTML erlaubt)', type:'textarea', rows:5,

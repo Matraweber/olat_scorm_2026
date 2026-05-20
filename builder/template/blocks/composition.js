@@ -52,7 +52,15 @@
     arrow:   () => ({ type:'arrow',   x1: 80, y1: 80, x2: 260, y2: 80,  color:'#003b5c', strokeWidth: 3, dash:'solid' }),
     circle:  () => ({ type:'circle',  cx:140, cy:140, r: 60,            color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' }),
     ellipse: () => ({ type:'ellipse', cx:160, cy:140, rx: 90, ry: 50,   color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' }),
-    polygon: () => ({ type:'polygon', cx:160, cy:140, r: 70, sides: 3,  color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' }),
+    polygon: () => {
+      // Pre-fill `points` so the polygon starts as a regular 3-gon but is
+      // already in the editable representation. The cx/cy/r/sides metadata
+      // is preserved for "Regulär machen" + the Ecken input.
+      const cx = 160, cy = 140, r = 70, sides = 3;
+      return { type:'polygon', cx, cy, r, sides,
+               points: regularPolygonPoints(cx, cy, r, sides),
+               color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' };
+    },
     rect:    () => ({ type:'rect',    x: 80, y: 80, w:220, h:120,       color:'#003b5c', fill:'#eef5f8', strokeWidth: 3, dash:'solid' }),
     label:   () => ({ type:'label',   x: 80, y:120, text:'Beschriftung',color:'#003b5c', fontSize:24, fontWeight:'700' }),
     coords:  () => ({ type:'coords',  x: 60, y: 60, w:320, h:220,
@@ -109,17 +117,41 @@
     return name;
   }
 
-  // Compute regular n-gon vertex points as an SVG "points" attribute value.
-  // Vertices start at the top (angle -π/2) and proceed clockwise.
-  function polygonPoints(cx, cy, r, sides){
+  // Compute regular n-gon vertex points as [[x,y], …]. Vertices start at the
+  // top (angle -π/2) and proceed clockwise.
+  function regularPolygonPoints(cx, cy, r, sides){
     const n = Math.max(3, Math.round(Number(sides) || 3));
     const radius = Math.max(1, Number(r) || 10);
     const pts = [];
     for(let i = 0; i < n; i++){
       const a = -Math.PI / 2 + (Math.PI * 2 * i) / n;
-      pts.push((cx + Math.cos(a) * radius).toFixed(2) + ',' + (cy + Math.sin(a) * radius).toFixed(2));
+      pts.push([cx + Math.cos(a) * radius, cy + Math.sin(a) * radius]);
     }
-    return pts.join(' ');
+    return pts;
+  }
+  // Return the polygon's vertices as [[x,y], …]. Free-form polygons store
+  // their own `points` array; legacy regular polygons compute from cx/cy/r/sides.
+  function polygonGetPoints(shape){
+    if(Array.isArray(shape.points) && shape.points.length >= 3){
+      return shape.points.map(p => Array.isArray(p) ? [Number(p[0]) || 0, Number(p[1]) || 0] : [0, 0]);
+    }
+    return regularPolygonPoints(
+      Number(shape.cx) || 0,
+      Number(shape.cy) || 0,
+      Number(shape.r)  || 10,
+      Number(shape.sides) || 3
+    );
+  }
+  // SVG attribute string for `points`.
+  function polygonPointsAttr(shape){
+    return polygonGetPoints(shape).map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
+  }
+  // Centroid of the polygon - used as a fixed point for uniform scaling.
+  function polygonCentroid(shape){
+    const pts = polygonGetPoints(shape);
+    let sx = 0, sy = 0;
+    pts.forEach(p => { sx += p[0]; sy += p[1]; });
+    return { x: sx / pts.length, y: sy / pts.length };
   }
 
   // Pure SVG render (used by runtime mount + builder editor + preview)
@@ -271,7 +303,7 @@
       if(dashAttr) el.setAttribute('stroke-dasharray', dashAttr);
     } else if(shape.type === 'polygon'){
       el = document.createElementNS(NS, 'polygon');
-      el.setAttribute('points', polygonPoints(shape.cx ?? 100, shape.cy ?? 100, shape.r ?? 50, shape.sides ?? 3));
+      el.setAttribute('points', polygonPointsAttr(shape));
       el.setAttribute('stroke', color); el.setAttribute('stroke-width', sw);
       el.setAttribute('stroke-linejoin', 'round');
       el.setAttribute('fill', shape.fill || 'none');
@@ -345,12 +377,112 @@
   function builderMount(host, block, api){
     if(!block.config) block.config = {};
     if(!Array.isArray(block.config.shapes)) block.config.shapes = [];
+    // Selection state:
+    //   _compSelection: number[]   canonical multi-selection (indices)
+    //   _compSelected:  number     "primary" index, -1 if 0 or 2+ selected
+    //                              (kept for toolbar code that wants a single shape)
+    if(!Array.isArray(block._compSelection)){
+      // Migrate from legacy single-selection if present.
+      block._compSelection = (typeof block._compSelected === 'number' && block._compSelected >= 0)
+        ? [block._compSelected] : [];
+    }
     if(block._compSelected == null) block._compSelected = -1;
+    if(!block._compTool) block._compTool = 'move'; // 'move' | 'select'
+
+    // Selection helpers
+    function selIndices(){ return Array.isArray(block._compSelection) ? block._compSelection : []; }
+    function syncPrimary(){
+      const a = selIndices();
+      block._compSelected = a.length === 1 ? a[0] : -1;
+    }
+    function isSelected(idx){ return selIndices().indexOf(idx) >= 0; }
+    function clearSelection(){ block._compSelection = []; block._compSelected = -1; }
+    function setSingleSelection(idx){
+      if(idx == null || idx < 0){ clearSelection(); return; }
+      block._compSelection = [idx]; block._compSelected = idx;
+    }
+    function setSelection(arr){
+      block._compSelection = Array.isArray(arr) ? arr.slice() : [];
+      syncPrimary();
+    }
+    function toggleInSelection(idx){
+      const a = selIndices().slice();
+      const i = a.indexOf(idx);
+      if(i < 0) a.push(idx); else a.splice(i, 1);
+      block._compSelection = a; syncPrimary();
+    }
+    function addToSelection(idx){
+      if(isSelected(idx)) return;
+      const a = selIndices().slice(); a.push(idx);
+      block._compSelection = a; syncPrimary();
+    }
+
+    // Composition-level undo/redo
+    // History is kept on the block itself so it survives editor re-mounts
+    // (e.g. when the right-pane refresh re-runs builderMount). One snapshot
+    // is taken per "interaction" - held-down keys and continuous drags get a
+    // single entry thanks to the debounce below.
+    const HISTORY_MAX = 80;
+    if(!block._compHistory){
+      block._compHistory = {
+        stack: [JSON.parse(JSON.stringify(block.config))],
+        pointer: 0,
+        pending: false   // a debounced push is queued
+      };
+    }
+    let _historyTimer = null;
+    function snapshotHistory(){
+      const h = block._compHistory;
+      // Truncate any forward-redo branch.
+      h.stack = h.stack.slice(0, h.pointer + 1);
+      const snap = JSON.parse(JSON.stringify(block.config));
+      // Skip if identical to top of stack - avoids creating a no-op entry
+      // when several commits in a row land on the same end state.
+      const top = h.stack[h.pointer];
+      if(top && JSON.stringify(top) === JSON.stringify(snap)) return;
+      h.stack.push(snap);
+      if(h.stack.length > HISTORY_MAX) h.stack.shift();
+      h.pointer = h.stack.length - 1;
+    }
+    function applySnapshot(snap){
+      // Replace block.config in place while keeping the same reference so
+      // existing handlers continue to mutate the right object.
+      Object.keys(block.config).forEach(k => { delete block.config[k]; });
+      Object.assign(block.config, JSON.parse(JSON.stringify(snap)));
+    }
+    function flushPendingSnapshot(){
+      if(_historyTimer){ clearTimeout(_historyTimer); _historyTimer = null; snapshotHistory(); }
+    }
+    function undoComposition(){
+      // Flush BEFORE checking pointer - otherwise an immediate undo right
+      // after a change would see pointer===0 (snapshot not taken yet) and
+      // wrongly fall through to the global handler.
+      flushPendingSnapshot();
+      const h = block._compHistory;
+      if(h.pointer <= 0) return false;
+      h.pointer--;
+      applySnapshot(h.stack[h.pointer]);
+      clearSelection();
+      render();
+      api.requestConfigRefresh();
+      return true;
+    }
+    function redoComposition(){
+      flushPendingSnapshot();
+      const h = block._compHistory;
+      if(h.pointer >= h.stack.length - 1) return false;
+      h.pointer++;
+      applySnapshot(h.stack[h.pointer]);
+      clearSelection();
+      render();
+      api.requestConfigRefresh();
+      return true;
+    }
 
     // Defer the right-pane refresh (which rebuilds the entire config form
     // and is the slow part) to the next animation frame so the editor paints
     // immediately. Multiple rapid commits (e.g. held-down arrow / Ctrl+D)
-    // collapse into a single refresh instead of one per keypress.
+    // collapse into a single refresh + a single history snapshot.
     let _refreshHandle = null;
     function commit(){
       render(); // synchronous - user sees the change next paint
@@ -359,14 +491,30 @@
         _refreshHandle = null;
         api.requestConfigRefresh();
       });
+      // Debounced history: ~250 ms of idle = one snapshot. This means held
+      // arrows or a drag-resize get rolled into a single undoable step.
+      if(_historyTimer) clearTimeout(_historyTimer);
+      _historyTimer = setTimeout(() => {
+        _historyTimer = null;
+        snapshotHistory();
+      }, 250);
     }
     function selectShape(idx){
-      block._compSelected = idx;
+      setSingleSelection(idx);
       render();
     }
     function getSelected(){
-      const i = block._compSelected;
+      // Returns the shape only when EXACTLY ONE is selected - used by the
+      // toolbar style controls that operate on a single shape.
+      const a = selIndices();
+      if(a.length !== 1) return null;
+      const i = a[0];
       return (i >= 0 && i < block.config.shapes.length) ? block.config.shapes[i] : null;
+    }
+    function getSelectedShapes(){
+      return selIndices()
+        .filter(i => i >= 0 && i < block.config.shapes.length)
+        .map(i => block.config.shapes[i]);
     }
 
     function render(){
@@ -380,9 +528,14 @@
       wrap.appendChild(buildCanvas());
       const hint = document.createElement('div');
       hint.className = 'comp-hint';
-      hint.textContent = block._compSelected >= 0
-        ? 'Form ausgewählt. Ziehen verschiebt sie • Pfeiltasten nudgen (⇧ +10 px) • ⌘/Ctrl + D dupliziert • ⌘/Ctrl + C / V kopiert / fügt ein • ⌫ löscht • Esc hebt die Auswahl auf.'
-        : 'Klicke auf eine Form, um sie auszuwählen, oder oben links ein neues Element hinzufügen.';
+      const _nSel = selIndices().length;
+      hint.textContent = _nSel >= 2
+        ? _nSel + ' Formen ausgewählt. Ziehen verschiebt alle • Pfeiltasten nudgen (⇧ +10 px) • ⌘/Ctrl + D / C / V • ⌫ löscht • Esc hebt auf.'
+        : _nSel === 1
+          ? 'Form ausgewählt. Ziehen verschiebt sie • Pfeiltasten verschieben pixelweise (⇧ +10 px) • ⌘/Ctrl + Z / ⇧Z rückgängig / wiederherstellen • ⌘/Ctrl + D dupliziert • ⌘/Ctrl + C / V kopiert / fügt ein • ⌫ löscht • Esc hebt die Auswahl auf.'
+          : (block._compTool === 'select'
+              ? 'Auswahl-Werkzeug aktiv: Mit der Maus einen Rahmen aufziehen, um mehrere Formen zu markieren.'
+              : 'Auf eine Form klicken oder einen Rahmen aufziehen für Mehrfachauswahl. Werkzeuge oben links.');
       wrap.appendChild(hint);
       host.appendChild(wrap);
     }
@@ -391,6 +544,29 @@
       const sel = getSelected();
       const bar = document.createElement('div');
       bar.className = 'comp-toolbar';
+
+      // Tool-mode group: Move / Select
+      const toolGroup = document.createElement('div');
+      toolGroup.className = 'comp-tool-group';
+      function mkToolBtn(toolKey, title, iconHtml){
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'comp-tool-btn' + (block._compTool === toolKey ? ' comp-tool-btn-active' : '');
+        b.title = title;
+        b.innerHTML = iconHtml;
+        b.addEventListener('click', e => {
+          e.stopPropagation();
+          if(block._compTool === toolKey) return;
+          block._compTool = toolKey;
+          render();
+        });
+        toolGroup.appendChild(b);
+      }
+      mkToolBtn('move',  'Verschieben-Werkzeug (V)',
+        '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path d="M10 2 L13 5 L11 5 L11 9 L15 9 L15 7 L18 10 L15 13 L15 11 L11 11 L11 15 L13 15 L10 18 L7 15 L9 15 L9 11 L5 11 L5 13 L2 10 L5 7 L5 9 L9 9 L9 5 L7 5 Z"/></svg>');
+      mkToolBtn('select','Auswahl-Werkzeug (S) - Rahmen aufziehen für Mehrfachauswahl',
+        '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1" stroke-dasharray="3 2"/><path d="M9 9 L13 13 M11 13 L13 13 L13 11" fill="currentColor"/></svg>');
+      bar.appendChild(toolGroup);
 
       // Left group: add-shape buttons
       const addGroup = document.createElement('div');
@@ -410,13 +586,13 @@
               const shape = newShape('image');
               shape.src = src;
               block.config.shapes.push(shape);
-              block._compSelected = block.config.shapes.length - 1;
+              setSingleSelection(block.config.shapes.length - 1);
               commit();
             });
             return;
           }
           block.config.shapes.push(newShape(type));
-          block._compSelected = block.config.shapes.length - 1;
+          setSingleSelection(block.config.shapes.length - 1);
           commit();
         });
         addGroup.appendChild(btn);
@@ -500,7 +676,9 @@
         );
       }
 
-      // Polygon-only: number-of-sides ("Ecken") input.
+      // Polygon-only: number-of-sides ("Ecken") input + "Regulär" button.
+      // Changing Ecken regenerates the polygon as a regular n-gon centered on
+      // the current centroid (using current `r` so size is preserved).
       if(sel && sel.type === 'polygon'){
         const sLbl = document.createElement('span');
         sLbl.className = 'comp-tool-label';
@@ -510,12 +688,39 @@
         sInp.type = 'number'; sInp.min = '3'; sInp.max = '20'; sInp.step = '1';
         sInp.className = 'comp-tool-num';
         sInp.value = sel.sides ?? 3;
-        sInp.title = 'Anzahl Ecken';
+        sInp.title = 'Anzahl Ecken (regeneriert als regulär)';
         sInp.addEventListener('input', () => {
           const v = parseInt(sInp.value, 10);
-          if(!isNaN(v) && v >= 3 && v <= 20){ sel.sides = v; commit(); }
+          if(!isNaN(v) && v >= 3 && v <= 20){
+            const c = polygonCentroid(sel);
+            sel.sides = v;
+            sel.cx = c.x; sel.cy = c.y;
+            sel.points = regularPolygonPoints(c.x, c.y, sel.r || 50, v);
+            commit();
+          }
         });
         styleGroup.appendChild(sInp);
+
+        // "Regulär machen" button: snap a deformed polygon back to a regular
+        // n-gon with the same centroid + radius.
+        const regBtn = document.createElement('button');
+        regBtn.type = 'button';
+        regBtn.className = 'comp-tool-btn-text';
+        regBtn.textContent = 'Regulär';
+        regBtn.title = 'Polygon zu reguläre Form zurücksetzen';
+        regBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const c = polygonCentroid(sel);
+          const pts = polygonGetPoints(sel);
+          // Use the average vertex distance as the new radius - closer to the
+          // current size than just reusing sel.r.
+          let avg = 0; pts.forEach(p => { avg += Math.hypot(p[0]-c.x, p[1]-c.y); });
+          const r = Math.max(10, avg / pts.length);
+          sel.r = r; sel.cx = c.x; sel.cy = c.y;
+          sel.points = regularPolygonPoints(c.x, c.y, r, sel.sides || 3);
+          commit();
+        });
+        styleGroup.appendChild(regBtn);
       }
 
       // Stroke width + dash: for outlined shapes (skip labels/images/coords).
@@ -572,7 +777,9 @@
         styleGroup.appendChild(fs);
       }
 
-      // Coordinate-system toggles: grid + axis labels on/off
+      // Coordinate-system toggles: grid + axis labels on/off, plus axis-range
+      // editing so the author can set xMin/xMax/yMin/yMax/step directly from
+      // the canvas toolbar without diving into the JSON list editor.
       if(sel && sel.type === 'coords'){
         const mkToggle = (key, label, defaultOn) => {
           const wrap = document.createElement('label');
@@ -588,6 +795,44 @@
         };
         mkToggle('showGrid',   'Gitter',   true);
         mkToggle('showLabels', 'Achsen­beschriftung', true);
+
+        const mkRange = (key, label, fallback) => {
+          const lbl = document.createElement('span');
+          lbl.className = 'comp-tool-label';
+          lbl.textContent = label;
+          styleGroup.appendChild(lbl);
+          const inp = document.createElement('input');
+          inp.type = 'number';
+          inp.className = 'comp-tool-num';
+          inp.step = '0.5';
+          inp.value = sel[key] != null ? sel[key] : fallback;
+          inp.title = 'Achsenbereich ' + label;
+          inp.addEventListener('input', () => {
+            const v = parseFloat(inp.value);
+            if(!isNaN(v)){ sel[key] = v; commit(); }
+          });
+          styleGroup.appendChild(inp);
+        };
+        mkRange('xMin', 'x min', -5);
+        mkRange('xMax', 'x max',  5);
+        mkRange('yMin', 'y min', -3);
+        mkRange('yMax', 'y max',  3);
+
+        const stepLbl = document.createElement('span');
+        stepLbl.className = 'comp-tool-label';
+        stepLbl.textContent = 'Schritt';
+        styleGroup.appendChild(stepLbl);
+        const stepInp = document.createElement('input');
+        stepInp.type = 'number';
+        stepInp.className = 'comp-tool-num';
+        stepInp.step = '0.5'; stepInp.min = '0.01';
+        stepInp.value = sel.step != null ? sel.step : 1;
+        stepInp.title = 'Abstand zwischen Gitter/Beschriftung';
+        stepInp.addEventListener('input', () => {
+          const v = parseFloat(stepInp.value);
+          if(!isNaN(v) && v > 0){ sel.step = v; commit(); }
+        });
+        styleGroup.appendChild(stepInp);
       }
 
       // Image: "Bild ersetzen" button to swap the source via the file picker.
@@ -693,26 +938,21 @@
         mkActionBtn('Nach vorne',  ACTION_ICONS.forward,   () => bringForward());
         mkActionBtn('Nach hinten', ACTION_ICONS.backward,  () => sendBackward());
         mkActionBtn('Duplizieren', ACTION_ICONS.duplicate, () => duplicateSelected());
-        mkActionBtn('Form löschen', ACTION_ICONS.delete, () => {
-          block.config.shapes.splice(block._compSelected, 1);
-          block._compSelected = -1;
-          commit();
-        }, true);
+        mkActionBtn('Form löschen', ACTION_ICONS.delete, () => deleteSelected(), true);
       }
       bar.appendChild(rightGroup);
 
       return bar;
     }
 
-    // Move the selected shape one step closer to the top of the SVG (later in
-    // the array → drawn on top). Swap with the next neighbour and update the
-    // stored selection index so the same shape remains selected.
+    // Bring/send only operates when exactly one shape is selected - z-order
+    // semantics aren't well-defined for multi-select.
     function bringForward(){
       const i = block._compSelected;
       const arr = block.config.shapes;
       if(i < 0 || i >= arr.length - 1) return;
       const tmp = arr[i]; arr[i] = arr[i + 1]; arr[i + 1] = tmp;
-      block._compSelected = i + 1;
+      setSingleSelection(i + 1);
       commit();
     }
     function sendBackward(){
@@ -720,19 +960,127 @@
       const arr = block.config.shapes;
       if(i <= 0) return;
       const tmp = arr[i]; arr[i] = arr[i - 1]; arr[i - 1] = tmp;
-      block._compSelected = i - 1;
+      setSingleSelection(i - 1);
       commit();
     }
-    // Clone the selected shape (deep copy via JSON), offset by 16px, and
-    // select the new copy. Shares offsetShape() with paste so the visual
-    // offset is consistent.
+    // Clone every selected shape (deep copy via JSON), offset by 16px, and
+    // select the clones. Works for both single and multi-select.
     function duplicateSelected(){
-      const sel = getSelected();
-      if(!sel) return;
-      const clone = offsetShape(JSON.parse(JSON.stringify(sel)), 16, 16);
-      block.config.shapes.push(clone);
-      block._compSelected = block.config.shapes.length - 1;
+      const sels = selIndices();
+      if(sels.length === 0) return;
+      const newIdxs = [];
+      sels.forEach(i => {
+        const src = block.config.shapes[i];
+        if(!src) return;
+        const clone = offsetShape(JSON.parse(JSON.stringify(src)), 16, 16);
+        block.config.shapes.push(clone);
+        newIdxs.push(block.config.shapes.length - 1);
+      });
+      setSelection(newIdxs);
       commit();
+    }
+    // Delete every selected shape. Splice in reverse index order so the
+    // remaining indices stay valid as we delete.
+    function deleteSelected(){
+      const sels = selIndices().slice().sort((a, b) => b - a);
+      if(sels.length === 0) return;
+      sels.forEach(i => { block.config.shapes.splice(i, 1); });
+      clearSelection();
+      commit();
+    }
+
+    // Bounding-box helpers for rubber-band selection
+    function shapeBBox(shape){
+      if(!shape) return null;
+      if(shape.type === 'line' || shape.type === 'arrow'){
+        const x = Math.min(shape.x1, shape.x2), y = Math.min(shape.y1, shape.y2);
+        return { x, y, w: Math.abs(shape.x2 - shape.x1), h: Math.abs(shape.y2 - shape.y1) };
+      }
+      if(shape.type === 'circle'){
+        return { x: shape.cx - shape.r, y: shape.cy - shape.r, w: 2 * shape.r, h: 2 * shape.r };
+      }
+      if(shape.type === 'ellipse'){
+        return { x: shape.cx - shape.rx, y: shape.cy - shape.ry, w: 2 * shape.rx, h: 2 * shape.ry };
+      }
+      if(shape.type === 'polygon'){
+        const pts = polygonGetPoints(shape);
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        pts.forEach(p => {
+          if(p[0] < minX) minX = p[0]; if(p[1] < minY) minY = p[1];
+          if(p[0] > maxX) maxX = p[0]; if(p[1] > maxY) maxY = p[1];
+        });
+        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+      }
+      if(shape.type === 'label'){
+        const fs = shape.fontSize || 18;
+        return {
+          x: shape.x - 2, y: shape.y - fs,
+          w: Math.max(40, (shape.text || '').length * fs * 0.55) + 4,
+          h: fs + 4
+        };
+      }
+      // rect, image, coords: top-left + width/height
+      return { x: shape.x || 0, y: shape.y || 0, w: shape.w || 100, h: shape.h || 60 };
+    }
+    function bboxIntersects(a, b){
+      return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+    }
+
+    // Start a rubber-band (marquee) selection from `start` in SVG coords.
+    // While dragging, a dashed rectangle visualizes the selection area.
+    // On release, every shape whose bbox intersects the rectangle is selected
+    // (replacing the current selection unless `additive`).
+    function startRubberband(svg, start, additive){
+      const rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('data-rubberband', '1');
+      rect.setAttribute('fill', 'rgba(15, 109, 173, 0.08)');
+      rect.setAttribute('stroke', '#0f6dad');
+      rect.setAttribute('stroke-width', '1');
+      rect.setAttribute('stroke-dasharray', '5 3');
+      rect.style.pointerEvents = 'none';
+      svg.appendChild(rect);
+      const baseSelection = additive ? selIndices().slice() : [];
+      let moved = false;
+      function onMove(ev){
+        const p = svgPoint(svg, ev.clientX, ev.clientY);
+        const x = Math.min(start.x, p.x), y = Math.min(start.y, p.y);
+        const w = Math.abs(p.x - start.x), h = Math.abs(p.y - start.y);
+        if(!moved && (w > 2 || h > 2)) moved = true;
+        rect.setAttribute('x', x); rect.setAttribute('y', y);
+        rect.setAttribute('width', w); rect.setAttribute('height', h);
+        // Live update: compute selection candidates each move so the user
+        // sees previews of which shapes will be selected.
+        if(moved){
+          const marquee = { x, y, w, h };
+          const hits = [];
+          (block.config.shapes || []).forEach((s, i) => {
+            const bb = shapeBBox(s);
+            if(bb && bboxIntersects(marquee, bb)) hits.push(i);
+          });
+          const merged = additive
+            ? Array.from(new Set(baseSelection.concat(hits)))
+            : hits;
+          setSelection(merged);
+          // Update the selection overlays without full re-render so the
+          // marquee rect stays on top.
+          svg.querySelectorAll('[data-selection-overlay="1"]').forEach(o => o.remove());
+          selIndices().forEach(i => drawSelection(svg, i));
+        }
+      }
+      function onUp(){
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        rect.remove();
+        if(moved){
+          commit();
+        } else if(!additive){
+          // Plain tap on empty area = deselect.
+          clearSelection();
+          render();
+        }
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     }
 
     function buildCanvas(){
@@ -741,19 +1089,27 @@
 
       const svg = buildSvg(block.config, { interactive: true, idPrefix: 'comp-edit-' + (block.id || 'b') });
       svg.classList.add('comp-canvas');
+      // Cursor reflects the active tool so the user can tell at a glance.
+      svg.style.cursor = block._compTool === 'select' ? 'crosshair' : 'default';
 
-      // Click on empty SVG area deselects.
+      // Mousedown on empty SVG area starts a rubber-band selection. With
+      // Shift held, the marquee is ADDITIVE (preserves current selection).
       svg.addEventListener('mousedown', e => {
-        if(e.target === svg){
-          if(block._compSelected !== -1){ block._compSelected = -1; render(); }
+        if(e.target !== svg) return;
+        e.preventDefault();
+        // Move focus off any external form input so keyboard shortcuts work.
+        const ae = document.activeElement;
+        if(ae && !host.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)){
+          ae.blur();
         }
+        startRubberband(svg, svgPoint(svg, e.clientX, e.clientY), e.shiftKey);
       });
 
       // Attach interaction handlers to each rendered shape element.
       Array.from(svg.querySelectorAll('[data-shape-idx]')).forEach(node => {
         const idx = parseInt(node.getAttribute('data-shape-idx'), 10);
         attachShapeHandlers(node, idx, svg);
-        if(idx === block._compSelected){
+        if(isSelected(idx)){
           // Selection outline + endpoint/edge handles drawn as siblings inside the SVG.
           drawSelection(svg, idx);
         }
@@ -780,57 +1136,84 @@
         e.stopPropagation();
         e.preventDefault();
 
-        const wasSelected = block._compSelected === idx;
         const shape = block.config.shapes[idx];
         if(!shape) return;
 
-        // Move focus off any external form input (e.g. the right-pane config
-        // pane) so keyboard shortcuts (arrows, Delete, Ctrl+D) reach this
-        // editor instead of being absorbed by the input.
+        // Move focus off any external form input so keyboard shortcuts reach this editor.
         const ae = document.activeElement;
         if(ae && !host.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)){
           ae.blur();
         }
 
-        // Promote to selected without rebuilding the DOM (that would detach
-        // `node` and break the in-progress drag). Just add the overlay so
-        // the user sees the selection feedback live.
+        // Select tool: mousedown on a shape starts a rubber-band, not a move
+        if(block._compTool === 'select'){
+          startRubberband(svg, svgPoint(svg, e.clientX, e.clientY), e.shiftKey);
+          return;
+        }
+
+        // Move tool: shift-click toggles selection (no drag)
+        if(e.shiftKey){
+          toggleInSelection(idx);
+          render();
+          return;
+        }
+
+        const wasSelected = isSelected(idx);
+        // If clicking an unselected shape, replace selection with this one.
         if(!wasSelected){
-          block._compSelected = idx;
+          setSingleSelection(idx);
           svg.querySelectorAll('[data-selection-overlay="1"]').forEach(o => o.remove());
           drawSelection(svg, idx);
         }
 
+        // Drag: move every selected shape together. Snapshot each so the
+        // delta is applied to its original coords (avoids cumulative drift).
+        const draggedIndices = selIndices();
+        const snapshots = draggedIndices.map(i => ({
+          i, original: JSON.parse(JSON.stringify(block.config.shapes[i]))
+        }));
         const start = svgPoint(svg, e.clientX, e.clientY);
-        const startShape = JSON.parse(JSON.stringify(shape));
         let moved = false;
+
+        function applyDelta(shape, original, dx, dy){
+          if(shape.type === 'line' || shape.type === 'arrow'){
+            shape.x1 = Math.round(original.x1 + dx); shape.y1 = Math.round(original.y1 + dy);
+            shape.x2 = Math.round(original.x2 + dx); shape.y2 = Math.round(original.y2 + dy);
+          } else if(shape.type === 'circle' || shape.type === 'ellipse'){
+            shape.cx = Math.round(original.cx + dx); shape.cy = Math.round(original.cy + dy);
+          } else if(shape.type === 'polygon'){
+            shape.cx = Math.round((original.cx || 0) + dx);
+            shape.cy = Math.round((original.cy || 0) + dy);
+            if(Array.isArray(original.points)){
+              shape.points = original.points.map(p => [p[0] + dx, p[1] + dy]);
+            }
+          } else {
+            shape.x = Math.round((original.x || 0) + dx);
+            shape.y = Math.round((original.y || 0) + dy);
+          }
+        }
         function onMove(ev){
           const p = svgPoint(svg, ev.clientX, ev.clientY);
           const dx = p.x - start.x, dy = p.y - start.y;
           if(!moved && (Math.abs(dx) > 1 || Math.abs(dy) > 1)){ moved = true; }
           if(!moved) return;
-          if(shape.type === 'line' || shape.type === 'arrow'){
-            shape.x1 = Math.round(startShape.x1 + dx); shape.y1 = Math.round(startShape.y1 + dy);
-            shape.x2 = Math.round(startShape.x2 + dx); shape.y2 = Math.round(startShape.y2 + dy);
-          } else if(shape.type === 'circle' || shape.type === 'ellipse' || shape.type === 'polygon'){
-            shape.cx = Math.round(startShape.cx + dx); shape.cy = Math.round(startShape.cy + dy);
-          } else {
-            // rect, label, image, coords: all use top-left (x, y)
-            shape.x = Math.round(startShape.x + dx); shape.y = Math.round(startShape.y + dy);
-          }
-          updateShapeNode(node, shape, idx, svg);
-          updateSelectionOverlay(svg, idx);
+          snapshots.forEach(snap => {
+            const sh = block.config.shapes[snap.i];
+            if(!sh) return;
+            applyDelta(sh, snap.original, dx, dy);
+            const n = svg.querySelector('[data-shape-idx="' + snap.i + '"]');
+            if(n) updateShapeNode(n, sh, snap.i, svg);
+            updateSelectionOverlay(svg, snap.i);
+          });
         }
         function onUp(){
-          
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
           if(moved){
-            // Persist the new shape coords + refresh the toolbar / right pane.
             commit();
           } else if(!wasSelected){
-            // Pure tap (no drag) on an unselected shape: do a full render now
-            // so the toolbar's style controls reflect this shape's properties.
+            // Pure tap on an unselected shape → re-render so toolbar reflects
+            // the new selection's properties.
             render();
           }
         }
@@ -849,7 +1232,7 @@
         node.setAttribute('cx', shape.cx); node.setAttribute('cy', shape.cy);
         node.setAttribute('rx', shape.rx); node.setAttribute('ry', shape.ry);
       } else if(shape.type === 'polygon'){
-        node.setAttribute('points', polygonPoints(shape.cx, shape.cy, shape.r, shape.sides));
+        node.setAttribute('points', polygonPointsAttr(shape));
       } else if(shape.type === 'rect' || shape.type === 'label' || shape.type === 'image'){
         node.setAttribute('x', shape.x); node.setAttribute('y', shape.y);
         if(shape.type === 'rect' || shape.type === 'image'){
@@ -886,11 +1269,12 @@
       if(!shape) return;
       const overlay = document.createElementNS(NS, 'g');
       overlay.setAttribute('data-selection-overlay', '1');
+      overlay.setAttribute('data-sel-idx', String(idx));
       svg.appendChild(overlay);
       paintSelection(overlay, shape, svg, idx);
     }
     function updateSelectionOverlay(svg, idx){
-      const existing = svg.querySelector('[data-selection-overlay="1"]');
+      const existing = svg.querySelector('[data-selection-overlay="1"][data-sel-idx="' + idx + '"]');
       if(!existing) return;
       const shape = block.config.shapes[idx];
       existing.innerHTML = '';
@@ -898,8 +1282,24 @@
     }
     function paintSelection(overlay, shape, svg, idx){
       // Dashed outline + endpoint handles. Handles are draggable for lines/arrows.
+      // When multiple shapes are selected, only show the outline (handles
+      // would conflict and clutter the canvas).
       const color = '#0f6dad';
+      const single = selIndices().length === 1;
       if(shape.type === 'line' || shape.type === 'arrow'){
+        if(!single) {
+          // Still draw a faint outline rectangle so the user sees the line is selected.
+          const x = Math.min(shape.x1, shape.x2), y = Math.min(shape.y1, shape.y2);
+          const w = Math.abs(shape.x2 - shape.x1), h = Math.abs(shape.y2 - shape.y1);
+          const rect = document.createElementNS(NS, 'rect');
+          rect.setAttribute('x', x - 4); rect.setAttribute('y', y - 4);
+          rect.setAttribute('width', w + 8); rect.setAttribute('height', h + 8);
+          rect.setAttribute('fill', 'none'); rect.setAttribute('stroke', color);
+          rect.setAttribute('stroke-width', 1.2); rect.setAttribute('stroke-dasharray', '4 3');
+          rect.style.pointerEvents = 'none';
+          overlay.appendChild(rect);
+          return;
+        }
         const dot1 = document.createElementNS(NS, 'circle');
         dot1.setAttribute('cx', shape.x1); dot1.setAttribute('cy', shape.y1);
         dot1.setAttribute('r', 6); dot1.setAttribute('fill', '#fff'); dot1.setAttribute('stroke', color); dot1.setAttribute('stroke-width', 2);
@@ -917,7 +1317,17 @@
       let bx, by, bw, bh;
       if(shape.type === 'circle'){ bx = shape.cx - shape.r; by = shape.cy - shape.r; bw = shape.r * 2; bh = shape.r * 2; }
       else if(shape.type === 'ellipse'){ bx = shape.cx - shape.rx; by = shape.cy - shape.ry; bw = shape.rx * 2; bh = shape.ry * 2; }
-      else if(shape.type === 'polygon'){ bx = shape.cx - shape.r; by = shape.cy - shape.r; bw = shape.r * 2; bh = shape.r * 2; }
+      else if(shape.type === 'polygon'){
+        // Real bbox from actual vertices so the dashed outline wraps the
+        // current (possibly deformed) shape, not the regular-polygon hull.
+        const pts = polygonGetPoints(shape);
+        let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+        pts.forEach(p => {
+          if(p[0] < minX) minX = p[0]; if(p[1] < minY) minY = p[1];
+          if(p[0] > maxX) maxX = p[0]; if(p[1] > maxY) maxY = p[1];
+        });
+        bx = minX; by = minY; bw = maxX - minX; bh = maxY - minY;
+      }
       else if(shape.type === 'rect' || shape.type === 'image' || shape.type === 'coords'){
         bx = shape.x; by = shape.y; bw = shape.w; bh = shape.h;
       }
@@ -927,12 +1337,15 @@
         bx = shape.x - 2; by = shape.y - fs; bw = textW + 4; bh = fs + 4;
       } else return;
       const rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('data-overlay-bbox', '1'); // for in-place update during drag
       rect.setAttribute('x', bx - 4); rect.setAttribute('y', by - 4);
       rect.setAttribute('width', bw + 8); rect.setAttribute('height', bh + 8);
       rect.setAttribute('fill', 'none'); rect.setAttribute('stroke', color);
       rect.setAttribute('stroke-width', 1.5); rect.setAttribute('stroke-dasharray', '4 3');
       rect.style.pointerEvents = 'none';
       overlay.appendChild(rect);
+      // Multi-select: stop here - no resize/vertex handles when 2+ shapes selected.
+      if(!single) return;
       if(shape.type === 'circle'){
         const r = document.createElementNS(NS, 'circle');
         r.setAttribute('cx', shape.cx + shape.r); r.setAttribute('cy', shape.cy);
@@ -951,13 +1364,20 @@
         overlay.appendChild(h);
       }
       if(shape.type === 'polygon'){
-        // Top-right corner of bounding box scales the polygon's outer radius.
-        const h = document.createElementNS(NS, 'circle');
-        h.setAttribute('cx', shape.cx + shape.r); h.setAttribute('cy', shape.cy);
-        h.setAttribute('r', 6); h.setAttribute('fill', '#fff'); h.setAttribute('stroke', color); h.setAttribute('stroke-width', 2);
-        h.style.cursor = 'ew-resize';
-        attachPolygonRadiusDrag(h, idx, svg);
-        overlay.appendChild(h);
+        // One handle per vertex - drag to deform the polygon. Hold Ctrl/Cmd
+        // and drag any vertex to uniformly scale all vertices around the
+        // centroid (keeps the shape proportional).
+        const pts = polygonGetPoints(shape);
+        pts.forEach((p, vi) => {
+          const h = document.createElementNS(NS, 'circle');
+          h.setAttribute('cx', p[0]); h.setAttribute('cy', p[1]);
+          h.setAttribute('r', 5); h.setAttribute('fill', '#fff');
+          h.setAttribute('stroke', color); h.setAttribute('stroke-width', 2);
+          h.style.cursor = 'crosshair';
+          h.setAttribute('data-vertex-idx', String(vi));
+          attachPolygonVertexDrag(h, idx, svg, vi);
+          overlay.appendChild(h);
+        });
       }
       if(shape.type === 'rect' || shape.type === 'image' || shape.type === 'coords'){
         const h = document.createElementNS(NS, 'circle');
@@ -1020,11 +1440,21 @@
         e.stopPropagation(); e.preventDefault();
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
+        const startRx = shape.rx || 1, startRy = shape.ry || 1;
+        const ratioAspect = startRy / startRx;
+        const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
         function onMove(ev){
           const p = svgPoint(svg, ev.clientX, ev.clientY);
-          shape.rx = Math.max(4, Math.round(Math.abs(p.x - shape.cx)));
-          shape.ry = Math.max(4, Math.round(Math.abs(p.y - shape.cy)));
+          const rx = Math.max(4, Math.round(Math.abs(p.x - shape.cx)));
+          if(uniform){
+            // Keep original aspect ratio while scaling.
+            shape.rx = rx;
+            shape.ry = Math.max(4, Math.round(rx * ratioAspect));
+          } else {
+            shape.rx = rx;
+            shape.ry = Math.max(4, Math.round(Math.abs(p.y - shape.cy)));
+          }
           moved = true;
           updateShapeNode(node, shape, idx, svg);
           updateSelectionOverlay(svg, idx);
@@ -1038,22 +1468,98 @@
         document.addEventListener('mouseup', onUp);
       });
     }
-    function attachPolygonRadiusDrag(handle, idx, svg){
+    // Recompute the dashed bbox + vertex handle positions IN PLACE - no DOM
+    // tear-down. Used during an active vertex / uniform-scale drag where
+    // calling updateSelectionOverlay (which rebuilds N+1 nodes + listeners
+    // per frame) would otherwise cost roughly N+1 createElementNS +
+    // addEventListener calls every 16 ms and stutter visibly.
+    function updatePolygonOverlayLive(svg, idx){
+      const overlay = svg.querySelector('[data-selection-overlay="1"][data-sel-idx="' + idx + '"]');
+      if(!overlay) return;
+      const shape = block.config.shapes[idx];
+      if(!shape) return;
+      const pts = polygonGetPoints(shape);
+
+      // Update bbox rect
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      pts.forEach(p => {
+        if(p[0] < minX) minX = p[0]; if(p[1] < minY) minY = p[1];
+        if(p[0] > maxX) maxX = p[0]; if(p[1] > maxY) maxY = p[1];
+      });
+      const bbox = overlay.querySelector('[data-overlay-bbox="1"]');
+      if(bbox){
+        bbox.setAttribute('x', minX - 4); bbox.setAttribute('y', minY - 4);
+        bbox.setAttribute('width', (maxX - minX) + 8);
+        bbox.setAttribute('height', (maxY - minY) + 8);
+      }
+      // Update each vertex handle's center. Handles missing from the DOM
+      // (e.g. if the vertex count changed) are simply skipped.
+      overlay.querySelectorAll('[data-vertex-idx]').forEach(h => {
+        const vi = parseInt(h.getAttribute('data-vertex-idx'), 10);
+        const p = pts[vi];
+        if(p){ h.setAttribute('cx', p[0]); h.setAttribute('cy', p[1]); }
+      });
+    }
+
+    // Drag a single polygon vertex. With Ctrl/Cmd held, scale the whole
+    // polygon uniformly around its centroid instead (keeps proportions).
+    function attachPolygonVertexDrag(handle, idx, svg, vertexIdx){
       handle.addEventListener('mousedown', e => {
         e.stopPropagation(); e.preventDefault();
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
+        // Ensure shape.points exists so we can mutate it.
+        if(!Array.isArray(shape.points) || shape.points.length === 0){
+          shape.points = polygonGetPoints(shape);
+        }
+        const startPoints = shape.points.map(p => p.slice());
+        const startCentroid = polygonCentroid(shape);
+        const startPt = startPoints[vertexIdx];
+        const startDist = Math.hypot(startPt[0] - startCentroid.x, startPt[1] - startCentroid.y) || 1;
+        const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
+        // Coalesce mousemove updates to rAF so we never apply more than one
+        // change per repaint, even if the browser fires events faster than
+        // the screen refresh rate.
+        let pendingPoint = null, rafScheduled = false;
+        function applyUpdate(){
+          rafScheduled = false;
+          if(!pendingPoint) return;
+          const p = pendingPoint; pendingPoint = null;
+          if(uniform){
+            const dist = Math.hypot(p.x - startCentroid.x, p.y - startCentroid.y);
+            const ratio = Math.max(0.1, dist / startDist);
+            // Mutate startPoints into shape.points so we avoid re-allocating
+            // a new array structure each frame.
+            const out = shape.points;
+            for(let i = 0; i < startPoints.length; i++){
+              out[i] = [
+                startCentroid.x + (startPoints[i][0] - startCentroid.x) * ratio,
+                startCentroid.y + (startPoints[i][1] - startCentroid.y) * ratio
+              ];
+            }
+            shape.r = Math.max(2, (Number(shape.r) || startDist) * ratio);
+          } else {
+            // Single-vertex move: only the dragged vertex changes.
+            shape.points[vertexIdx] = [Math.round(p.x), Math.round(p.y)];
+          }
+          // Polygon node: one setAttribute. Overlay: in-place attribute
+          // updates only. No DOM churn, no listener re-binding.
+          node.setAttribute('points', polygonPointsAttr(shape));
+          updatePolygonOverlayLive(svg, idx);
+        }
         function onMove(ev){
-          const p = svgPoint(svg, ev.clientX, ev.clientY);
-          shape.r = Math.max(6, Math.round(Math.abs(p.x - shape.cx)));
           moved = true;
-          updateShapeNode(node, shape, idx, svg);
-          updateSelectionOverlay(svg, idx);
+          pendingPoint = svgPoint(svg, ev.clientX, ev.clientY);
+          if(!rafScheduled){
+            rafScheduled = true;
+            requestAnimationFrame(applyUpdate);
+          }
         }
         function onUp(){
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          if(rafScheduled){ applyUpdate(); } // flush any tail update
           if(moved) commit();
         }
         document.addEventListener('mousemove', onMove);
@@ -1065,11 +1571,20 @@
         e.stopPropagation(); e.preventDefault();
         const shape = block.config.shapes[idx];
         let node = svg.querySelector('[data-shape-idx="' + idx + '"]');
+        const startW = shape.w || 1, startH = shape.h || 1;
+        const aspect = startH / startW;
+        const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
         function onMove(ev){
           const p = svgPoint(svg, ev.clientX, ev.clientY);
-          shape.w = Math.max(4, Math.round(p.x - shape.x));
-          shape.h = Math.max(4, Math.round(p.y - shape.y));
+          const w = Math.max(4, Math.round(p.x - shape.x));
+          if(uniform){
+            shape.w = w;
+            shape.h = Math.max(4, Math.round(w * aspect));
+          } else {
+            shape.w = w;
+            shape.h = Math.max(4, Math.round(p.y - shape.y));
+          }
           moved = true;
           if(shape.type === 'rect' || shape.type === 'image'){
             node.setAttribute('width',  shape.w);
@@ -1098,22 +1613,42 @@
       if(shape.type === 'line' || shape.type === 'arrow'){
         shape.x1 = (shape.x1 || 0) + dx; shape.y1 = (shape.y1 || 0) + dy;
         shape.x2 = (shape.x2 || 0) + dx; shape.y2 = (shape.y2 || 0) + dy;
-      } else if(shape.type === 'circle' || shape.type === 'ellipse' || shape.type === 'polygon'){
+      } else if(shape.type === 'circle' || shape.type === 'ellipse'){
         shape.cx = (shape.cx || 0) + dx; shape.cy = (shape.cy || 0) + dy;
+      } else if(shape.type === 'polygon'){
+        shape.cx = (shape.cx || 0) + dx; shape.cy = (shape.cy || 0) + dy;
+        if(Array.isArray(shape.points)){
+          shape.points = shape.points.map(p => [p[0] + dx, p[1] + dy]);
+        }
       } else {
         shape.x = (shape.x || 0) + dx; shape.y = (shape.y || 0) + dy;
       }
       return shape;
     }
+    // Uniform scale: multiply each polygon vertex's distance from the
+    // centroid by `ratio`. Used by Ctrl+drag scaling.
+    function scalePolygonUniform(shape, ratio){
+      if(!shape || shape.type !== 'polygon') return;
+      const pts = polygonGetPoints(shape);
+      const c = polygonCentroid(shape);
+      shape.points = pts.map(p => [c.x + (p[0] - c.x) * ratio, c.y + (p[1] - c.y) * ratio]);
+      shape.r = Math.max(2, (Number(shape.r) || 0) * ratio);
+    }
 
-    // Paste a deep-cloned shape from the module-scope clipboard at +16/+16
-    // offset so it's visible next to where the user is working. Selects the
-    // pasted shape so further keyboard ops act on it.
+    // Paste shape(s) from the module-scope clipboard at +16/+16 offset, then
+    // select the pasted shape(s). The clipboard holds either a single shape
+    // (legacy) or an array of shapes (multi-select copy).
     function pasteFromClipboard(){
       if(!_compClipboard) return false;
-      const clone = offsetShape(JSON.parse(JSON.stringify(_compClipboard)), 16, 16);
-      block.config.shapes.push(clone);
-      block._compSelected = block.config.shapes.length - 1;
+      const items = Array.isArray(_compClipboard) ? _compClipboard : [_compClipboard];
+      if(items.length === 0) return false;
+      const newIdxs = [];
+      items.forEach(it => {
+        const clone = offsetShape(JSON.parse(JSON.stringify(it)), 16, 16);
+        block.config.shapes.push(clone);
+        newIdxs.push(block.config.shapes.length - 1);
+      });
+      setSelection(newIdxs);
       commit();
       return true;
     }
@@ -1152,14 +1687,41 @@
         pasteFromClipboard();
         return;
       }
-      if(block._compSelected < 0) return;
+      // Tool-mode hotkeys (V = move, S = select) - no modifier required and
+      // they work even when nothing is selected.
+      if(!mod && (key === 'v' || key === 'V') && block._compTool !== 'move'){
+        e.preventDefault(); e.stopImmediatePropagation();
+        block._compTool = 'move'; render(); return;
+      }
+      if(!mod && (key === 's' || key === 'S') && block._compTool !== 'select'){
+        e.preventDefault(); e.stopImmediatePropagation();
+        block._compTool = 'select'; render(); return;
+      }
+
+      // Undo / redo at the COMPOSITION level. Call the operation first so it
+      // can flush any pending debounced snapshot; only stop propagation if
+      // we actually had something to undo/redo, otherwise main.js's block-
+      // level Ctrl+Z runs normally.
+      if(mod && (key === 'z' || key === 'Z')){
+        const did = e.shiftKey ? redoComposition() : undoComposition();
+        if(did){ e.preventDefault(); e.stopImmediatePropagation(); }
+        return;
+      }
+      if(mod && (key === 'y' || key === 'Y')){
+        if(redoComposition()){ e.preventDefault(); e.stopImmediatePropagation(); }
+        return;
+      }
+
+      // All remaining shortcuts require at least one selected shape.
+      const sels = selIndices();
+      if(sels.length === 0) return;
 
       if(mod && (key === 'c' || key === 'C')){
-        const sel = getSelected();
-        if(!sel) return;
         e.preventDefault();
         e.stopImmediatePropagation();
-        _compClipboard = JSON.parse(JSON.stringify(sel));
+        const shapes = getSelectedShapes();
+        // Always store as array so paste handles single + multi uniformly.
+        _compClipboard = shapes.map(s => JSON.parse(JSON.stringify(s)));
         return;
       }
       if(mod && (key === 'd' || key === 'D')){
@@ -1175,22 +1737,28 @@
         const step = e.shiftKey ? 10 : 1;
         const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0;
         const dy = key === 'ArrowUp'   ? -step : key === 'ArrowDown'  ? step : 0;
-        offsetShape(getSelected(), dx, dy);
+        getSelectedShapes().forEach(s => offsetShape(s, dx, dy));
         commit();
         return;
       }
       if(key === 'Delete' || key === 'Backspace'){
         e.preventDefault();
         e.stopImmediatePropagation();
-        block.config.shapes.splice(block._compSelected, 1);
-        block._compSelected = -1;
-        commit();
+        deleteSelected();
+        return;
+      }
+      // ⌘/Ctrl + A: select all shapes in this composition.
+      if(mod && (key === 'a' || key === 'A')){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setSelection((block.config.shapes || []).map((_, i) => i));
+        render();
         return;
       }
       if(key === 'Escape'){
         e.preventDefault();
         e.stopImmediatePropagation();
-        block._compSelected = -1;
+        clearSelection();
         render();
       }
     }
@@ -1547,7 +2115,7 @@
   // Block registration
   Blocks.register('composition', {
     label: 'Komposition',
-    description: 'Eigene Skizze aus Linien, Kreisen, Rechtecken, Pfeilen und Beschriftungen zusammenstellen. Optional bewertbar (Klick-Aufgabe, Lückentext, Hotspot oder Bestätigung).',
+    description: 'Skizze aus Linien, Kreisen, Pfeilen und Beschriftungen. Optional als Aufgabe bewertbar.',
     category: 'Inhalt',
     icon: '◧',
     // graded:true tells the builder this block can award points. The actual

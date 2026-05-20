@@ -1,17 +1,39 @@
 (function(){
   'use strict';
+
+  // Stock illustration used as the default Hotzone background so new blocks
+  // immediately show how the exercise works - and so the welcome-page live
+  // preview is meaningful rather than "(Kein Bild)".
+  // Inline SVG → data URL: a simple landscape with sun, cloud and tree.
+  const STOCK_LANDSCAPE_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">' +
+      '<rect width="400" height="240" fill="#e7f3f8"/>' +
+      '<rect y="180" width="400" height="60" fill="#cde4b0"/>' +
+      '<circle cx="60" cy="60" r="30" fill="#f5c14d"/>' +
+      '<g fill="#ffffff">' +
+        '<ellipse cx="280" cy="70" rx="40" ry="20"/>' +
+        '<ellipse cx="310" cy="60" rx="25" ry="18"/>' +
+        '<ellipse cx="255" cy="65" rx="22" ry="15"/>' +
+      '</g>' +
+      '<rect x="195" y="150" width="15" height="40" fill="#7a4d28"/>' +
+      '<circle cx="202" cy="140" r="38" fill="#3f8a3f"/>' +
+    '</svg>'
+  );
+
   Blocks.register('hotzone', {
     label: 'Hotzone (Bild markieren)',
-    description: 'Bild hochladen, mehrere Bereiche markieren. Studenten müssen in die richtigen Bereiche klicken.',
+    description: 'Bild mit markierten Bereichen. Lernende klicken in die richtigen Zonen.',
     category: 'Frage',
     icon: '◳',
     graded: true,
     defaultConfig(){
       return {
         blockTitle: '',
-        src: '',
-        zones: [],
-        prompt: 'Klicke auf alle markierten Bereiche.',
+        // Stock landscape + one zone over the tree so the exercise is
+        // self-explanatory the moment a hotzone block is created.
+        src: STOCK_LANDSCAPE_SVG,
+        zones: [{ x: 0.41, y: 0.425, w: 0.19, h: 0.317 }],
+        prompt: 'Klicken Sie auf den Baum.',
         showZonesAfterCheck: true,
         maxPoints: 1
       };
@@ -156,7 +178,7 @@
         overlay.innerHTML = '';
         stage.dataset.locked = '';
         updateCounter();
-        fb.neutral('Zurückgesetzt. Klicke neu.');
+        fb.neutral('Zurückgesetzt. Bitte neu klicken.');
       }
       checkBtn.addEventListener('click', grade);
       resetBtn.addEventListener('click', reset);
@@ -171,6 +193,12 @@
       tag.textContent = '◳  Hotzone';
       tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700;';
       wrap.appendChild(tag);
+      if(config.prompt){
+        const q = document.createElement('div');
+        q.textContent = config.prompt;
+        q.style.cssText = 'color:#003b5c; font-weight:700; font-size:0.82rem;';
+        wrap.appendChild(q);
+      }
       if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'flex:1; display:flex; align-items:center; justify-content:center; color:#888; font-style:italic; border:1px dashed #d8e0e6; border-radius:6px;';

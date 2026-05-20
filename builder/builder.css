@@ -537,45 +537,154 @@ html.welcome-active {
   border-bottom: 1px solid var(--line);
 }
 .welcome-blocks-cat:first-child { margin-top: 0; }
+/* Real <button> cards. Grid: icon top-left spanning both text rows so the
+ * title + description stack TIGHTLY to its right and start at the same y
+ * as the icon. Result: zero wasted vertical space at the top, and the
+ * description sits indented under the title (not under the icon).
+ *
+ * `minmax(0, 1fr)` is critical: a plain `1fr` lets long unbreakable words
+ * (e.g. "Einheitenumrechnung") blow the column wider than its share of the
+ * card, which would push text out of the card on the right. */
 .welcome-block-card {
   background: #fff; border: 1px solid var(--line);
-  border-radius: 8px; padding: 0.8rem; position: relative;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem 0.7rem;
+  position: relative;
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+  text-align: left;
+  font: inherit; color: inherit;
+  cursor: pointer;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 0.65rem;
+  row-gap: 0.18rem;
+  align-items: start;
+  overflow: hidden; /* belt-and-braces */
 }
-.welcome-block-card:hover { border-color: rgba(0,59,92,0.25); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,59,92,0.06); }
-.welcome-block-card.graded { border-left: 3px solid var(--accent-dark); }
+.welcome-block-card:hover,
+.welcome-block-card:focus-visible {
+  border-color: rgba(0,59,92,0.32);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,59,92,0.08);
+  outline: none;
+}
+.welcome-block-card:focus-visible { box-shadow: 0 0 0 2px rgba(0,59,92,0.18), 0 6px 18px rgba(0,59,92,0.08); }
+.welcome-block-card:active { transform: translateY(0); }
+/* The .reveal-target rule (further down) sets a 540 ms transition for the
+ * initial scroll-fade. That's elegant for entrance, but makes hover feel
+ * sluggish. Override with higher specificity so hover stays at 200 ms while
+ * opacity keeps its slower elegant fade-in. */
+.welcome-block-card.reveal-target {
+  transition: opacity 540ms cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform 200ms ease,
+              border-color 200ms ease,
+              box-shadow 200ms ease;
+}
+/* Graded cards: green accent stripe on the left edge AND inline "bewertet"
+ * pill in the title row. The stripe gives a strong, scannable signal at the
+ * row level; the pill provides the explicit label inline with the title.
+ * padding-left compensates so the icon and text don't visually jump. */
+.welcome-block-card.graded {
+  border-left: 3px solid var(--accent-dark);
+  padding-left: calc(0.8rem - 2px);
+}
+/* Icon spans both rows so the text block to its right can sit tight at
+ * the top - no extra row-height padded by the 30 px icon chip. */
 .welcome-block-icon {
   font-family: "Courier New", monospace; font-weight: 800; font-size: 1rem;
   color: var(--primary);
   width: 30px; height: 30px;
   background: var(--panel-soft); border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
-  margin-bottom: 0.45rem;
+  grid-row: 1 / span 2; grid-column: 1;
+  align-self: start;
 }
-.welcome-block-name { font-weight: 700; color: var(--primary); font-size: 0.88rem; margin-bottom: 0.2rem; }
-.welcome-block-desc { font-size: 0.72rem; color: var(--muted); line-height: 1.45; }
+.welcome-block-name {
+  font-weight: 700; color: var(--primary); font-size: 0.86rem;
+  grid-row: 1; grid-column: 2;
+  align-self: start;
+  min-width: 0; line-height: 1.3;
+  /* `break-word` only breaks long unbreakable strings; word boundaries
+   * are still respected. Hyphenation kicks in for ≥8-char German compound
+   * words (with at least 4 chars on each side of the break), so
+   * "Einheitenumrechnung" splits at a real syllable boundary instead of
+   * mid-word. The 4/4 limits avoid earlier ugliness like "Ein-gabe". */
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after:  4;
+  hyphenate-limit-chars: 8 4 4;
+}
+.welcome-block-desc {
+  font-size: 0.72rem; color: var(--muted); line-height: 1.55;
+  grid-row: 2; grid-column: 2;
+  align-self: start;
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after:  4;
+  hyphenate-limit-chars: 8 4 4;
+}
+/* Inline pill following the title text. Kept very compact so it almost
+ * always fits on the same line as the title, even on the narrowest cards.
+ * The green left stripe on .graded cards is the primary signal - the pill
+ * is the accessible label for screen readers + a confirming visual cue. */
 .welcome-block-graded {
-  position: absolute; top: 0.5rem; right: 0.5rem;
-  font-size: 0.6rem; font-weight: 700; color: #fff;
+  display: inline-block;
+  position: static;
+  font-size: 0.52rem; font-weight: 700; color: #fff;
   background: var(--accent-dark);
-  padding: 0.08rem 0.4rem; border-radius: 99px; letter-spacing: 0.06em;
+  padding: 0.04rem 0.36rem;
+  border-radius: 99px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-left: 0.35rem;
+  vertical-align: 0.22em;
+  white-space: nowrap;
+  line-height: 1.25;
 }
 
 /* Canvas tips */
 .welcome-tips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.7rem; }
 .welcome-tip-card {
   background: var(--panel-soft); border-radius: 10px;
-  padding: 0.95rem 1.05rem; border: 1px solid var(--line);
+  padding: 0.9rem 1.05rem; border: 1px solid var(--line);
+  /* Mirror block-card grid layout: icon top-left, title to its right on the
+   * same row, body spans both columns below. Same visual rhythm everywhere. */
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 0.6rem;
+  row-gap: 0.35rem;
+  align-items: center;
+  /* CRITICAL: pin rows to the top, otherwise the outer tips-grid stretches
+   * cards in the same row to the tallest one and the inner grid distributes
+   * the extra height across rows - which makes the title drift below the
+   * icon's center on shorter-body cards. */
+  align-content: start;
 }
 .welcome-tip-icon {
-  font-size: 1.05rem; line-height: 1;
-  width: 30px; height: 30px; border-radius: 6px;
+  width: 32px; height: 32px; border-radius: 8px;
   background: #fff; border: 1px solid var(--line);
   display: flex; align-items: center; justify-content: center;
-  margin-bottom: 0.5rem; color: var(--primary); font-weight: 700;
+  color: var(--primary);
+  grid-row: 1; grid-column: 1;
+  align-self: start;
+  flex-shrink: 0;
+  overflow: hidden; /* belt-and-braces against any stray text */
 }
-.welcome-tip-title { font-weight: 700; color: var(--primary); margin-bottom: 0.2rem; font-size: 0.93rem; }
-.welcome-tip-body { font-size: 0.85rem; line-height: 1.5; color: #2a4053; }
+.welcome-tip-icon > svg { display: block; }
+.welcome-tip-title {
+  font-weight: 700; color: var(--primary); font-size: 0.93rem;
+  grid-row: 1; grid-column: 2; min-width: 0;
+}
+.welcome-tip-body {
+  font-size: 0.85rem; line-height: 1.5; color: #2a4053;
+  grid-row: 2; grid-column: 1 / -1;
+}
 
 /* Keyboard shortcuts */
 .welcome-kbd-table { width: 100%; border-collapse: collapse; }
@@ -832,3 +941,145 @@ html.welcome-active {
   font: inherit; font-size: 0.82rem; font-weight: 600;
 }
 .comp-tool-btn-text:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* Welcome: Block-detail modal */
+.welcome-hint {
+  font-size: 0.78rem; color: var(--muted);
+  margin: -0.3rem 0 0.7rem;
+}
+
+/* Welcome: Block-detail modal */
+.welcome-block-modal {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+.welcome-block-modal.is-open    { opacity: 1; pointer-events: auto; }
+.welcome-block-modal.is-closing { opacity: 0; pointer-events: none; }
+.welcome-block-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0, 28, 47, 0.42);
+  backdrop-filter: blur(2px);
+}
+.welcome-block-modal-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 28, 47, 0.22);
+  width: min(820px, calc(100vw - 2rem));
+  max-height: min(620px, calc(100vh - 2rem));
+  display: flex; flex-direction: column;
+  transform: translateY(8px) scale(0.985);
+  transition: transform 200ms ease;
+}
+.welcome-block-modal.is-open .welcome-block-modal-card { transform: translateY(0) scale(1); }
+
+.welcome-block-modal-close {
+  position: absolute; top: 0.75rem; right: 0.75rem;
+  width: 32px; height: 32px;
+  background: transparent; border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.welcome-block-modal-close:hover,
+.welcome-block-modal-close:focus-visible {
+  background: var(--panel-soft);
+  color: var(--primary);
+  outline: none;
+  border-color: var(--line);
+}
+
+.welcome-block-modal-head {
+  display: flex; align-items: center; gap: 0.9rem;
+  padding: 1.1rem 1.3rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.welcome-block-modal-icon {
+  font-family: "Courier New", monospace;
+  font-weight: 800; font-size: 1.55rem;
+  width: 52px; height: 52px;
+  background: var(--panel-soft);
+  border-radius: 10px;
+  color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.welcome-block-modal-titles { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.welcome-block-modal-title {
+  margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--primary);
+}
+.welcome-block-modal-meta { display: flex; gap: 0.4rem; }
+.welcome-block-modal-cat {
+  font-size: 0.7rem; font-weight: 700;
+  background: var(--panel-soft);
+  color: var(--primary);
+  border: 1px solid var(--line);
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.welcome-block-modal-graded {
+  font-size: 0.7rem; font-weight: 700;
+  background: var(--accent-dark); color: #fff;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+.welcome-block-modal-body {
+  display: grid; grid-template-columns: 1fr 1.1fr;
+  gap: 1.2rem;
+  padding: 1.1rem 1.3rem 1.3rem;
+  overflow: auto;
+  flex: 1 1 auto; min-height: 0;
+}
+@media (max-width: 720px) { .welcome-block-modal-body { grid-template-columns: 1fr; } }
+.welcome-block-modal-text { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.welcome-block-modal-desc {
+  margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.55;
+}
+.welcome-block-modal-facts {
+  margin: 0;
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+}
+.welcome-block-modal-facts dt {
+  font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.7rem;
+  padding-top: 0.18rem;
+}
+.welcome-block-modal-facts dd { margin: 0; color: var(--text); }
+
+.welcome-block-modal-preview {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  min-width: 0; min-height: 0;
+}
+.welcome-block-modal-preview-label {
+  font-size: 0.7rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.welcome-block-modal-preview-host {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem;
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 140px;
+}
+.welcome-block-modal-preview-host > * { pointer-events: none; }
+.welcome-block-modal-preview-empty {
+  color: var(--muted); font-size: 0.85rem; padding: 1rem; text-align: center;
+}

@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('text-input', {
     label: 'Text-Eingabe',
-    description: 'Freie Text-Antwort. Vergleich exakt, ohne Groß/Klein, oder per Regex.',
+    description: 'Freie Text-Antwort. Vergleich exakt oder per regulärem Ausdruck.',
     category: 'Frage',
     icon: 'Aa',
     graded: true,
@@ -11,8 +11,8 @@
         blockTitle: '',
         preset: 'custom',
         answerMode: 'iexact',
-        question: '',
-        answers: [],
+        question: 'Wie heißt die Hauptstadt von Deutschland?',
+        answers: ['Berlin'],
         maxPoints: 1,
         partialKeywords: false
       };

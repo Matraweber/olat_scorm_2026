@@ -10,7 +10,7 @@
 
   Blocks.register('numeric-input', {
     label: 'Numerische Eingabe',
-    description: 'Frage mit numerischer Lösung. Variablen aus Zufallsbereichen + Formel erzeugen die Lösung.',
+    description: 'Numerische Frage mit Zufallsvariablen und Lösungs-Formel.',
     category: 'Frage',
     icon: '#',
     graded: true,
@@ -18,9 +18,12 @@
       return {
         blockTitle: '',
         preset: 'custom',
-        questionTemplate: '',
-        variables: [],
-        formula: '',
+        questionTemplate: 'Wie viel ist {a} + {b}?',
+        variables: [
+          { name: 'a', min: 1, max: 10, step: 1 },
+          { name: 'b', min: 1, max: 10, step: 1 }
+        ],
+        formula: 'a + b',
         tolerance: 0.01,
         unit: '',
         maxPoints: 1

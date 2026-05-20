@@ -249,7 +249,7 @@
   // Block-Registrierung
   Blocks.register('unit-convert', {
     label: 'Einheitenumrechnung',
-    description: 'Physikalische Größen umrechnen. Jede Aufgabe definiert Richtung und Wertebereich; daraus werden zufällige Werte erzeugt.',
+    description: 'Physikalische Einheiten umrechnen mit zufälligen Werten.',
     category: 'Frage',
     icon: '⇌',
     graded: true,

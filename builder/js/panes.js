@@ -130,7 +130,7 @@ function renderWelcomePane(host){
   heroBody.insertAdjacentHTML('afterbegin',
     '<span class="welcome-kicker">SCORM Builder · Umwelt-Campus Birkenfeld</span>'
   );
-  heroBody.appendChild(el('p', {className:'welcome-lede', text:'Mit dem SCORM Builder erstellst du Lerneinheiten für OLAT. Direkt im Browser, ohne Installation. Diese Seite erklärt den Ablauf in fünf Kapiteln.'}));
+  heroBody.appendChild(el('p', {className:'welcome-lede', text:'Mit dem SCORM Builder erstellen Sie Lerneinheiten für OLAT - direkt im Browser, ohne Installation. Diese Seite erklärt den Ablauf in fünf Kapiteln.'}));
   const heroCta = el('div', {className:'welcome-cta-row'});
   const newTaskBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
   newTaskBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
@@ -147,27 +147,27 @@ function renderWelcomePane(host){
   const stepDefs = [
     {
       n: 1, title: 'Aufgabe anlegen',
-      body: 'Klicke links in der Seitenleiste auf <strong>+ Aufgabe</strong>. Wähle zwischen einer leeren Aufgabe oder einer Vorlage (z. B. „Wahrheitstabelle", „Numerische Eingabe mit Variablen").',
+      body: 'Klicken Sie links in der Seitenleiste auf <strong>+ Aufgabe</strong>. Sie wählen zwischen einer leeren Aufgabe oder einer Vorlage (z. B. „Wahrheitstabelle", „Numerische Eingabe mit Variablen").',
       mock: mockSidebarAddTask()
     },
     {
       n: 2, title: 'Block hinzufügen',
-      body: 'Innerhalb der Aufgabe klickst du auf <strong>+ Block</strong>. Es öffnet sich ein Menü mit allen verfügbaren Block-Typen.',
+      body: 'Innerhalb der Aufgabe klicken Sie auf <strong>+ Block</strong>. Es öffnet sich ein Menü mit allen verfügbaren Block-Typen.',
       mock: mockBlockPicker()
     },
     {
       n: 3, title: 'Beispiel laden oder selbst füllen',
-      body: 'Jeder Frage-Block startet mit einer <strong>Vorlage</strong>: „Manuell (leer)" für eigene Inhalte, oder ein <strong>Beispiel</strong> mit fertigem Inhalt. Mit <strong>↺ Zurücksetzen</strong> löschst du deine manuelle Eingabe.',
+      body: 'Jeder Frage-Block startet mit einer <strong>Vorlage</strong>: „Manuell (leer)" für eigene Inhalte oder ein <strong>Beispiel</strong> mit fertigem Inhalt. Mit <strong>Zurücksetzen</strong> entfernen Sie Ihre manuelle Eingabe.',
       mock: mockPresetDropdown()
     },
     {
       n: 4, title: 'Vorschau ansehen',
-      body: 'Klicke oben rechts auf <strong>Vorschau</strong>. So sehen Studierende die fertige Lerneinheit. Du kannst Antworten direkt ausprobieren.',
+      body: 'Klicken Sie oben rechts auf <strong>Vorschau</strong>. So sehen Studierende die fertige Lerneinheit. Sie können Antworten direkt ausprobieren.',
       mock: mockTopbarBtn('Vorschau', 'secondary')
     },
     {
       n: 5, title: 'SCORM-ZIP erzeugen',
-      body: 'Mit <strong>SCORM-ZIP erzeugen</strong> wird ein vollständiges SCORM-1.2-Paket heruntergeladen. Diese ZIP-Datei kannst du in OLAT als Lerneinheit hochladen.',
+      body: 'Mit <strong>SCORM-ZIP erzeugen</strong> wird ein vollständiges SCORM-1.2-Paket heruntergeladen. Diese ZIP-Datei laden Sie in OLAT als Lerneinheit hoch.',
       mock: mockTopbarBtn('SCORM-ZIP erzeugen', 'primary')
     }
   ];
@@ -190,7 +190,7 @@ function renderWelcomePane(host){
 
   const layoutLegend = el('ul', {className:'welcome-legend'});
   [
-    ['1', 'Seitenleiste', 'Liste deiner Aufgaben + Allgemein-Links (Kopfdaten, Branding, diese Hilfe). Hier kannst du Aufgaben hinzufügen, umsortieren und löschen.'],
+    ['1', 'Seitenleiste', 'Liste Ihrer Aufgaben sowie die Allgemein-Links (Kopfdaten, Branding, diese Hilfe). Hier fügen Sie Aufgaben hinzu, sortieren sie um oder löschen sie.'],
     ['2', 'Canvas', 'Die Arbeitsfläche der ausgewählten Aufgabe. Blöcke werden hier per Drag & Drop angeordnet und in der Größe angepasst.'],
     ['3', 'Konfigurations-Pane', 'Rechts: Eigenschaften des markierten Blocks. Vorlagen, Texte, Antworten und Bewertung werden hier eingestellt.']
   ].forEach(([n, k, v]) => {
@@ -204,6 +204,7 @@ function renderWelcomePane(host){
   const types = chapter('Block-Typen');
   types.appendChild(el('p', {className:'welcome-lead', text:'Inhalts-Blöcke sind statisch, Frage-Blöcke werden bewertet. Eine Aufgabe kann beliebig viele Blöcke enthalten.'}));
 
+  types.appendChild(el('p', {className:'welcome-hint', text:'Auf eine Kachel klicken, um eine Live-Vorschau und Details zu sehen.'}));
   const blocksGrid = el('div', {className:'welcome-blocks-grid'});
   const allBlocks = window.Blocks ? window.Blocks.ids().map(id => ({ id, def: window.Blocks.get(id) })).filter(x => x.def) : [];
   // Group by category
@@ -217,12 +218,22 @@ function renderWelcomePane(host){
     const catLabel = el('div', {className:'welcome-blocks-cat', text: cat});
     blocksGrid.appendChild(catLabel);
     items.forEach(({ id, def }) => {
-      const card = el('div', {className:'welcome-block-card' + (def.graded ? ' graded' : '')});
+      // Card is a real <button> so it is keyboard-focusable, has the right
+      // affordance, and screen readers announce it as clickable.
+      const card = el('button', {
+        className:'welcome-block-card' + (def.graded ? ' graded' : ''),
+        attrs:{ type:'button', 'data-block-id': id, 'aria-label': (def.label || id) + ' - Details ansehen' }
+      });
+      // "bewertet" badge sits INLINE after the title so it can never overlap
+      // the title text. If the title wraps to multiple lines, the badge stays
+      // visually attached to the last word.
       card.innerHTML =
-        '<div class="welcome-block-icon">' + (def.icon || '◧') + '</div>' +
-        '<div class="welcome-block-name">' + (def.label || id) + '</div>' +
-        '<div class="welcome-block-desc">' + (def.description || '') + '</div>' +
-        (def.graded ? '<div class="welcome-block-graded">bewertet</div>' : '');
+        '<div class="welcome-block-icon">' + escapeHtml(def.icon || '◧') + '</div>' +
+        '<div class="welcome-block-name">' + escapeHtml(def.label || id) +
+          (def.graded ? ' <span class="welcome-block-graded">bewertet</span>' : '') +
+        '</div>' +
+        '<div class="welcome-block-desc">' + escapeHtml(def.description || '') + '</div>';
+      card.addEventListener('click', () => openBlockDetailModal(id, def));
       blocksGrid.appendChild(card);
     });
   });
@@ -232,12 +243,36 @@ function renderWelcomePane(host){
   const tips = chapter('Mit dem Canvas arbeiten');
   const tipsGrid = el('div', {className:'welcome-tips-grid'});
   [
-    { icon:'✥', title:'Verschieben', body:'Blöcke werden per Maus gezogen. Mit gehaltener Shift-Taste mehrere Blöcke gleichzeitig.' },
-    { icon:'⌟', title:'Größe ändern', body:'Unten rechts an jedem Block die Ecke ziehen, oder den ↕-Knopf für „Höhe an Inhalt anpassen".' },
-    { icon:'☐', title:'Mehrfach-Auswahl', body:'Shift + Klick wählt mehrere Blöcke aus. Im rechten Pane erscheinen dann Ausrichten/Verteilen/Duplizieren.' },
-    { icon:'+/−', title:'Zoom', body:'Strg/Cmd + Mausrad zoomt das Canvas. Oder die +/− Knöpfe oben rechts in der Aufgabe.' },
-    { icon:'⌧', title:'Tabs (optional)', body:'Pro Aufgabe können zwei Tabs aktiviert werden, z. B. „Visualisierung" und „Aufgabe".' },
-    { icon:'★', title:'Vorlagen speichern', body:'Eine fertige Aufgabe als Vorlage speichern („★ Vorlage" im Aufgaben-Header). Steht beim nächsten Mal sofort zur Verfügung.' }
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L12 22 M2 12 L22 12 M9 5 L12 2 L15 5 M19 9 L22 12 L19 15 M9 19 L12 22 L15 19 M5 9 L2 12 L5 15"/></svg>',
+      title:'Verschieben',
+      body:'Blöcke werden per Maus gezogen. Mit gehaltener Shift-Taste lassen sich mehrere Blöcke gleichzeitig bewegen.'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 L13 11 M21 3 L15 3 M21 3 L21 9 M3 21 L11 13 M3 21 L9 21 M3 21 L3 15"/></svg>',
+      title:'Größe ändern',
+      body:'Unten rechts an jedem Block die Ecke ziehen, oder den Knopf „Höhe an Inhalt anpassen" verwenden.'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><circle cx="3"  cy="3"  r="1.5" fill="currentColor"/><circle cx="21" cy="3"  r="1.5" fill="currentColor"/><circle cx="3"  cy="21" r="1.5" fill="currentColor"/><circle cx="21" cy="21" r="1.5" fill="currentColor"/></svg>',
+      title:'Mehrfach-Auswahl',
+      body:'Shift + Klick wählt mehrere Blöcke aus. Im rechten Pane erscheinen dann Ausrichten, Verteilen und Duplizieren.'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6"/><path d="M21 21 L15 15 M7 10 L13 10 M10 7 L10 13"/></svg>',
+      title:'Zoom',
+      body:'Strg/Cmd + Mausrad zoomt die Canvas. Alternativ stehen die +/− Knöpfe oben rechts in der Aufgabe zur Verfügung.'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 9 L8 9 L9 6 L15 6 L16 9 L21 9 L21 20 L3 20 Z"/></svg>',
+      title:'Tabs (optional)',
+      body:'Pro Aufgabe können zwei Tabs aktiviert werden, beispielsweise „Visualisierung" und „Aufgabe".'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 3 L18 3 L18 21 L12 17 L6 21 Z"/></svg>',
+      title:'Vorlagen speichern',
+      body:'Eine fertige Aufgabe als Vorlage speichern („Vorlage" im Aufgaben-Header). Sie steht beim nächsten Mal sofort zur Verfügung.'
+    }
   ].forEach(t => {
     const card = el('div', {className:'welcome-tip-card'});
     card.innerHTML =
@@ -274,7 +309,7 @@ function renderWelcomePane(host){
 
   // Closing call-to-action
   const foot = el('section', {className:'welcome-foot'});
-  foot.innerHTML = '<p>Diese Hilfe findest du jederzeit in der Seitenleiste unter <strong>Willkommen / Hilfe</strong>.</p>';
+  foot.innerHTML = '<p>Diese Hilfe finden Sie jederzeit in der Seitenleiste unter <strong>Willkommen / Hilfe</strong>.</p>';
   const footBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
   footBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
   foot.appendChild(footBtn);
@@ -361,6 +396,131 @@ function setupWelcomeScrollSpy(chapters, railList){
     document.documentElement.classList.remove('welcome-active');
     delete window._welcomeScrollCleanup;
   };
+}
+
+// HTML-escape helper for content interpolated into innerHTML strings. The
+// welcome page builds card markup from block definitions whose `label`,
+// `description` and `icon` come from registered blocks - defensive escaping
+// keeps things consistent even if a definition later contains markup chars.
+function escapeHtml(s){
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Detail modal opened when a block card on the Welcome page is clicked.
+// Shows the block's label, category, description, scoring info, and a live
+// preview rendered via the block's own `preview()` function (with its
+// default config). Close via the X button, the backdrop, or Escape.
+function openBlockDetailModal(id, def){
+  // If a previous modal is still open, replace it cleanly.
+  document.querySelectorAll('.welcome-block-modal').forEach(m => m.remove());
+
+  const modal = el('div', {
+    className:'welcome-block-modal',
+    attrs:{ role:'dialog', 'aria-modal':'true', 'aria-label': (def.label || id) + ' - Details' }
+  });
+  const backdrop = el('div', {className:'welcome-block-modal-backdrop'});
+  const card     = el('div', {className:'welcome-block-modal-card'});
+
+  // Close button (top-right) - used both by mouse and by screen readers.
+  const closeBtn = el('button', {
+    className:'welcome-block-modal-close',
+    attrs:{ type:'button', 'aria-label':'Schließen' }
+  });
+  closeBtn.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5 L15 15 M15 5 L5 15"/></svg>';
+
+  // Header: large icon + label + category badge + graded badge.
+  const head = el('div', {className:'welcome-block-modal-head'});
+  head.innerHTML =
+    '<div class="welcome-block-modal-icon">' + escapeHtml(def.icon || '◧') + '</div>' +
+    '<div class="welcome-block-modal-titles">' +
+      '<h3 class="welcome-block-modal-title">' + escapeHtml(def.label || id) + '</h3>' +
+      '<div class="welcome-block-modal-meta">' +
+        '<span class="welcome-block-modal-cat">' + escapeHtml(def.category || 'Sonstige') + '</span>' +
+        (def.graded ? '<span class="welcome-block-modal-graded">Bewertet</span>' : '') +
+      '</div>' +
+    '</div>';
+  card.appendChild(closeBtn);
+  card.appendChild(head);
+
+  // Body: description on the left, live preview on the right.
+  const body = el('div', {className:'welcome-block-modal-body'});
+  const left = el('div', {className:'welcome-block-modal-text'});
+  if(def.description){
+    left.appendChild(el('p', {className:'welcome-block-modal-desc', text: def.description}));
+  }
+  // Key facts list - derived from the block definition so it stays in sync.
+  const facts = [];
+  facts.push({ k:'Kategorie', v: def.category || 'Sonstige' });
+  facts.push({ k:'Bewertbar', v: def.graded ? 'Ja' : 'Nein' });
+  if(typeof def.builderSchema === 'function'){
+    try {
+      const schema = def.builderSchema();
+      const optionCount = Array.isArray(schema) ? schema.filter(s => s && s.key).length : 0;
+      if(optionCount) facts.push({ k:'Konfigurations-Optionen', v: String(optionCount) });
+    } catch(e){ /* ignore - schema may require runtime context */ }
+  }
+  const factList = el('dl', {className:'welcome-block-modal-facts'});
+  facts.forEach(f => {
+    factList.appendChild(el('dt', {text: f.k}));
+    factList.appendChild(el('dd', {text: f.v}));
+  });
+  left.appendChild(factList);
+
+  // Right side: live preview rendered with the block's defaultConfig.
+  // The preview is the same one the builder canvas shows - it doubles as a
+  // visual screenshot without us having to maintain static images.
+  const right = el('div', {className:'welcome-block-modal-preview'});
+  right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text:'Live-Vorschau'}));
+  const previewHost = el('div', {className:'welcome-block-modal-preview-host'});
+  right.appendChild(previewHost);
+  try {
+    const cfg = (def.defaultConfig ? def.defaultConfig() : {}) || {};
+    if(typeof def.preview === 'function'){
+      def.preview(previewHost, cfg);
+    } else if(typeof def.mount === 'function' && window.BlockUtils){
+      // Some blocks (e.g. composition before grading was added) only have mount.
+      def.mount(previewHost, cfg, {
+        utils: window.BlockUtils,
+        blockId: 'welcome_preview_' + id,
+        initScore(){}, reportScore(){}
+      });
+    } else {
+      previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'(Keine Vorschau verfügbar)'}));
+    }
+  } catch(err){
+    previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'Vorschau konnte nicht gerendert werden.'}));
+  }
+
+  body.appendChild(left);
+  body.appendChild(right);
+  card.appendChild(body);
+
+  modal.appendChild(backdrop);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+
+  // Focus management: focus the close button so Escape works immediately
+  // and keyboard users land somewhere meaningful.
+  closeBtn.focus({ preventScroll: true });
+
+  function close(){
+    modal.classList.add('is-closing');
+    setTimeout(() => modal.remove(), 180);
+    document.removeEventListener('keydown', onKey, true);
+  }
+  function onKey(e){
+    if(e.key === 'Escape'){ e.preventDefault(); close(); }
+  }
+  closeBtn.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', onKey, true);
+
+  // Trigger the fade-in by deferring the open class to the next frame.
+  requestAnimationFrame(() => modal.classList.add('is-open'));
 }
 
 // Scroll-triggered reveal: each below-the-fold reading element fades in and

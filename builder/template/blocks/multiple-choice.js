@@ -7,11 +7,18 @@
     icon: '☑',
     graded: true,
     defaultConfig(){
+      // Sensible starting content so a freshly created block (and the
+      // welcome-page live preview) shows a complete, editable example.
       return {
         blockTitle: '',
         preset: 'custom',
-        question: '',
-        choices: [],
+        question: 'Welche Hauptstadt gehört zu Deutschland?',
+        choices: [
+          { text: 'Berlin',  correct: true  },
+          { text: 'München', correct: false },
+          { text: 'Wien',    correct: false },
+          { text: 'Hamburg', correct: false }
+        ],
         multi: false,
         shuffle: true,
         maxPoints: 1,

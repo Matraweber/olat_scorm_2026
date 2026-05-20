@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('cloze', {
     label: 'Lückentext',
-    description: 'Text mit Lücken {{antwort}} (Eingabe), {{a|b}} (Eingabe mit Alternativen) oder {{=korrekt|falsch1|falsch2}} (Dropdown).',
+    description: 'Lückentext mit freier Eingabe, Alternativen oder Dropdown-Auswahl.',
     category: 'Frage',
     icon: '___',
     graded: true,
@@ -10,10 +10,14 @@
       return {
         blockTitle: '',
         preset: 'custom',
-        text: '',
+        // Three short blanks demonstrate all three input types:
+        //   {{Berlin}}         = freie Texteingabe
+        //   {{Wasser|H2O}}     = Alternativen
+        //   {{=Saturn|Jupiter}}= Dropdown (erste Option = richtig)
+        text: 'Die Hauptstadt Deutschlands heißt {{Berlin}}. Das chemische Symbol für Wasser ist {{H2O|Wasser}}. Der größte Planet im Sonnensystem ist {{=Jupiter|Saturn|Mars}}.',
         ignoreCase: true,
         shuffleDropdown: true,
-        maxPoints: 1
+        maxPoints: 3
       };
     },
     builderSchema(){

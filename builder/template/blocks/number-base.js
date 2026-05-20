@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('number-base', {
     label: 'Zahlensysteme (Bin/Dez/Hex)',
-    description: 'Umrechnung zwischen Binär (Basis 2), Oktal (8), Dezimal (10) und Hexadezimal (16).',
+    description: 'Umrechnung zwischen Binär, Oktal, Dezimal und Hexadezimal.',
     category: 'Frage',
     icon: '0x',
     graded: true,

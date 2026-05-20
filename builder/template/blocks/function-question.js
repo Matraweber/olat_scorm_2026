@@ -13,7 +13,7 @@
 
   Blocks.register('function-question', {
     label: 'Funktion ablesen',
-    description: 'Funktion plotten, Funktionswerte, Nullstellen und Extrempunkte ablesen lassen.',
+    description: 'Funktionsgraph anzeigen. Werte, Nullstellen und Extrempunkte ablesen.',
     category: 'Frage',
     icon: 'ƒ',
     graded: true,

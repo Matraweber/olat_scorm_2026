@@ -2,7 +2,7 @@
   'use strict';
   Blocks.register('note-box', {
     label: 'Hinweisbox',
-    description: 'Hervorgehobener Hinweis-/Info-/Warnkasten.',
+    description: 'Hervorgehobener Hinweiskasten (Info oder Warnung).',
     category: 'Inhalt',
     icon: 'ℹ',
     graded: false,
