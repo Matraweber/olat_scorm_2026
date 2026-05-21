@@ -150,23 +150,21 @@
     preview(host, config){
       const activeConfig = mcPresetConfig(config);
       const card = document.createElement('div');
-      card.style.cssText = 'background:#fff; border:1px solid #d8e0e6; border-radius:18px; padding:1.2rem; margin:0;';
+      card.className = 'bp-card';
       const h3 = document.createElement('h3');
       h3.textContent = 'Frage';
-      h3.style.cssText = 'color:#003b5c; margin:0 0 0.6rem; font-size:1rem;';
       card.appendChild(h3);
       const q = document.createElement('p');
       q.innerHTML = activeConfig.question || '<em style="color:#888">(Frage leer)</em>';
-      q.style.cssText = 'margin:0 0 0.9rem; color:#111; line-height:1.45;';
       card.appendChild(q);
       const isMulti = !!activeConfig.multi;
       const list = document.createElement('div');
-      list.style.cssText = 'display:grid; gap:0.5rem;';
+      list.className = 'bp-choice-list';
       (activeConfig.choices || []).forEach(c => {
         const li = document.createElement('div');
-        li.style.cssText = 'display:flex; align-items:center; gap:0.5rem; padding:0.6rem 0.8rem; border:1px solid #d8e0e6; border-radius:12px; background:#fff; line-height:1.35;';
+        li.className = 'bp-choice';
         const m = document.createElement('span');
-        m.style.cssText = 'color:' + (c.correct ? '#84bf66' : '#5d6872') + '; font-size:1rem; line-height:1; min-width:1rem;';
+        m.className = 'bp-choice-marker' + (c.correct ? ' is-correct' : '');
         m.textContent = c.correct ? (isMulti ? '☑' : '◉') : (isMulti ? '☐' : '○');
         li.appendChild(m);
         const t = document.createElement('span'); t.innerHTML = c.text || '';
@@ -175,15 +173,15 @@
       });
       card.appendChild(list);
       const btnRow = document.createElement('div');
-      btnRow.style.cssText = 'margin-top:1rem;';
+      btnRow.style.marginTop = '1rem';
       const btn = document.createElement('span');
       btn.textContent = 'Korrektur';
-      btn.style.cssText = 'display:inline-block; background:#003b5c; color:#fff; padding:0.55rem 1.1rem; border-radius:999px; font-weight:700; font-size:0.88rem;';
+      btn.className = 'bp-btn';
       btnRow.appendChild(btn);
       card.appendChild(btnRow);
       const fb = document.createElement('div');
-      fb.style.cssText = 'background:#f5f8fa; border:1px solid #d8e0e6; border-left:6px solid #a1d884; border-radius:14px; padding:0.7rem 0.9rem; margin-top:0.6rem;';
-      fb.innerHTML = '<div style="font-weight:700; color:#003b5c; margin-bottom:0.2rem;">Rückmeldung</div><div style="color:#0f2d44; font-family:Courier New,monospace;">Noch keine Korrektur durchgeführt.</div>';
+      fb.className = 'bp-hint';
+      fb.innerHTML = '<div class="bp-hint-title">Rückmeldung</div><div class="bp-hint-body">Noch keine Korrektur durchgeführt.</div>';
       card.appendChild(fb);
       host.appendChild(card);
     }

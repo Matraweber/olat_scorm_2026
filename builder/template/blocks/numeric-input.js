@@ -167,37 +167,35 @@
         } catch(e){}
       }
       const card = document.createElement('div');
-      card.style.cssText = 'background:#fff; border:1px solid #d8e0e6; border-radius:18px; padding:1.2rem;';
+      card.className = 'bp-card';
       const h3 = document.createElement('h3');
       h3.textContent = 'Frage';
-      h3.style.cssText = 'color:#003b5c; margin:0 0 0.6rem; font-size:1rem;';
       card.appendChild(h3);
       const q = document.createElement('p');
       q.textContent = questionText;
-      q.style.cssText = 'margin:0 0 1rem; color:#111; line-height:1.45;';
       card.appendChild(q);
       const inpRow = document.createElement('div');
-      inpRow.style.cssText = 'display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;';
+      inpRow.className = 'bp-input-row';
       const inp = document.createElement('div');
-      inp.style.cssText = 'flex:1; border:1px solid #c6d1d8; border-radius:8px; padding:0.55rem 0.75rem; background:#f5f8fa; color:#888; font-size:0.88rem;';
+      inp.className = 'bp-input';
       inp.textContent = 'Zahl eingeben…';
       inpRow.appendChild(inp);
       if(activeConfig.unit){
         const u = document.createElement('span');
-        u.style.cssText = 'font-weight:700; color:#5d6872;';
+        u.className = 'bp-unit';
         u.textContent = activeConfig.unit;
         inpRow.appendChild(u);
       }
       card.appendChild(inpRow);
       const btn = document.createElement('span');
       btn.textContent = 'Korrektur';
-      btn.style.cssText = 'display:inline-block; background:#003b5c; color:#fff; padding:0.55rem 1.1rem; border-radius:999px; font-weight:700; font-size:0.88rem;';
+      btn.className = 'bp-btn';
       card.appendChild(btn);
       if(solution != null){
         const hint = document.createElement('div');
-        hint.style.cssText = 'background:#f5f8fa; border:1px solid #d8e0e6; border-left:6px solid #a1d884; border-radius:14px; padding:0.7rem 0.9rem; margin-top:1rem;';
-        hint.innerHTML = '<div style="font-weight:700; color:#003b5c; margin-bottom:0.2rem;">Beispiel-Lösung</div>' +
-          '<div style="color:#0f2d44; font-family:Courier New,monospace;">' + activeConfig.formula + ' = ' + solution +
+        hint.className = 'bp-hint';
+        hint.innerHTML = '<div class="bp-hint-title">Beispiel-Lösung</div>' +
+          '<div class="bp-hint-body">' + activeConfig.formula + ' = ' + solution +
           (activeConfig.unit ? ' ' + activeConfig.unit : '') + '</div>';
         card.appendChild(hint);
       }
