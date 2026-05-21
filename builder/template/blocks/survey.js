@@ -1,10 +1,5 @@
-// ============================================================================
-// survey.js: Umfrage / Feedback block - non-graded feedback collection
-// with three question types: rating (1-5 stars), single-select (radio
-// buttons), and free text. Answers are stored in cmi.suspend_data so the
-// LMS records them anonymously per learner. The block never affects the
-// score (graded=false) - it's purely formative feedback.
-// ============================================================================
+// survey.js: Non-graded feedback. Three question types: rating, single-select,
+// free text. Answers persist to cmi.suspend_data via api.persist().
 (function(){
   'use strict';
 
@@ -130,7 +125,6 @@
             block.appendChild(lbl);
           });
         } else {
-          // text
           const ta = document.createElement('textarea');
           ta.rows = 3;
           ta.placeholder = q.placeholder || '';
@@ -141,10 +135,8 @@
         form.appendChild(block);
       });
 
-      // Submit button - persists answers to suspend_data if API available.
-      // In builder-preview the api has no persist() function, so we mark
-      // the button disabled to make clear that this is "live preview" and
-      // clicking would do nothing.
+      // Builder preview lacks api.persist(); disable the submit button so
+      // it reads as "live preview, no submit".
       const submit = document.createElement('button');
       submit.type = 'button';
       submit.textContent = 'Absenden';
@@ -174,7 +166,6 @@
       return {};
     },
     preview(host, config){
-      // Pass an empty api so mount() detects preview-mode and disables submit.
       this.mount(host, config, {});
     }
   });

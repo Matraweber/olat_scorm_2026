@@ -1,10 +1,7 @@
 (function(){
   'use strict';
 
-  // Stock illustration used as the default Hotzone background so new blocks
-  // immediately show how the exercise works - and so the welcome-page live
-  // preview is meaningful rather than "(Kein Bild)".
-  // Inline SVG → data URL: a simple landscape with sun, cloud and tree.
+  // Stock illustration used as the welcome-preview background.
   const STOCK_LANDSCAPE_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">' +
       '<rect width="400" height="240" fill="#e7f3f8"/>' +
@@ -48,16 +45,13 @@
     builderSchema(){
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Hotzone' },
-        // Frage
         { type:'section', label:'Frage', key:'_sec_q' },
         { key:'prompt', label:'Aufgabentext', type:'math-textarea', rows:2 },
-        // Bild & Zonen
         { type:'section', label:'Bild & Zonen', key:'_sec_zones' },
         { key:'src',   label:'Bild', type:'image',
           help:'Bild hochladen oder URL eingeben.' },
         { key:'zones', label:'Hotzonen einzeichnen', type:'zone-editor',
           help:'Rechteck auf dem Bild ziehen → Zone hinzufügen. Zone anklicken → löschen.' },
-        // Einstellungen & Bewertung
         { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
         { key:'showZonesAfterCheck', label:'Nicht gefundene Zonen nach Korrektur anzeigen', type:'boolean' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }

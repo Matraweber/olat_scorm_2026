@@ -1,9 +1,6 @@
-// ============================================================================
-// scorm12.js: Thin wrapper around the SCORM 1.2 API exposed by the LMS.
-// The LMS injects an `API` object into a parent window; findAPI walks up the
-// window chain to locate it. All methods degrade to no-ops when no API is
-// present, so the runtime also works when opened standalone (outside an LMS).
-// ============================================================================
+// scorm12.js: Thin wrapper around the SCORM 1.2 LMS API. The LMS injects
+// `window.API` somewhere up the window chain. All methods no-op when no
+// API is present so the runtime also works standalone.
 function findAPI(win){
   let attempts = 0;
   while(win && attempts < 500){

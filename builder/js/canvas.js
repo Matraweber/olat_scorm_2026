@@ -1,11 +1,9 @@
-// ============================================================================
-// canvas.js: Canvas constants, default sizes, position helpers, snap algorithm,
-//             snap guides, block summary, autofit, drop-marker helpers.
-// ============================================================================
+// canvas.js: Canvas constants, default sizes, position helpers, snap
+// algorithm, snap guides, block summary, autofit, drop-marker helpers.
 import { el, cssEscape } from './util.js';
 import { state, pushHistory, render } from './state.js';
 
-// ---- Block-files registry (used for ZIP packaging and template loading) ----
+// Block-files registry, used for ZIP packaging and template loading.
 export const BLOCK_FILES = {
   'heading':           'heading.js',
   'rich-text':         'rich-text.js',
@@ -44,7 +42,6 @@ export function usedBlockTypes(){
   return Array.from(set);
 }
 
-// ---- Canvas dimensions ----
 export const CANVAS_WIDTH = 1100;
 export const SNAP_PX = 6;
 export const GRID = 8;
@@ -81,7 +78,7 @@ export function ensurePos(block, allBlocks){
 }
 export function ensureAllPos(blocks){ blocks.forEach(b => ensurePos(b, blocks)); }
 
-// ---- Snap algorithm ----
+// Snap algorithm
 const EDGE_LABELS = {
   left:'links', right:'rechts', cx:'Mitte X',
   top:'oben',  bottom:'unten', cy:'Mitte Y'
@@ -172,7 +169,7 @@ export function showSnapGuides(canvas, guides){
 }
 export function hideSnapGuides(canvas){ canvas.querySelectorAll('.snap-guide').forEach(g => g.remove()); }
 
-// ---- Drop markers (block list reordering) ----
+// Drop markers (block list reordering)
 export function clearDropMarkers(host){
   host.querySelectorAll('.drop-before, .drop-after').forEach(c => c.classList.remove('drop-before','drop-after'));
 }
@@ -185,11 +182,8 @@ export function findInsertIndex(listEl, y){
   return listEl.querySelectorAll('.block-edit-card').length;
 }
 
-// ---- Short summary text used when block preview can't render ----
-// Each block-template may declare `summary(cfg)` returning a one-line
-// description for the task-list / fallback rendering. If absent we fall back
-// to the block's label so unknown / legacy blocks still produce something
-// readable.
+// Block summary text used when preview can't render. Blocks may declare
+// summary(cfg); we fall back to the block's label.
 export function blockSummary(block){
   const def = window.Blocks.get(block.type);
   if(def && typeof def.summary === 'function'){
@@ -198,13 +192,9 @@ export function blockSummary(block){
   return (def && def.label) || block.type;
 }
 
-// ---- Content-fit height measurement helpers ----
-// Used by autoFitBlock plus the post-render autofit passes in task-pane.js
-// and task-pane-canvas.js. Centralised so all three agree on how to read a
-// block's rendered height (which may live inside a shadow-DOM mount host).
-
-// Measure the rendered content height of a canvas-block card.
-// Returns 0 if the card has no body or has not rendered yet.
+// Content-fit height. Centralised so autoFitBlock + the autofit passes
+// agree on how to read a height inside a shadow-DOM. Returns 0 when nothing
+// has rendered yet.
 export function measureCardContent(card){
   if(!card) return 0;
   const body = card.querySelector('.canvas-block-body');
@@ -217,8 +207,8 @@ export function measureCardContent(card){
   return body.scrollHeight;
 }
 
-// Compute the card height (head + content + padding) that snugly fits the
-// rendered content. Returns null when there is nothing measurable yet.
+// Card height = head + content + 8 px padding. Returns null when nothing
+// measurable is rendered yet.
 export function fitHeightForCard(card){
   const content = measureCardContent(card);
   if(content <= 0) return null;
@@ -227,7 +217,7 @@ export function fitHeightForCard(card){
   return Math.max(60, Math.round(content + headH + 8));
 }
 
-// ---- Auto-fit block height to its rendered content (button + Enter handler) ----
+// Auto-fit block height to its rendered content (button + Enter handler).
 export function autoFitBlock(block){
   const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscape(block.id) + '"]');
   const newH = fitHeightForCard(card);

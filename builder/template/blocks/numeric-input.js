@@ -154,13 +154,11 @@
     },
     preview(host, config){
       const activeConfig = numericPresetConfig(config);
-      // Pick a deterministic-looking example so the placeholder values stay
-      // identical across renders (no random shuffle in the welcome preview).
+      // Deterministic sample so the preview is stable across renders.
       const sample = { a: 7, b: 3, p: 20, g: 150, x: 4, y: 3 };
       const questionText = (activeConfig.questionTemplate || '(Aufgabe)')
         .replace(/\{(\w+)\}/g, (_, name) => (sample[name] != null ? sample[name] : '?'));
-      // Evaluate the formula with the same sample so the "Lösung"-Hint shows
-      // a concrete number, not the symbolic expression.
+      // Evaluate with the same sample so the Lösung-Hint shows a number.
       let solution = null;
       if(activeConfig.formula){
         try {

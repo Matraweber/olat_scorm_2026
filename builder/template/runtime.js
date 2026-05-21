@@ -1,19 +1,13 @@
-// ============================================================================
-// runtime.js: SCORM-1.2 player runtime. Loads tasks.json + theme.json,
-// builds the top navigation, renders each task's blocks onto an absolutely-
-// positioned canvas, tracks per-block scores, and pushes the aggregate
-// score into the LMS via scorm12.js.
-//
-// Per-task default sizes are duplicated from canvas.js because the runtime
-// must work standalone inside the SCORM ZIP without builder code.
-// ============================================================================
+// runtime.js: SCORM-1.2 player. Loads tasks.json + theme.json, builds the
+// top nav, renders blocks on an absolute-positioned canvas, tracks scores,
+// pushes aggregate to the LMS via scorm12.js. Default sizes are duplicated
+// from canvas.js because the runtime ships standalone in the SCORM ZIP.
 (function(){
   'use strict';
 
   const utils = window.BlockUtils;
   if(!utils) throw new Error('runtime.js: window.BlockUtils not loaded. Make sure utils.js is loaded before runtime.js.');
 
-  // ---- Runtime state ----
   let theme = null;
   let courseConfig = null;
   let currentPageIdx = -1;
@@ -45,7 +39,6 @@
     }
   }
 
-  // Default canvas size + per-block default sizes
   const CANVAS_WIDTH = 1100;
   const BLOCK_DEFAULT_SIZES = {
     'heading':           {w: 900, h: 72},
@@ -80,16 +73,15 @@
   }
 
   function migrateLegacyTask(task){
-    // Tab-based task: ensure positions for each tab's blocks
     if(task.tabs && Array.isArray(task.tabs)){
       task.tabs.forEach(t => { ensurePositions(t.blocks = t.blocks || []); });
       return task;
     }
-    // Backward compat: old monolithic task types that now live as blocks
     if(task.blocks){
       ensurePositions(task.blocks);
       return task;
     }
+    // Old monolithic task types map onto a single block.
     const legacyMap = {
       'complex-numbers': 'complex-question',
       'function-plot':   'function-question',
@@ -150,7 +142,7 @@
       const def = window.Blocks.get(b.type);
       return def && def.graded;
     });
-    if(graded.length === 0) return true; // content-only tasks count as done after view
+    if(graded.length === 0) return true; // content-only tasks count as done
     return graded.every(b => {
       const s = t.blockScores[b.id];
       return s && s.points >= s.max && s.max > 0;
@@ -238,7 +230,7 @@
       page.appendChild(h);
     }
 
-    // Optional tab navigation (per-task, e.g. Visualisierung + Aufgabe)
+    // Optional tab navigation per task.
     const useTabs = task.tabs && Array.isArray(task.tabs) && task.tabs.length >= 2;
     if(useTabs){
       if(task._activeTab == null) task._activeTab = 0;
@@ -259,7 +251,7 @@
       page.appendChild(tabNav);
     }
 
-    // Canvas: blocks are absolutely positioned per their pos.{x,y,w,h}
+    // Canvas: blocks absolutely positioned per pos.{x,y,w,h}.
     const canvas = document.createElement('div');
     canvas.className = 'task-canvas';
     canvas.style.width = CANVAS_WIDTH + 'px';
@@ -307,7 +299,6 @@
       };
       try {
         slot.blockInstances.push(def.mount(cell, block.config || {}, blockApi) || {});
-        // Render LaTeX inside this block, if KaTeX is loaded.
         utils.renderMath(cell);
       } catch(err){
         console.error('Block ' + block.type + ' mount error:', err);
@@ -365,7 +356,6 @@
   function bootstrap(){
     loadJson('__SCORM_THEME__', 'theme.json').then(t => { theme = t; applyTheme(t); }).catch(() => {});
     loadJson('__SCORM_TASKS__', 'tasks.json').then(cfg => {
-      // Migrate legacy tasks (old monolithic task type) into block-based form
       cfg.tasks = (cfg.tasks || []).map(migrateLegacyTask);
       courseConfig = cfg;
       document.title = cfg.courseTitle || 'SCORM Lerneinheit';

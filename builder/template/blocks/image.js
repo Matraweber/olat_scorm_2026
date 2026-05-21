@@ -1,8 +1,7 @@
 (function(){
   'use strict';
 
-  // Same stock illustration used by hotzone.js - kept inline so each block
-  // module is self-contained and loads without network.
+  // Same SVG as hotzone.js, inlined so each block file is self-contained.
   const STOCK_LANDSCAPE_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">' +
       '<rect width="400" height="240" fill="#e7f3f8"/>' +

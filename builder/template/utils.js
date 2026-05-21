@@ -1,13 +1,7 @@
-// ============================================================================
-// utils.js: Shared helpers passed into every block's mount() as `api.utils`.
-// Provides: DOM/SVG element builders, number/angle parsing, a safe math-
-// expression evaluator, two ready-made question-card layouts (questionCard /
-// simpleQuestionCard), a coordinate-plane renderer (renderPlane), a feedback
-// box, and the KaTeX auto-render bootstrap (utils.renderMath).
-//
-// Block modules use these so each block stays small and visually consistent
-// with the rest of the runtime.
-// ============================================================================
+// utils.js: Helpers passed into every block's mount() as `api.utils`.
+// DOM/SVG builders, number/angle parsing, safe math-expression evaluator,
+// questionCard / simpleQuestionCard layouts, renderPlane, feedbackBox,
+// and the KaTeX auto-render bootstrap (renderMath).
 (function(){
   'use strict';
   if(window.BlockUtils) return;
@@ -113,26 +107,10 @@
         neutral(msg){ box.classList.remove('feedback-good','feedback-bad'); text.textContent = msg; }
       };
     },
-    /**
-     * Standard question card layout used by numeric-input, number-base, and
-     * other "ask a question, accept a single text answer, check, regenerate"
-     * style blocks.
-     *
-     * opts: {
-     *   h3?: string              // section heading (default 'Aufgabe')
-     *   qBoxTitle?: string       // title of the formula-box (default 'Aufgabe')
-     *   inputLabel?: string      // label for the answer input (default 'Antwort')
-     *   inputPlaceholder?: string // placeholder for the answer input
-     * }
-     *
-     * Returns: { card, qText, inp, checkBtn, newBtn, fb }
-     *  - qText: the element to set the question text into
-     *  - inp:   the answer <input>
-     *  - checkBtn / newBtn: buttons (attach onclick handlers yourself)
-     *  - fb:    feedbackBox API { ok, bad, neutral }
-     *
-     * The card is appended to `host` automatically.
-     */
+    // Standard question card: heading, question box, single text input,
+    // Korrektur + Neu generieren buttons, feedback box.
+    // opts: { h3?, qBoxTitle?, inputLabel?, inputPlaceholder? }
+    // Returns: { card, qText, inp, checkBtn, newBtn, fb }
     questionCard(host, opts){
       opts = opts || {};
       const card = document.createElement('section');
@@ -183,24 +161,9 @@
 
       return { card, qText, inp, checkBtn, newBtn, fb };
     },
-    /**
-     * Simpler question-card layout used by blocks where the answer area is
-     * not a single text input (multiple-choice, sort-list, text-input, hotzone).
-     * Layout matches questionCard / numeric-input visually: section-card > h3 >
-     * formula-box (Frage label + question text) > content > button-cluster > feedback.
-     *
-     * opts: {
-     *   title?: string         // h3 text (block-level title; default 'Aufgabe')
-     *   qBoxTitle?: string     // formula-box title (default 'Frage')
-     *   question?: string      // textual question; rendered into formula-text
-     *   questionHtml?: string  // HTML question; rendered into formula-text (overrides question)
-     * }
-     * Returns: { card, qText, content, buttons, fb }
-     *   qText:   the formula-text div (caller can update later)
-     *   content: empty <div> placeholder where caller appends block-specific UI
-     *   buttons: <div class="button-cluster"> for caller to append <button>s
-     *   fb:      feedbackBox API
-     */
+    // Question card variant for blocks with custom answer UIs (MC, sort-list,
+    // text-input, hotzone). opts: { title?, qBoxTitle?, question? | questionHtml? }
+    // Returns: { card, qText, content, buttons, fb }
     simpleQuestionCard(host, opts){
       opts = opts || {};
       const card = document.createElement('section');
@@ -209,7 +172,6 @@
       h.textContent = opts.title || 'Aufgabe';
       card.appendChild(h);
 
-      // Wrap the question in a formula-box for visual consistency with numeric-input/questionCard
       const hasQuestion = (opts.questionHtml != null && String(opts.questionHtml).trim() !== '') ||
                           (opts.question != null && String(opts.question).trim() !== '');
       const qBox = document.createElement('div');
@@ -236,18 +198,8 @@
       host.appendChild(card);
       return { card, qText, content, buttons, fb };
     },
-    /**
-     * Standard preview wrapper used in the builder canvas: a small padded div
-     * with an optional green tag (icon + label) at the top. Caller appends
-     * block-specific content to the returned wrap.
-     *
-     * opts: {
-     *   icon?: string        // short icon string, e.g. '#', '↕', '⇄'
-     *   label?: string       // label text after the icon
-     *   fillHeight?: boolean // set height:100%; overflow:hidden on wrap
-     * }
-     * Returns: the wrap element (also the body: caller appends content to it).
-     */
+    // Builder-canvas preview wrapper: padded div with an optional green
+    // icon+label tag at the top. opts: { icon?, label?, fillHeight? }.
     tagPreview(host, opts){
       opts = opts || {};
       const wrap = document.createElement('div');
@@ -351,9 +303,8 @@
     host.appendChild(svg);
   };
 
-  // Auto-render LaTeX math inside an element using KaTeX (loaded via <script> in index.html).
-  // Recognised delimiters: $...$, $$...$$, \(...\), \[...\]. No-op if KaTeX isn't loaded yet
-  // (will be re-rendered once it does load: see retryQueue below).
+  // Auto-render LaTeX via KaTeX. Delimiters: $...$, $$...$$, \(...\), \[...\].
+  // If KaTeX isn't loaded yet, queue and retry every 100 ms.
   const _mathRetryQueue = [];
   let _katexWatcher = null;
   function _runMathRenderOn(root){
@@ -368,7 +319,7 @@
         throwOnError: false,
         ignoredTags: ['script','noscript','style','textarea','pre','code']
       });
-    } catch(e){ /* swallow render errors */ }
+    } catch(e){}
   }
   utils.renderMath = function(root){
     if(!root) return;
@@ -376,7 +327,6 @@
       _runMathRenderOn(root);
       return;
     }
-    // KaTeX not loaded yet: queue and re-attempt every 100ms until it arrives.
     _mathRetryQueue.push(root);
     if(_katexWatcher) return;
     _katexWatcher = setInterval(() => {
@@ -387,9 +337,7 @@
     }, 100);
   };
 
-  // Random helpers
-  // Fisher-Yates in-place shuffle. Returns the same array reference for
-  // chaining. Used by block runtimes to randomise answer order.
+  // Fisher-Yates in-place shuffle. Returns the same array for chaining.
   utils.shuffle = function(arr){
     if(!Array.isArray(arr)) return arr;
     for(let i = arr.length - 1; i > 0; i--){

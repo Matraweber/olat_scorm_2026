@@ -1,13 +1,11 @@
-// ============================================================================
-// preview.js: Render a block's real runtime mount() inside an isolated
-// Shadow DOM, so the builder canvas matches the SCORM preview exactly.
-// Falls back to def.preview() or a text summary if mount() isn't possible.
-// ============================================================================
+// preview.js: Run the real block mount() inside an isolated Shadow DOM so
+// the builder canvas matches the SCORM preview exactly. Falls back to
+// def.preview() or a text summary if mount() isn't usable.
 import { el } from './util.js';
 import { state } from './state.js';
 import { blockSummary } from './canvas.js';
 
-// ---- Cache for runtime stylesheet (injected into each shadow root) ----
+// Cached runtime stylesheet, injected into each shadow root.
 let _runtimeStylesText = null;
 let _runtimeStylesPromise = null;
 
@@ -25,11 +23,10 @@ export function loadRuntimeStyles(){
   return _runtimeStylesPromise;
 }
 
-// Preload once on first use; re-render whatever's already on screen.
+// Preload once; re-render whatever's already mounted.
 loadRuntimeStyles().then(() => { try { renderCanvasAll(); } catch(e){} });
 
 export function renderCanvasAll(){
-  // Re-render every canvas-block-body that has a [data-block-id] in the document.
   document.querySelectorAll('.canvas-block-card').forEach(card => {
     const id = card.dataset.blockId;
     const body = card.querySelector('.canvas-block-body');
@@ -45,16 +42,14 @@ function makeStubApi(block){
   return {
     utils: window.BlockUtils,
     blockId: 'preview_' + String(block.id || '').replace(/[^A-Za-z0-9_]/g, ''),
-    initScore(){ /* no-op in builder preview */ },
-    reportScore(){ /* no-op in builder preview */ }
+    initScore(){},
+    reportScore(){}
   };
 }
 
-// API passed to builderMount() for blocks that opt into in-canvas editing.
-// The block mutates `block.config` directly and calls `requestConfigRefresh`
-// to ask the right-side config pane to re-render. `stopBlockSelection` is
-// called on internal pointer events so they don't trigger the card-level
-// drag/select handler in task-pane-canvas.js.
+// API for blocks that opt into in-canvas editing via builderMount(). They
+// mutate block.config directly and call requestConfigRefresh to update the
+// right-side config pane.
 function makeBuilderApi(block, host){
   return {
     utils: window.BlockUtils,
@@ -72,21 +67,18 @@ export function renderBlockPreview(host, block){
   host.innerHTML = '';
   const def = window.Blocks.get(block.type);
 
-  // Blocks that opt into interactive in-canvas editing register a
-  // `builderMount(host, block, api)` method. Rendered in regular DOM so
-  // drag/click work without pointer-events tricks.
+  // builderMount() = interactive in-canvas editor, rendered in regular DOM
+  // so drag/click work without pointer-events tricks.
   if(def && typeof def.builderMount === 'function' && window.BlockUtils){
     try {
       def.builderMount(host, block, makeBuilderApi(block, host));
       return;
     } catch(e){
       host.innerHTML = '';
-      // Fall through to the standard mount() path on error.
     }
   }
 
-  // Standard path: real runtime mount() inside an isolated shadow DOM so the
-  // canvas matches the SCORM preview exactly.
+  // Standard path: real mount() inside an isolated shadow DOM.
   if(def && typeof def.mount === 'function' && window.BlockUtils){
     try {
       const shadowHost = document.createElement('div');
@@ -102,7 +94,7 @@ export function renderBlockPreview(host, block){
         '.canvas-mount-wrap { padding: 0.55rem 0.7rem; }\n';
       shadow.appendChild(styleEl);
 
-      // Mirror the page's KaTeX stylesheet so math renders inside shadow root.
+      // Mirror KaTeX stylesheet so math renders inside the shadow root.
       document.querySelectorAll('link[rel="stylesheet"][href*="katex"]').forEach(l => {
         const link = document.createElement('link');
         link.rel = 'stylesheet'; link.href = l.href; link.crossOrigin = 'anonymous';
@@ -113,7 +105,7 @@ export function renderBlockPreview(host, block){
       mountHost.className = 'canvas-mount-wrap';
       shadow.appendChild(mountHost);
 
-      // Stabilise random/shuffle config so the canvas stays static while editing.
+      // Stabilise random/shuffle so the canvas stays still while editing.
       const stableConfig = Object.assign({}, block.config || {}, { shuffle: false, randomize: false });
       def.mount(mountHost, stableConfig, makeStubApi(block));
       if(window.BlockUtils && typeof window.BlockUtils.renderMath === 'function'){
@@ -122,13 +114,12 @@ export function renderBlockPreview(host, block){
       return;
     } catch(e){
       host.innerHTML = '';
-      // Fall through to legacy preview()
     }
   }
 
   if(def && typeof def.preview === 'function'){
     try { def.preview(host, block.config || {}); return; }
-    catch(e){ /* fall through to summary text */ }
+    catch(e){}
   }
   // Fallback: text summary
   const span = document.createElement('span');

@@ -7,9 +7,7 @@
     icon: '☑',
     graded: true,
     defaultConfig(){
-      // Fresh block on the canvas starts empty - the user fills it in.
-      // For the welcome-page preview we expose `previewConfig` below with a
-      // populated example so the modal isn't blank.
+      // Fresh block starts empty; previewConfig() supplies a populated demo.
       return {
         blockTitle: '',
         preset: 'custom',
@@ -62,10 +60,8 @@
           {value:'example-math',   label:'Beispiel: Mathematik, Ableitungsregeln (Einfachauswahl)'}
         ], help:'Beispiele zeigen die Möglichkeiten des Blocks. Eigene Inhalte unter „Manuell" eingeben.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        // Frage
         { type:'section', label:'Frage', key:'_sec_q', showIf: isCustom },
         { key:'question', label:'Fragetext', type:'math-textarea', rows:2, showIf: isCustom },
-        // Antworten
         { type:'section', label:'Antwortmöglichkeiten', key:'_sec_choices', showIf: isCustom },
         { key:'choices', label:'Antworten', type:'list', itemLabel:'Antwort',
           showIf: isCustom,
@@ -74,11 +70,9 @@
             { key:'text',    label:'Antworttext', type:'text', fullWidth:true },
             { key:'correct', label:'Ist richtig', type:'boolean' }
           ]},
-        // Einstellungen
         { type:'section', label:'Einstellungen', key:'_sec_opts', showIf: isCustom },
         { key:'multi',   label:'Mehrfachauswahl erlauben', type:'boolean', showIf: isCustom },
         { key:'shuffle', label:'Antworten mischen',        type:'boolean', showIf: isCustom },
-        // Bewertung
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
         { key:'partialCredit', label:'Teilpunkte bei Mehrfachauswahl', type:'boolean',

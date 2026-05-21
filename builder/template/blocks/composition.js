@@ -1,19 +1,17 @@
 (function(){
   'use strict';
 
-  // Module-scope clipboard: a deep-cloned shape stashed by Ctrl+C, pasted by
-  // Ctrl+V. Persists across builderMount calls and shared across composition
-  // blocks, so the user can copy in one block and paste in another.
+  // Module-scope clipboard, shared across composition blocks so Ctrl+C in
+  // one and Ctrl+V in another works.
   let _compClipboard = null;
 
-  // SVG namespace + helpers
   const NS = 'http://www.w3.org/2000/svg';
   const DASH = { solid: '', dashed: '10 5', dotted: '2 4' };
   const SHAPE_LABELS = {
     line:'Linie', arrow:'Pfeil', circle:'Kreis', ellipse:'Ellipse', polygon:'Polygon',
     rect:'Rechteck', label:'Beschriftung', coords:'Koordinatensystem', image:'Bild'
   };
-  // Inline SVG icons for toolbar shape buttons (kept compact + monochrome).
+  // Inline SVG icons for toolbar shape buttons.
   const SHAPE_ICONS = {
     line:    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="16" x2="17" y2="4"/></svg>',
     arrow:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="10" x2="15" y2="10"/><polyline points="11,6 17,10 11,14"/></svg>',
@@ -26,36 +24,32 @@
     image:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1"/><circle cx="8" cy="9" r="1.3" fill="currentColor" stroke="none"/><path d="M3 14 L8 10 L13 14 L17 11"/></svg>'
   };
 
-  // Action-button icons (z-order, duplicate, delete) used in the right
-  // toolbar group when a shape is selected.
+  // Action-button icons (z-order, duplicate, delete) in the right toolbar
+  // group when a shape is selected.
   const ACTION_ICONS = {
     forward:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7" width="10" height="10" rx="1" fill="#fff"/><rect x="7" y="3" width="10" height="10" rx="1" fill="currentColor" fill-opacity="0.15"/></svg>',
     backward:  '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="7" y="3" width="10" height="10" rx="1" fill="#fff"/><rect x="3" y="7" width="10" height="10" rx="1" fill="currentColor" fill-opacity="0.15"/></svg>',
     duplicate: '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="11" height="11" rx="1"/><rect x="6" y="6" width="11" height="11" rx="1" fill="#fff"/></svg>',
     delete:    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 6h10M8 6V4h4v2M6 6l1 11h6l1-11" stroke-linecap="round"/></svg>',
-    // Crossed-out square: "transparent / no fill" toggle. Active state is
-    // applied via the .comp-tool-btn-active class on the surrounding button.
+    // Crossed-out square: transparent/no-fill toggle.
     transparent: '<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="3.5" width="13" height="13" rx="2"/><line x1="4" y1="16" x2="16" y2="4"/></svg>'
   };
 
-  // Sentinel value used to mark a color as "transparent / none". We use
-  // 'none' for fill (SVG default for no fill) and 'transparent' for stroke
-  // - both are valid CSS values that render as fully transparent.
+  // 'none' (fill) / 'transparent' (stroke): SVG/CSS sentinels for no paint.
   const NONE_FILL = 'none';
   const NONE_STROKE = 'transparent';
   function isNoneColor(v){ return v === 'none' || v === 'transparent' || v === '' || v == null; }
 
-  // Shape factory used by both the toolbar add-buttons and the right-pane
-  // action handler (task-pane-config.js).
+  // Shape factory used by the toolbar add-buttons and the right-pane
+  // action handler.
   const SHAPE_DEFAULTS = {
     line:    () => ({ type:'line',    x1: 80, y1: 80, x2: 260, y2: 80,  color:'#003b5c', strokeWidth: 3, dash:'solid' }),
     arrow:   () => ({ type:'arrow',   x1: 80, y1: 80, x2: 260, y2: 80,  color:'#003b5c', strokeWidth: 3, dash:'solid' }),
     circle:  () => ({ type:'circle',  cx:140, cy:140, r: 60,            color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' }),
     ellipse: () => ({ type:'ellipse', cx:160, cy:140, rx: 90, ry: 50,   color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' }),
     polygon: () => {
-      // Pre-fill `points` so the polygon starts as a regular 3-gon but is
-      // already in the editable representation. The cx/cy/r/sides metadata
-      // is preserved for "Regulär machen" + the Ecken input.
+      // Start as a regular 3-gon already in editable representation.
+      // cx/cy/r/sides stay around for "Regulär machen" + Ecken input.
       const cx = 160, cy = 140, r = 70, sides = 3;
       return { type:'polygon', cx, cy, r, sides,
                points: regularPolygonPoints(cx, cy, r, sides),
@@ -73,8 +67,8 @@
     return factory ? factory() : { type };
   }
 
-  // Opens a hidden <input type=file>, reads the chosen image as a data URL,
-  // and resolves the promise. Resolves with null if the user cancels.
+  // Pick an image via hidden <input type=file>, return its data URL.
+  // Resolves with null on cancel.
   function pickImageDataUrl(){
     return new Promise(resolve => {
       const inp = document.createElement('input');
@@ -95,8 +89,7 @@
         reader.onerror = () => { cleanup(); resolve(null); };
         reader.readAsDataURL(file);
       });
-      // Re-focus fallback: if the user cancels the OS dialog, no `change`
-      // fires but the window regains focus. Use that to remove the input.
+      // Cancel-via-OS-dialog: no `change` fires but the window regains focus.
       window.addEventListener('focus', function onFocus(){
         window.removeEventListener('focus', onFocus);
         setTimeout(() => { if(!inp.files || !inp.files[0]){ cleanup(); resolve(null); } }, 250);
@@ -117,8 +110,7 @@
     return name;
   }
 
-  // Compute regular n-gon vertex points as [[x,y], …]. Vertices start at the
-  // top (angle -π/2) and proceed clockwise.
+  // Regular n-gon vertices, starting at top (angle -π/2), clockwise.
   function regularPolygonPoints(cx, cy, r, sides){
     const n = Math.max(3, Math.round(Number(sides) || 3));
     const radius = Math.max(1, Number(r) || 10);
@@ -129,8 +121,8 @@
     }
     return pts;
   }
-  // Return the polygon's vertices as [[x,y], …]. Free-form polygons store
-  // their own `points` array; legacy regular polygons compute from cx/cy/r/sides.
+  // Return polygon vertices. Free-form uses shape.points; legacy regular
+  // polygons compute from cx/cy/r/sides.
   function polygonGetPoints(shape){
     if(Array.isArray(shape.points) && shape.points.length >= 3){
       return shape.points.map(p => Array.isArray(p) ? [Number(p[0]) || 0, Number(p[1]) || 0] : [0, 0]);
@@ -142,11 +134,10 @@
       Number(shape.sides) || 3
     );
   }
-  // SVG attribute string for `points`.
   function polygonPointsAttr(shape){
     return polygonGetPoints(shape).map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
   }
-  // Centroid of the polygon - used as a fixed point for uniform scaling.
+  // Centroid: fixed point for uniform scaling.
   function polygonCentroid(shape){
     const pts = polygonGetPoints(shape);
     let sx = 0, sy = 0;
@@ -154,7 +145,7 @@
     return { x: sx / pts.length, y: sy / pts.length };
   }
 
-  // Pure SVG render (used by runtime mount + builder editor + preview)
+  // Pure SVG render, shared by runtime mount, builder editor, and preview.
   function buildArrowhead(color, id){
     const m = document.createElementNS(NS, 'marker');
     m.setAttribute('id', id);
@@ -168,9 +159,8 @@
     m.appendChild(p);
     return m;
   }
-  // Render a Cartesian coordinate system as an SVG <g>. Grid + axes + ticks
-  // are positioned relative to (shape.x, shape.y) so the whole system can be
-  // moved by changing those two values (no need to recompute the children).
+  // Cartesian coordinate system as an SVG <g>, positioned at (shape.x,
+  // shape.y) so moving the whole system is just two attribute changes.
   function renderCoords(shape){
     const g = document.createElementNS(NS, 'g');
     const x = Number(shape.x) || 0;
@@ -188,8 +178,7 @@
     const toSvgX = dx => x + (dx - xMin) / (xMax - xMin) * w;
     const toSvgY = dy => y + (yMax - dy) / (yMax - yMin) * h;
 
-    // Invisible hit-rect so the entire bounding area is draggable, not just
-    // the thin axis lines.
+    // Invisible hit-rect so the whole area is draggable, not just the axes.
     const hit = document.createElementNS(NS, 'rect');
     hit.setAttribute('x', x); hit.setAttribute('y', y);
     hit.setAttribute('width', w); hit.setAttribute('height', h);
@@ -258,8 +247,7 @@
     return g;
   }
 
-  // Tiny inline placeholder used when an image shape has no src yet (just
-  // after the user added it but before the file picker resolved).
+  // Placeholder for an image shape with no src yet.
   function placeholderImage(){
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">' +
@@ -324,20 +312,17 @@
       el.setAttribute('font-family', 'Verdana, Arial, sans-serif');
       el.textContent = shape.text || '';
     } else if(shape.type === 'coords'){
-      // Coordinate system: an SVG group containing grid lines, axes, tick
-      // labels, and a transparent rect that captures pointer events so the
-      // whole system can be dragged from anywhere inside it.
       el = renderCoords(shape);
     } else if(shape.type === 'image'){
       el = document.createElementNS(NS, 'image');
       el.setAttribute('x', shape.x ?? 0); el.setAttribute('y', shape.y ?? 0);
       el.setAttribute('width',  shape.w ?? 100); el.setAttribute('height', shape.h ?? 80);
-      // `href` is the modern attribute; older SVG parsers may also use xlink:href.
+      // Set both href and xlink:href for older SVG parsers.
       if(shape.src){
         el.setAttribute('href', shape.src);
         el.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', shape.src);
       } else {
-        // Empty image: draw a placeholder so the shape is still selectable.
+        // Placeholder so empty shapes stay selectable.
         el.setAttribute('href', placeholderImage());
       }
       el.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -370,26 +355,21 @@
     return svg;
   }
 
-  // In-canvas Photoshop-style editor
-  // Toolbar on top, SVG below. Click a shape to select it; drag to move; for
-  // lines/arrows the two endpoints can be dragged individually. The toolbar's
-  // colour pickers + style controls operate on the currently selected shape.
+  // In-canvas editor: toolbar on top, SVG below. Click to select, drag to
+  // move, line/arrow endpoints draggable individually.
   function builderMount(host, block, api){
     if(!block.config) block.config = {};
     if(!Array.isArray(block.config.shapes)) block.config.shapes = [];
-    // Selection state:
-    //   _compSelection: number[]   canonical multi-selection (indices)
-    //   _compSelected:  number     "primary" index, -1 if 0 or 2+ selected
-    //                              (kept for toolbar code that wants a single shape)
+    // _compSelection: number[] (canonical multi-select indices)
+    // _compSelected:  number   (primary, -1 if 0 or 2+ selected)
     if(!Array.isArray(block._compSelection)){
-      // Migrate from legacy single-selection if present.
+      // Migrate legacy single-selection.
       block._compSelection = (typeof block._compSelected === 'number' && block._compSelected >= 0)
         ? [block._compSelected] : [];
     }
     if(block._compSelected == null) block._compSelected = -1;
     if(!block._compTool) block._compTool = 'move'; // 'move' | 'select'
 
-    // Selection helpers
     function selIndices(){ return Array.isArray(block._compSelection) ? block._compSelection : []; }
     function syncPrimary(){
       const a = selIndices();
@@ -417,27 +397,23 @@
       block._compSelection = a; syncPrimary();
     }
 
-    // Composition-level undo/redo
-    // History is kept on the block itself so it survives editor re-mounts
-    // (e.g. when the right-pane refresh re-runs builderMount). One snapshot
-    // is taken per "interaction" - held-down keys and continuous drags get a
-    // single entry thanks to the debounce below.
+    // Composition-level undo/redo. History lives on the block so it survives
+    // editor re-mounts. One snapshot per interaction thanks to the debounce.
     const HISTORY_MAX = 80;
     if(!block._compHistory){
       block._compHistory = {
         stack: [JSON.parse(JSON.stringify(block.config))],
         pointer: 0,
-        pending: false   // a debounced push is queued
+        pending: false
       };
     }
     let _historyTimer = null;
     function snapshotHistory(){
       const h = block._compHistory;
-      // Truncate any forward-redo branch.
       h.stack = h.stack.slice(0, h.pointer + 1);
       const snap = JSON.parse(JSON.stringify(block.config));
-      // Skip if identical to top of stack - avoids creating a no-op entry
-      // when several commits in a row land on the same end state.
+      // Skip identical-to-top so a series of commits at the same end state
+      // doesn't pile up no-op entries.
       const top = h.stack[h.pointer];
       if(top && JSON.stringify(top) === JSON.stringify(snap)) return;
       h.stack.push(snap);
@@ -445,8 +421,7 @@
       h.pointer = h.stack.length - 1;
     }
     function applySnapshot(snap){
-      // Replace block.config in place while keeping the same reference so
-      // existing handlers continue to mutate the right object.
+      // Mutate block.config in place to keep the reference stable.
       Object.keys(block.config).forEach(k => { delete block.config[k]; });
       Object.assign(block.config, JSON.parse(JSON.stringify(snap)));
     }
@@ -454,9 +429,8 @@
       if(_historyTimer){ clearTimeout(_historyTimer); _historyTimer = null; snapshotHistory(); }
     }
     function undoComposition(){
-      // Flush BEFORE checking pointer - otherwise an immediate undo right
-      // after a change would see pointer===0 (snapshot not taken yet) and
-      // wrongly fall through to the global handler.
+      // Flush before checking pointer, otherwise an immediate undo right
+      // after a change would fall through to the global handler.
       flushPendingSnapshot();
       const h = block._compHistory;
       if(h.pointer <= 0) return false;
@@ -479,20 +453,19 @@
       return true;
     }
 
-    // Defer the right-pane refresh (which rebuilds the entire config form
-    // and is the slow part) to the next animation frame so the editor paints
-    // immediately. Multiple rapid commits (e.g. held-down arrow / Ctrl+D)
-    // collapse into a single refresh + a single history snapshot.
+    // Defer the right-pane refresh (rebuilds the whole config form) to the
+    // next frame so the editor paints immediately. Rapid commits collapse
+    // into one refresh + one history snapshot.
     let _refreshHandle = null;
     function commit(){
-      render(); // synchronous - user sees the change next paint
+      render();
       if(_refreshHandle){ cancelAnimationFrame(_refreshHandle); }
       _refreshHandle = requestAnimationFrame(() => {
         _refreshHandle = null;
         api.requestConfigRefresh();
       });
-      // Debounced history: ~250 ms of idle = one snapshot. This means held
-      // arrows or a drag-resize get rolled into a single undoable step.
+      // 250 ms idle = one history snapshot, so held arrows / drag-resize
+      // collapse into a single undoable step.
       if(_historyTimer) clearTimeout(_historyTimer);
       _historyTimer = setTimeout(() => {
         _historyTimer = null;
@@ -504,8 +477,7 @@
       render();
     }
     function getSelected(){
-      // Returns the shape only when EXACTLY ONE is selected - used by the
-      // toolbar style controls that operate on a single shape.
+      // Single-shape only; used by toolbar style controls.
       const a = selIndices();
       if(a.length !== 1) return null;
       const i = a[0];
@@ -521,8 +493,8 @@
       host.innerHTML = '';
       const wrap = document.createElement('div');
       wrap.className = 'comp-editor';
-      // Stop the card-level drag (task-pane-canvas.js) from firing inside
-      // the editor. The user drags the block itself by its header.
+      // Stop the card-level drag from firing inside the editor; the user
+      // drags the block by its header.
       wrap.addEventListener('mousedown', e => e.stopPropagation());
       wrap.appendChild(buildToolbar());
       wrap.appendChild(buildCanvas());
@@ -545,7 +517,7 @@
       const bar = document.createElement('div');
       bar.className = 'comp-toolbar';
 
-      // Tool-mode group: Move / Select
+      // Tool-mode: Move / Select
       const toolGroup = document.createElement('div');
       toolGroup.className = 'comp-tool-group';
       function mkToolBtn(toolKey, title, iconHtml){
@@ -568,7 +540,7 @@
         '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1" stroke-dasharray="3 2"/><path d="M9 9 L13 13 M11 13 L13 13 L13 11" fill="currentColor"/></svg>');
       bar.appendChild(toolGroup);
 
-      // Left group: add-shape buttons
+      // Add-shape buttons
       const addGroup = document.createElement('div');
       addGroup.className = 'comp-tool-group';
       ['line','arrow','circle','ellipse','polygon','rect','label','coords','image'].forEach(type => {
@@ -580,7 +552,7 @@
         btn.addEventListener('click', e => {
           e.stopPropagation();
           if(type === 'image'){
-            // Open a file picker; only add the shape once a file is chosen.
+            // Only add the shape after the file picker resolves.
             pickImageDataUrl().then(src => {
               if(!src) return;
               const shape = newShape('image');
@@ -599,16 +571,13 @@
       });
       bar.appendChild(addGroup);
 
-      // Middle: style controls (only active when a shape is selected)
+      // Style controls (active only when a shape is selected).
       const styleGroup = document.createElement('div');
       styleGroup.className = 'comp-tool-group comp-style-group';
       if(!sel) styleGroup.classList.add('comp-tool-group-disabled');
 
-      // Color picker + "Transparent" toggle. The toggle stores a sentinel
-      // value ('none' / 'transparent') in the shape; clicking it again
-      // restores either the last-picked color or a sensible default. Labels
-      // can be transparent only if you want them invisible (rare), but for
-      // shape outlines and fills it's a common need.
+      // Color picker + Transparent toggle. The toggle stores 'none' (fill)
+      // or 'transparent' (stroke); clicking restores the previous color.
       function mkColorControl(label, currentValue, noneValue, restoreDefault, onSet, opts){
         const lbl = document.createElement('span');
         lbl.className = 'comp-tool-label';
@@ -632,7 +601,7 @@
           const noBtn = document.createElement('button');
           noBtn.type = 'button';
           noBtn.className = 'comp-tool-btn comp-tool-btn-sm' + (transparent ? ' comp-tool-btn-active' : '');
-          noBtn.title = transparent ? 'Transparent aktiv - klicken für Farbe' : 'Auf transparent setzen';
+          noBtn.title = transparent ? 'Transparent aktiv. Klicken für Farbe' : 'Auf transparent setzen';
           noBtn.innerHTML = ACTION_ICONS.transparent;
           noBtn.addEventListener('click', e => {
             e.stopPropagation();
@@ -649,10 +618,8 @@
         const label = (sel && sel.type === 'label') ? 'Text'
                     : (sel && sel.type === 'coords') ? 'Achse'
                     : 'Linie';
-        // Transparent stroke makes the shape outline disappear (useful for
-        // fill-only shapes). Disable the toggle for labels and coords, where
-        // a hidden colour would either hide the text or make the axis
-        // disappear - confusing more than useful.
+        // Transparent doesn't make sense for labels (would hide the text)
+        // or coords (would hide the axes).
         const allowTrans = !!sel && sel.type !== 'label' && sel.type !== 'coords';
         mkColorControl(
           label,
@@ -664,7 +631,7 @@
         );
       }
 
-      // Fill colour (filled shapes only) - always pair with a transparent toggle.
+      // Fill colour, only for filled shapes.
       if(sel && (sel.type === 'circle' || sel.type === 'ellipse' || sel.type === 'polygon' || sel.type === 'rect')){
         mkColorControl(
           'Füllung',
@@ -676,9 +643,8 @@
         );
       }
 
-      // Polygon-only: number-of-sides ("Ecken") input + "Regulär" button.
-      // Changing Ecken regenerates the polygon as a regular n-gon centered on
-      // the current centroid (using current `r` so size is preserved).
+      // Polygon-only: Ecken input + Regulär button. Changing Ecken
+      // regenerates as a regular n-gon at the current centroid + r.
       if(sel && sel.type === 'polygon'){
         const sLbl = document.createElement('span');
         sLbl.className = 'comp-tool-label';
@@ -701,8 +667,7 @@
         });
         styleGroup.appendChild(sInp);
 
-        // "Regulär machen" button: snap a deformed polygon back to a regular
-        // n-gon with the same centroid + radius.
+        // Snap a deformed polygon back to a regular n-gon (same centroid).
         const regBtn = document.createElement('button');
         regBtn.type = 'button';
         regBtn.className = 'comp-tool-btn-text';
@@ -712,8 +677,7 @@
           e.stopPropagation();
           const c = polygonCentroid(sel);
           const pts = polygonGetPoints(sel);
-          // Use the average vertex distance as the new radius - closer to the
-          // current size than just reusing sel.r.
+          // Average vertex distance hugs the current size better than sel.r.
           let avg = 0; pts.forEach(p => { avg += Math.hypot(p[0]-c.x, p[1]-c.y); });
           const r = Math.max(10, avg / pts.length);
           sel.r = r; sel.cx = c.x; sel.cy = c.y;
@@ -723,7 +687,7 @@
         styleGroup.appendChild(regBtn);
       }
 
-      // Stroke width + dash: for outlined shapes (skip labels/images/coords).
+      // Stroke width + dash for outlined shapes.
       if(sel && (sel.type === 'line' || sel.type === 'arrow' || sel.type === 'circle' || sel.type === 'ellipse' || sel.type === 'polygon' || sel.type === 'rect')){
         const swLbl = document.createElement('span');
         swLbl.className = 'comp-tool-label';
@@ -751,7 +715,7 @@
         styleGroup.appendChild(dashSel);
       }
 
-      // Label text editor + font size
+      // Label: text + font size
       if(sel && sel.type === 'label'){
         const textLbl = document.createElement('span');
         textLbl.className = 'comp-tool-label';
@@ -777,9 +741,7 @@
         styleGroup.appendChild(fs);
       }
 
-      // Coordinate-system toggles: grid + axis labels on/off, plus axis-range
-      // editing so the author can set xMin/xMax/yMin/yMax/step directly from
-      // the canvas toolbar without diving into the JSON list editor.
+      // Coordinate system: grid/labels toggles + axis-range editing.
       if(sel && sel.type === 'coords'){
         const mkToggle = (key, label, defaultOn) => {
           const wrap = document.createElement('label');
@@ -835,7 +797,7 @@
         styleGroup.appendChild(stepInp);
       }
 
-      // Image: "Bild ersetzen" button to swap the source via the file picker.
+      // Image: "Bild ersetzen" via the file picker.
       if(sel && sel.type === 'image'){
         const replace = document.createElement('button');
         replace.type = 'button';
@@ -848,10 +810,7 @@
         styleGroup.appendChild(replace);
       }
 
-      // Grading-specific per-shape toggles
-      // Show toolbar controls relevant to the active grading mode (only when
-      // a shape is selected). These mutate the selected shape's flags
-      // directly; the rest of the toolbar/canvas behaves the same.
+      // Per-shape grading toggles for the active mode.
       const gMode = block.config.gradingMode || 'none';
       if(sel && gMode !== 'none'){
         const gradeLbl = document.createElement('span');
@@ -894,8 +853,7 @@
           mkToggle('isMarker', 'Marker',
             () => sel.isMarker, v => { sel.isMarker = v; if(v) sel.isTarget = false; });
           if(sel.isMarker){
-            // Dropdown listing all targets so the author picks which one this
-            // marker should land in. The value is the target's shapes-array idx.
+            // Pick the target's shapes-array idx.
             const targetOpts = (block.config.shapes || [])
               .map((s, i) => s.isTarget ? { idx: i, label: 'Ziel #' + i + ' (' + (SHAPE_LABELS[s.type] || s.type) + ')' } : null)
               .filter(Boolean);
@@ -922,7 +880,7 @@
 
       bar.appendChild(styleGroup);
 
-      // Right: action group (z-order + duplicate + delete)
+      // Right action group: z-order, duplicate, delete.
       const rightGroup = document.createElement('div');
       rightGroup.className = 'comp-tool-group';
       if(sel){
@@ -945,8 +903,7 @@
       return bar;
     }
 
-    // Bring/send only operates when exactly one shape is selected - z-order
-    // semantics aren't well-defined for multi-select.
+    // Z-order ops require exactly one selected shape.
     function bringForward(){
       const i = block._compSelected;
       const arr = block.config.shapes;
@@ -963,8 +920,7 @@
       setSingleSelection(i - 1);
       commit();
     }
-    // Clone every selected shape (deep copy via JSON), offset by 16px, and
-    // select the clones. Works for both single and multi-select.
+    // Deep-clone selected shapes, offset by 16 px, select the clones.
     function duplicateSelected(){
       const sels = selIndices();
       if(sels.length === 0) return;
@@ -979,8 +935,7 @@
       setSelection(newIdxs);
       commit();
     }
-    // Delete every selected shape. Splice in reverse index order so the
-    // remaining indices stay valid as we delete.
+    // Splice in reverse index order so the remaining indices stay valid.
     function deleteSelected(){
       const sels = selIndices().slice().sort((a, b) => b - a);
       if(sels.length === 0) return;
@@ -989,7 +944,7 @@
       commit();
     }
 
-    // Bounding-box helpers for rubber-band selection
+    // Bounding-box helpers for rubber-band selection.
     function shapeBBox(shape){
       if(!shape) return null;
       if(shape.type === 'line' || shape.type === 'arrow'){
@@ -1019,17 +974,13 @@
           h: fs + 4
         };
       }
-      // rect, image, coords: top-left + width/height
       return { x: shape.x || 0, y: shape.y || 0, w: shape.w || 100, h: shape.h || 60 };
     }
     function bboxIntersects(a, b){
       return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
     }
 
-    // Start a rubber-band (marquee) selection from `start` in SVG coords.
-    // While dragging, a dashed rectangle visualizes the selection area.
-    // On release, every shape whose bbox intersects the rectangle is selected
-    // (replacing the current selection unless `additive`).
+    // Rubber-band (marquee) selection. Replaces selection unless `additive`.
     function startRubberband(svg, start, additive){
       const rect = document.createElementNS(NS, 'rect');
       rect.setAttribute('data-rubberband', '1');
@@ -1048,8 +999,7 @@
         if(!moved && (w > 2 || h > 2)) moved = true;
         rect.setAttribute('x', x); rect.setAttribute('y', y);
         rect.setAttribute('width', w); rect.setAttribute('height', h);
-        // Live update: compute selection candidates each move so the user
-        // sees previews of which shapes will be selected.
+        // Preview the selection candidates each move.
         if(moved){
           const marquee = { x, y, w, h };
           const hits = [];
@@ -1061,8 +1011,7 @@
             ? Array.from(new Set(baseSelection.concat(hits)))
             : hits;
           setSelection(merged);
-          // Update the selection overlays without full re-render so the
-          // marquee rect stays on top.
+          // Update overlays without full re-render so the marquee stays on top.
           svg.querySelectorAll('[data-selection-overlay="1"]').forEach(o => o.remove());
           selIndices().forEach(i => drawSelection(svg, i));
         }
@@ -1074,7 +1023,7 @@
         if(moved){
           commit();
         } else if(!additive){
-          // Plain tap on empty area = deselect.
+          // Tap on empty area: deselect.
           clearSelection();
           render();
         }
@@ -1089,15 +1038,13 @@
 
       const svg = buildSvg(block.config, { interactive: true, idPrefix: 'comp-edit-' + (block.id || 'b') });
       svg.classList.add('comp-canvas');
-      // Cursor reflects the active tool so the user can tell at a glance.
       svg.style.cursor = block._compTool === 'select' ? 'crosshair' : 'default';
 
-      // Mousedown on empty SVG area starts a rubber-band selection. With
-      // Shift held, the marquee is ADDITIVE (preserves current selection).
+      // Mousedown on empty SVG starts a rubber-band; Shift = additive.
       svg.addEventListener('mousedown', e => {
         if(e.target !== svg) return;
         e.preventDefault();
-        // Move focus off any external form input so keyboard shortcuts work.
+        // Blur external inputs so keyboard shortcuts reach this editor.
         const ae = document.activeElement;
         if(ae && !host.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)){
           ae.blur();
@@ -1105,12 +1052,10 @@
         startRubberband(svg, svgPoint(svg, e.clientX, e.clientY), e.shiftKey);
       });
 
-      // Attach interaction handlers to each rendered shape element.
       Array.from(svg.querySelectorAll('[data-shape-idx]')).forEach(node => {
         const idx = parseInt(node.getAttribute('data-shape-idx'), 10);
         attachShapeHandlers(node, idx, svg);
         if(isSelected(idx)){
-          // Selection outline + endpoint/edge handles drawn as siblings inside the SVG.
           drawSelection(svg, idx);
         }
       });
@@ -1120,7 +1065,7 @@
     }
 
     function svgPoint(svg, clientX, clientY){
-      // Convert client coordinates to the SVG's viewBox coordinate system.
+      // Client coords -> SVG viewBox coords.
       const rect = svg.getBoundingClientRect();
       const vb = svg.viewBox.baseVal;
       const scale = vb.width / rect.width;
@@ -1139,19 +1084,19 @@
         const shape = block.config.shapes[idx];
         if(!shape) return;
 
-        // Move focus off any external form input so keyboard shortcuts reach this editor.
+        // Blur external inputs so keyboard shortcuts reach this editor.
         const ae = document.activeElement;
         if(ae && !host.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)){
           ae.blur();
         }
 
-        // Select tool: mousedown on a shape starts a rubber-band, not a move
+        // Select tool: mousedown on a shape starts a rubber-band.
         if(block._compTool === 'select'){
           startRubberband(svg, svgPoint(svg, e.clientX, e.clientY), e.shiftKey);
           return;
         }
 
-        // Move tool: shift-click toggles selection (no drag)
+        // Move tool, shift-click: toggle selection (no drag).
         if(e.shiftKey){
           toggleInSelection(idx);
           render();
@@ -1159,15 +1104,14 @@
         }
 
         const wasSelected = isSelected(idx);
-        // If clicking an unselected shape, replace selection with this one.
         if(!wasSelected){
           setSingleSelection(idx);
           svg.querySelectorAll('[data-selection-overlay="1"]').forEach(o => o.remove());
           drawSelection(svg, idx);
         }
 
-        // Drag: move every selected shape together. Snapshot each so the
-        // delta is applied to its original coords (avoids cumulative drift).
+        // Drag every selected shape together. Snapshot originals so deltas
+        // apply to the original coords (no cumulative drift).
         const draggedIndices = selIndices();
         const snapshots = draggedIndices.map(i => ({
           i, original: JSON.parse(JSON.stringify(block.config.shapes[i]))
@@ -1212,8 +1156,7 @@
           if(moved){
             commit();
           } else if(!wasSelected){
-            // Pure tap on an unselected shape → re-render so toolbar reflects
-            // the new selection's properties.
+            // Tap on an unselected shape: re-render to update toolbar.
             render();
           }
         }
@@ -1240,15 +1183,12 @@
           node.setAttribute('height', shape.h);
         }
       } else if(shape.type === 'coords'){
-        // Coords is a group of child elements; cheapest update is to replace
-        // it with a freshly-rendered group (still no full editor rebuild).
+        // Coords is a group; cheapest update is replacing the whole node.
         replaceShapeNode(svg, idx);
       }
     }
 
-    // Re-render a single shape in place, preserving its position in the SVG
-    // child list (so z-order stays stable). Used for coordinate systems
-    // where attribute-level updates would be more complex than re-rendering.
+    // Re-render a single shape in place, preserving z-order position.
     function replaceShapeNode(svg, idx){
       const old = svg.querySelector('[data-shape-idx="' + idx + '"]');
       if(!old) return null;
@@ -1281,14 +1221,12 @@
       paintSelection(existing, shape, svg, idx);
     }
     function paintSelection(overlay, shape, svg, idx){
-      // Dashed outline + endpoint handles. Handles are draggable for lines/arrows.
-      // When multiple shapes are selected, only show the outline (handles
-      // would conflict and clutter the canvas).
+      // Dashed outline + endpoint handles. Multi-select skips the handles.
       const color = '#0f6dad';
       const single = selIndices().length === 1;
       if(shape.type === 'line' || shape.type === 'arrow'){
         if(!single) {
-          // Still draw a faint outline rectangle so the user sees the line is selected.
+          // Faint outline rect so the line still reads as selected.
           const x = Math.min(shape.x1, shape.x2), y = Math.min(shape.y1, shape.y2);
           const w = Math.abs(shape.x2 - shape.x1), h = Math.abs(shape.y2 - shape.y1);
           const rect = document.createElementNS(NS, 'rect');
@@ -1318,8 +1256,7 @@
       if(shape.type === 'circle'){ bx = shape.cx - shape.r; by = shape.cy - shape.r; bw = shape.r * 2; bh = shape.r * 2; }
       else if(shape.type === 'ellipse'){ bx = shape.cx - shape.rx; by = shape.cy - shape.ry; bw = shape.rx * 2; bh = shape.ry * 2; }
       else if(shape.type === 'polygon'){
-        // Real bbox from actual vertices so the dashed outline wraps the
-        // current (possibly deformed) shape, not the regular-polygon hull.
+        // Real bbox from vertices so the outline wraps deformed shapes too.
         const pts = polygonGetPoints(shape);
         let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
         pts.forEach(p => {
@@ -1337,14 +1274,14 @@
         bx = shape.x - 2; by = shape.y - fs; bw = textW + 4; bh = fs + 4;
       } else return;
       const rect = document.createElementNS(NS, 'rect');
-      rect.setAttribute('data-overlay-bbox', '1'); // for in-place update during drag
+      rect.setAttribute('data-overlay-bbox', '1'); // for in-place drag update
       rect.setAttribute('x', bx - 4); rect.setAttribute('y', by - 4);
       rect.setAttribute('width', bw + 8); rect.setAttribute('height', bh + 8);
       rect.setAttribute('fill', 'none'); rect.setAttribute('stroke', color);
       rect.setAttribute('stroke-width', 1.5); rect.setAttribute('stroke-dasharray', '4 3');
       rect.style.pointerEvents = 'none';
       overlay.appendChild(rect);
-      // Multi-select: stop here - no resize/vertex handles when 2+ shapes selected.
+      // Multi-select: no resize/vertex handles.
       if(!single) return;
       if(shape.type === 'circle'){
         const r = document.createElementNS(NS, 'circle');
@@ -1364,9 +1301,7 @@
         overlay.appendChild(h);
       }
       if(shape.type === 'polygon'){
-        // One handle per vertex - drag to deform the polygon. Hold Ctrl/Cmd
-        // and drag any vertex to uniformly scale all vertices around the
-        // centroid (keeps the shape proportional).
+        // One handle per vertex. Ctrl/Cmd + drag = uniform scale around centroid.
         const pts = polygonGetPoints(shape);
         pts.forEach((p, vi) => {
           const h = document.createElementNS(NS, 'circle');
@@ -1448,7 +1383,6 @@
           const p = svgPoint(svg, ev.clientX, ev.clientY);
           const rx = Math.max(4, Math.round(Math.abs(p.x - shape.cx)));
           if(uniform){
-            // Keep original aspect ratio while scaling.
             shape.rx = rx;
             shape.ry = Math.max(4, Math.round(rx * ratioAspect));
           } else {
@@ -1468,11 +1402,9 @@
         document.addEventListener('mouseup', onUp);
       });
     }
-    // Recompute the dashed bbox + vertex handle positions IN PLACE - no DOM
-    // tear-down. Used during an active vertex / uniform-scale drag where
-    // calling updateSelectionOverlay (which rebuilds N+1 nodes + listeners
-    // per frame) would otherwise cost roughly N+1 createElementNS +
-    // addEventListener calls every 16 ms and stutter visibly.
+    // In-place bbox + vertex-handle update for active vertex drags.
+    // updateSelectionOverlay would rebuild N+1 nodes/listeners per frame
+    // and visibly stutter; this just mutates attributes.
     function updatePolygonOverlayLive(svg, idx){
       const overlay = svg.querySelector('[data-selection-overlay="1"][data-sel-idx="' + idx + '"]');
       if(!overlay) return;
@@ -1480,7 +1412,6 @@
       if(!shape) return;
       const pts = polygonGetPoints(shape);
 
-      // Update bbox rect
       let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
       pts.forEach(p => {
         if(p[0] < minX) minX = p[0]; if(p[1] < minY) minY = p[1];
@@ -1492,8 +1423,7 @@
         bbox.setAttribute('width', (maxX - minX) + 8);
         bbox.setAttribute('height', (maxY - minY) + 8);
       }
-      // Update each vertex handle's center. Handles missing from the DOM
-      // (e.g. if the vertex count changed) are simply skipped.
+      // Move each vertex handle. Skip if the handle is gone (vertex count change).
       overlay.querySelectorAll('[data-vertex-idx]').forEach(h => {
         const vi = parseInt(h.getAttribute('data-vertex-idx'), 10);
         const p = pts[vi];
@@ -1501,14 +1431,12 @@
       });
     }
 
-    // Drag a single polygon vertex. With Ctrl/Cmd held, scale the whole
-    // polygon uniformly around its centroid instead (keeps proportions).
+    // Drag a polygon vertex. Ctrl/Cmd: uniform scale around centroid.
     function attachPolygonVertexDrag(handle, idx, svg, vertexIdx){
       handle.addEventListener('mousedown', e => {
         e.stopPropagation(); e.preventDefault();
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
-        // Ensure shape.points exists so we can mutate it.
         if(!Array.isArray(shape.points) || shape.points.length === 0){
           shape.points = polygonGetPoints(shape);
         }
@@ -1518,9 +1446,7 @@
         const startDist = Math.hypot(startPt[0] - startCentroid.x, startPt[1] - startCentroid.y) || 1;
         const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
-        // Coalesce mousemove updates to rAF so we never apply more than one
-        // change per repaint, even if the browser fires events faster than
-        // the screen refresh rate.
+        // rAF-coalesced updates: at most one change per repaint.
         let pendingPoint = null, rafScheduled = false;
         function applyUpdate(){
           rafScheduled = false;
@@ -1529,8 +1455,7 @@
           if(uniform){
             const dist = Math.hypot(p.x - startCentroid.x, p.y - startCentroid.y);
             const ratio = Math.max(0.1, dist / startDist);
-            // Mutate startPoints into shape.points so we avoid re-allocating
-            // a new array structure each frame.
+            // Mutate shape.points in place to avoid per-frame allocation.
             const out = shape.points;
             for(let i = 0; i < startPoints.length; i++){
               out[i] = [
@@ -1540,11 +1465,8 @@
             }
             shape.r = Math.max(2, (Number(shape.r) || startDist) * ratio);
           } else {
-            // Single-vertex move: only the dragged vertex changes.
             shape.points[vertexIdx] = [Math.round(p.x), Math.round(p.y)];
           }
-          // Polygon node: one setAttribute. Overlay: in-place attribute
-          // updates only. No DOM churn, no listener re-binding.
           node.setAttribute('points', polygonPointsAttr(shape));
           updatePolygonOverlayLive(svg, idx);
         }
@@ -1559,7 +1481,7 @@
         function onUp(){
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
-          if(rafScheduled){ applyUpdate(); } // flush any tail update
+          if(rafScheduled){ applyUpdate(); } // flush tail
           if(moved) commit();
         }
         document.addEventListener('mousemove', onMove);
@@ -1605,9 +1527,8 @@
       });
     }
 
-    // Translate a shape by (dx, dy). Handles every shape's position scheme
-    // (line endpoints, circle/ellipse/polygon centers, rect/label/image/coords
-    // top-left). Used by both arrow-key nudging and paste-offsets.
+    // Translate a shape by (dx, dy), handling every position scheme.
+    // Used by arrow-key nudges and paste offsets.
     function offsetShape(shape, dx, dy){
       if(!shape) return shape;
       if(shape.type === 'line' || shape.type === 'arrow'){
@@ -1625,8 +1546,7 @@
       }
       return shape;
     }
-    // Uniform scale: multiply each polygon vertex's distance from the
-    // centroid by `ratio`. Used by Ctrl+drag scaling.
+    // Scale polygon vertices around the centroid by `ratio`.
     function scalePolygonUniform(shape, ratio){
       if(!shape || shape.type !== 'polygon') return;
       const pts = polygonGetPoints(shape);
@@ -1635,9 +1555,8 @@
       shape.r = Math.max(2, (Number(shape.r) || 0) * ratio);
     }
 
-    // Paste shape(s) from the module-scope clipboard at +16/+16 offset, then
-    // select the pasted shape(s). The clipboard holds either a single shape
-    // (legacy) or an array of shapes (multi-select copy).
+    // Paste from clipboard at +16/+16 offset and select the pasted shapes.
+    // Clipboard holds either a single shape (legacy) or an array.
     function pasteFromClipboard(){
       if(!_compClipboard) return false;
       const items = Array.isArray(_compClipboard) ? _compClipboard : [_compClipboard];
@@ -1653,33 +1572,25 @@
       return true;
     }
 
-    // Keyboard shortcuts:
-    //   ← ↑ → ↓               nudge by 1 px            (requires selection)
-    //   Shift + ← ↑ → ↓       nudge by 10 px           (requires selection)
-    //   Delete / Backspace    remove selected shape    (requires selection)
-    //   Ctrl/Cmd + D          duplicate selected shape (requires selection)
-    //   Ctrl/Cmd + C          copy selected to clipboard
-    //   Ctrl/Cmd + V          paste shape from clipboard
-    //   Escape                deselect
-    //
-    // Registered in the capture phase so this runs before main.js's
-    // bubble-phase global shortcuts (which would otherwise move/delete/copy
-    // the entire block card). stopImmediatePropagation prevents those.
+    // Keyboard shortcuts (capture phase, so main.js's bubble-phase block
+    // shortcuts don't fire when this editor handles them):
+    //   Arrows / Shift+Arrows  nudge 1 / 10 px (needs selection)
+    //   Delete / Backspace     remove selected
+    //   Ctrl/Cmd + D           duplicate, + C copy, + V paste, + A select all
+    //   Ctrl/Cmd + Z / Y       undo / redo
+    //   V / S                  switch tool (move / select)
+    //   Escape                 deselect
     function onKeyDown(e){
-      // Don't steal keys while the user is typing in an input/select on the
-      // page (e.g. the right-pane config form, or our own toolbar number/text
-      // inputs). Native copy/paste in those inputs continues to work.
+      // Don't steal keys while the user types in form fields.
       const ae = document.activeElement;
       if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
-      // Only respond when focus is on this editor (host) or on body - avoids
-      // catching keys when another editor or pane has focus.
+      // Only fire when focus is on this editor or body.
       if(!host.contains(ae) && ae !== document.body) return;
 
       const key = e.key;
       const mod = e.ctrlKey || e.metaKey;
 
-      // Ctrl+V works even without a current selection (pure paste). All other
-      // shape shortcuts require a selection.
+      // Ctrl+V works without a selection (pure paste).
       if(mod && (key === 'v' || key === 'V')){
         if(!_compClipboard) return;
         e.preventDefault();
@@ -1687,8 +1598,7 @@
         pasteFromClipboard();
         return;
       }
-      // Tool-mode hotkeys (V = move, S = select) - no modifier required and
-      // they work even when nothing is selected.
+      // Tool-mode hotkeys: V = move, S = select.
       if(!mod && (key === 'v' || key === 'V') && block._compTool !== 'move'){
         e.preventDefault(); e.stopImmediatePropagation();
         block._compTool = 'move'; render(); return;
@@ -1698,10 +1608,8 @@
         block._compTool = 'select'; render(); return;
       }
 
-      // Undo / redo at the COMPOSITION level. Call the operation first so it
-      // can flush any pending debounced snapshot; only stop propagation if
-      // we actually had something to undo/redo, otherwise main.js's block-
-      // level Ctrl+Z runs normally.
+      // Composition-level undo/redo. Only stop propagation if there was
+      // something to undo/redo, otherwise main.js's block-level handler runs.
       if(mod && (key === 'z' || key === 'Z')){
         const did = e.shiftKey ? redoComposition() : undoComposition();
         if(did){ e.preventDefault(); e.stopImmediatePropagation(); }
@@ -1712,12 +1620,8 @@
         return;
       }
 
-      // Ctrl+A and Delete are handled by the composition even with zero
-      // shapes - otherwise they bubble to main.js and start operating on
-      // the outer block card (selecting/deleting the whole composition),
-      // which is rarely what the user means when focus is inside this
-      // editor. Ctrl+A with zero shapes is a harmless no-op; Delete with
-      // zero shapes does nothing but does NOT delete the host block.
+      // Handle Ctrl+A and Delete even with zero shapes, otherwise they'd
+      // bubble to main.js and act on the outer block card.
       const sels = selIndices();
       if(mod && (key === 'a' || key === 'A')){
         e.preventDefault();
@@ -1733,14 +1637,14 @@
         return;
       }
 
-      // All remaining shortcuts require at least one selected shape.
+      // Remaining shortcuts require at least one selected shape.
       if(sels.length === 0) return;
 
       if(mod && (key === 'c' || key === 'C')){
         e.preventDefault();
         e.stopImmediatePropagation();
         const shapes = getSelectedShapes();
-        // Always store as array so paste handles single + multi uniformly.
+        // Store as array so paste handles single + multi uniformly.
         _compClipboard = shapes.map(s => JSON.parse(JSON.stringify(s)));
         return;
       }
@@ -1768,13 +1672,8 @@
         render();
       }
     }
-    // Register in the CAPTURE phase so this listener fires before main.js's
-    // bubble-phase global shortcut handler (and can stopImmediatePropagation it).
-    // Re-mounting the editor would otherwise stack listeners on document.
-    // The previous handler reference is stored on the BLOCK (not the host
-    // element) because a full task-pane re-render swaps out the host node -
-    // a host-scoped reference would orphan the old listener and let it
-    // intercept future keydowns from a detached DOM tree.
+    // Capture phase, and stored on the block (not host) because a task-pane
+    // re-render swaps out the host node and would orphan the listener.
     if(block._compKeyHandler){
       document.removeEventListener('keydown', block._compKeyHandler, true);
     }
@@ -1786,9 +1685,7 @@
 
   // Runtime mount helpers (SCORM player)
 
-  // Wraps an SVG inside the standard SCORM card with title + (optional)
-  // prompt + content area + button cluster + feedback box. Returns the
-  // helpers so the caller can append controls and report scores.
+  // Wrap an SVG inside the standard SCORM card.
   function makeRuntimeCard(host, config){
     const u = window.BlockUtils;
     const opts = {
@@ -1822,7 +1719,7 @@
     return {};
   }
 
-  // Mode dispatcher (graded modes share the standard question card)
+  // Mode dispatcher; graded modes share the standard question card.
   function mountGraded(host, config, api, mode){
     const ui = makeRuntimeCard(host, config);
     const maxPoints = Math.max(1, Number(config.maxPoints) || 1);
@@ -1834,7 +1731,7 @@
     return {};
   }
 
-  // Mode: acknowledge - show SVG + "Verstanden"-Button
+  // Mode: acknowledge - SVG + "Verstanden" button.
   function runAcknowledge(ui, config, api, maxPoints){
     appendSvg(ui.content, config, 'comp-ack-' + (api?.blockId || ''));
     const btn = document.createElement('button');
@@ -1874,7 +1771,7 @@
       node.classList.add('comp-graded-' + kind);
       node.style.cursor = 'default';
     }
-    // Make each shape clickable; clicking marks it green (correct) or red (wrong).
+    // Click each shape: green = correct, red = wrong.
     svg.querySelectorAll('[data-shape-idx]').forEach(node => {
       node.style.cursor = 'pointer';
       node.addEventListener('click', () => {
@@ -1896,7 +1793,7 @@
       if(locked) return;
       locked = true;
       checkBtn.disabled = true;
-      // Reveal which correct shapes were missed
+      // Reveal correct shapes the learner missed.
       svg.querySelectorAll('[data-shape-idx]').forEach(node => {
         const idx = parseInt(node.getAttribute('data-shape-idx'), 10);
         const sh = shapes[idx];
@@ -1920,24 +1817,23 @@
     return {};
   }
 
-  // Mode: fillblanks - label shapes with blank=true become inputs
+  // Mode: fillblanks - label shapes with blank=true become inputs.
   function runFillBlanks(ui, config, api, maxPoints){
     const svg = appendSvg(ui.content, config, 'comp-blanks-' + (api?.blockId || ''));
     const shapes = config.shapes || [];
-    const blanks = []; // { idx, input, correct }
+    const blanks = [];
 
-    // Replace each blank label's <text> with a foreignObject containing an <input>.
+    // Replace each blank label's <text> with a foreignObject + <input>.
     shapes.forEach((sh, idx) => {
       if(sh.type !== 'label' || !sh.blank) return;
       const textNode = svg.querySelector('text[data-shape-idx="' + idx + '"]');
       if(!textNode) return;
       const fs = sh.fontSize || 18;
       const expected = String(sh.correctText || sh.text || '').trim();
-      // Estimate input width from expected length (or fall back to 120).
+      // Input width derived from expected length.
       const w = Math.max(80, expected.length * fs * 0.55 + 24);
       const h = fs + 12;
-      // foreignObject lets us drop an HTML input inside the SVG. Position it
-      // so the input baseline lines up with where the text used to be.
+      // Position the foreignObject so the input baseline matches the text.
       const fo = document.createElementNS(NS, 'foreignObject');
       fo.setAttribute('x', sh.x - 2);
       fo.setAttribute('y', sh.y - fs);
@@ -1987,7 +1883,7 @@
     return {};
   }
 
-  // Mode: hotspot - draggable markers must land in correct target zones
+  // Mode: hotspot - draggable markers must land in their target zones.
   function runHotspot(ui, config, api, maxPoints){
     const svg = appendSvg(ui.content, config, 'comp-hot-' + (api?.blockId || ''));
     const shapes = config.shapes || [];
@@ -1998,7 +1894,7 @@
       else if(sh.isMarker) markers.push({ idx, shape: sh, node: svg.querySelector('[data-shape-idx="' + idx + '"]') });
     });
 
-    // Visualise targets with a dashed outline so learners see where to drop.
+    // Dashed outline so learners see where to drop.
     targets.forEach(t => {
       const n = svg.querySelector('[data-shape-idx="' + t.idx + '"]');
       if(n){ n.classList.add('comp-target-zone'); n.style.pointerEvents = 'none'; }
@@ -2026,7 +1922,7 @@
         const dx = (pt.x - t.cx) / t.rx, dy = (pt.y - t.cy) / t.ry;
         return dx*dx + dy*dy <= 1;
       }
-      // Polygon/label/line/arrow targets: approximate with bbox.
+      // Polygon/label/line/arrow: approximate with a radius.
       const c = shapeCenter(t);
       const r = (t.r || Math.max(t.rx || 50, t.ry || 50));
       const dx = pt.x - c.x, dy = pt.y - c.y;
@@ -2039,7 +1935,6 @@
       return { x: (cx - r.left) * scale, y: (cy - r.top) * scale };
     }
     function moveShapeTo(sh, dx, dy){
-      // Move by delta - preserves the shape's geometry.
       if(sh.type === 'line' || sh.type === 'arrow'){
         sh.x1 += dx; sh.y1 += dy; sh.x2 += dx; sh.y2 += dy;
       } else if(sh.type === 'circle' || sh.type === 'ellipse' || sh.type === 'polygon'){
@@ -2071,7 +1966,7 @@
           const dx = p.x - start.x, dy = p.y - start.y;
           if(!moved && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) moved = true;
           if(!moved) return;
-          // Rebuild from startShape + delta to avoid drift.
+          // Rebuild from startShape + delta to avoid cumulative drift.
           Object.assign(m.shape, JSON.parse(JSON.stringify(startShape)));
           moveShapeTo(m.shape, dx, dy);
           refreshMarkerNode(m);
@@ -2126,13 +2021,11 @@
     description: 'Skizze aus Linien, Kreisen, Pfeilen und Beschriftungen. Optional als Aufgabe bewertbar.',
     category: 'Visualisierung',
     icon: '◧',
-    // graded:true tells the builder this block can award points. The actual
-    // runtime behavior depends on config.gradingMode: 'none' (default) is a
-    // pure-display block, the other four modes turn it into an interactive
-    // assessment.
+    // graded:true means the block can award points; behavior depends on
+    // config.gradingMode below.
     graded: true,
 
-    newShape, // Kept for the right-pane "+ Form" toolbox.
+    newShape, // for the right-pane "+ Form" toolbox
 
     defaultConfig(){
       return {
@@ -2140,15 +2033,14 @@
         canvasWidth: 600,
         canvasHeight: 360,
         background: '#ffffff',
-        // Bewertung
-        // 'none' | 'acknowledge' | 'click' | 'fillblanks' | 'hotspot'.
-        // Per-shape flags used by the modes (set via in-canvas toolbar):
-        //   isCorrect       - click mode: clicking this shape scores points
-        //   blank           - fillblanks mode (label only): render as input
+        // Bewertung. 'none' | 'acknowledge' | 'click' | 'fillblanks' | 'hotspot'.
+        // Per-shape flags (set via in-canvas toolbar):
+        //   isCorrect       - click: clicking this shape scores
+        //   blank           - fillblanks (label): render as input
         //   correctText     - fillblanks: expected answer
-        //   isTarget        - hotspot: this shape is a target zone
-        //   isMarker        - hotspot: this shape is a draggable marker
-        //   markerTargetIdx - hotspot: idx in shapes[] of marker's correct target
+        //   isTarget        - hotspot: target zone
+        //   isMarker        - hotspot: draggable marker
+        //   markerTargetIdx - hotspot: shapes[] idx of marker's correct target
         gradingMode: 'none',
         maxPoints: 1,
         prompt: '',
@@ -2158,8 +2050,7 @@
       };
     },
     previewConfig(){
-      // Used by the welcome-page modal - shows what a composition can look
-      // like without forcing every new block to start populated.
+      // Welcome-page demo content.
       return {
         blockTitle: '', canvasWidth: 600, canvasHeight: 360, background: '#ffffff',
         gradingMode: 'none', maxPoints: 1, prompt: '', penalizeWrong: false,
@@ -2179,7 +2070,6 @@
         { key:'canvasWidth',  label:'Breite (px)', type:'number', step:10, min:100, max:1400 },
         { key:'canvasHeight', label:'Höhe (px)',   type:'number', step:10, min:100, max:1400 },
         { key:'background',   label:'Hintergrund', type:'color' },
-        // Bewertung
         { type:'section', label:'Bewertung', key:'_sec_grading' },
         { key:'gradingMode', label:'Bewertungsart', type:'select', options:[
             { value:'none',        label:'Keine (nur Anzeige)' },
@@ -2196,8 +2086,7 @@
         { key:'penalizeWrong', label:'Falsche Klicks abziehen', type:'boolean',
           showIf: c => c.gradingMode === 'click',
           help:'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.' },
-        // The "shapes" array is shown for advanced manual editing. Day-to-day
-        // editing happens directly on the canvas (drag, toolbar above).
+        // Advanced manual editing; day-to-day work happens on the canvas.
         { type:'section', label:'Formen (erweitert)', key:'_sec_shapes' },
         { key:'shapes', label:'Formen', type:'list', itemLabel:'Form',
           help:'Tipp: Formen lassen sich auch direkt auf der Canvas verschieben und in der Werkzeugleiste oberhalb der Canvas anpassen.',
@@ -2226,17 +2115,10 @@
       ];
     },
 
-    // Interactive editor used inside the builder canvas. Renders a toolbar
-    // followed by a draggable SVG with selection handles. The user mutates
-    // block.config directly via mousedown / mouseup handlers.
     builderMount,
 
-    // Runtime mount. Dispatches based on config.gradingMode:
-    //   - none (default): static SVG, no scoring
-    //   - acknowledge:    SVG + "Verstanden"-button → full points on click
-    //   - click:          shapes are clickable; correct ones award points
-    //   - fillblanks:     labels with blank=true become input fields
-    //   - hotspot:        markers are draggable; check after "Prüfen"
+    // Runtime: dispatch on config.gradingMode (none / acknowledge / click /
+    // fillblanks / hotspot).
     mount(host, config, api){
       const mode = config.gradingMode || 'none';
       if(mode === 'none') return mountStatic(host, config, api);

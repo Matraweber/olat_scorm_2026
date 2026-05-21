@@ -1,21 +1,16 @@
-// ============================================================================
-// panes.js: Sidebar (task list) + course + theme settings panes.
-// renderActivePaneImpl dispatches to course / theme / task-pane based on the
-// current selection. The task editor lives in task-pane.js + sibling modules.
-// ============================================================================
+// panes.js: Sidebar task list + course/theme settings panes.
+// renderActivePaneImpl dispatches to course/theme/task-pane. The task editor
+// lives in task-pane.js + sibling modules.
 import { el, toast, confirmDialog, escapeHtml } from './util.js';
 import { state, pushHistory, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder } from './state.js';
 import { renderField } from './form.js';
 import { renderTaskPane } from './task-pane.js';
 
-// ---- Sidebar: task list + Allgemein-Links ----
 export function renderTaskList(){
   const list = document.getElementById('taskList');
   list.innerHTML = '';
-  // Toggle the header "+ Aufgabe" button based on whether the empty-state
-  // already provides a CTA. With zero tasks the empty-state card has its own
-  // "+ Erste Aufgabe" button - showing both creates three "Aufgabe erstellen"
-  // calls-to-action in a single viewport, which felt repetitive.
+  // Hide the header "+ Aufgabe" when the empty-state card already shows its
+  // own CTA, otherwise we'd render three "Aufgabe erstellen" buttons at once.
   const headerAddBtn = document.getElementById('btnAddTask');
   if(headerAddBtn) headerAddBtn.hidden = state.course.tasks.length === 0;
   if(state.course.tasks.length === 0){
@@ -34,7 +29,6 @@ export function renderTaskList(){
       text: '+ Erste Aufgabe'
     });
     cta.addEventListener('click', () => {
-      // Click the (now-hidden) header button to trigger the same flow.
       const btn = document.getElementById('btnAddTask');
       if(btn) btn.click();
     });
@@ -90,9 +84,8 @@ export function renderTaskList(){
   });
 }
 
-// Drag-and-drop reorder for the sidebar task list. Up/down arrow buttons
-// still work - DnD is just a faster path for non-adjacent moves. A 2 px
-// accent-coloured indicator line previews the drop position.
+// Drag-and-drop reorder for the sidebar task list (in addition to the
+// up/down arrow buttons).
 function installTaskDnD(list){
   let fromIdx = null;
   function clearMarkers(){
@@ -101,8 +94,7 @@ function installTaskDnD(list){
     );
   }
   list.querySelectorAll('li').forEach(li => {
-    // Drag must NOT start from the icon buttons (up/down/delete) - those
-    // get their own click handlers and shouldn't be hijacked.
+    // Don't hijack the up/down/delete icon buttons.
     li.addEventListener('mousedown', (e) => {
       const onBtn = e.target.closest('.task-controls');
       li.draggable = !onBtn;
@@ -110,7 +102,7 @@ function installTaskDnD(list){
     li.addEventListener('dragstart', (e) => {
       fromIdx = parseInt(li.dataset.taskIdx, 10);
       e.dataTransfer.effectAllowed = 'move';
-      // Some browsers refuse to start the drag without setData.
+      // Some browsers refuse to start a drag without setData.
       try { e.dataTransfer.setData('text/plain', String(fromIdx)); } catch(_){}
       li.classList.add('dragging');
     });
@@ -153,13 +145,11 @@ function swapTasks(a, b){
   render();
 }
 
-// Move task `from` to position `to`, treating `to` as the desired *post-move*
-// index. This is the semantics drag-and-drop callers want: dropping after
-// item 3 means "land at index 4".
+// Move `from` to position `to` (post-move index): dropping after item 3
+// means land at index 4.
 function moveTask(from, to){
   const tasks = state.course.tasks;
   if(from < 0 || from >= tasks.length) return;
-  // Dropping onto the same slot or directly after itself is a no-op.
   if(to === from || to === from + 1) return;
   pushHistory();
   const [moved] = tasks.splice(from, 1);
@@ -174,10 +164,9 @@ function moveTask(from, to){
   render();
 }
 
-// ---- Active pane dispatcher (welcome / course / theme / task) ----
+// Active pane dispatcher (welcome / course / theme / task).
 export function renderActivePaneImpl(){
   const host = document.getElementById('formPane');
-  // Tear down any welcome-pane scroll observer before clearing the host
   if(typeof window._welcomeScrollCleanup === 'function') window._welcomeScrollCleanup();
   host.classList.remove('welcome-pane');
   host.innerHTML = '';
@@ -192,18 +181,15 @@ export function renderActivePaneImpl(){
 
 function renderWelcomePane(host){
   host.classList.add('welcome-pane');
-  // Enable scroll-snap and smooth-scroll only while welcome is the active pane.
+  // Scoped to the welcome pane so other panes scroll normally.
   document.documentElement.classList.add('welcome-active');
 
-  // Thin reading-progress strip directly under the sticky builder-header.
-  // Fills with the accent colour as the user scrolls through the chapters.
+  // Reading-progress strip under the sticky header.
   const progress = el('div', {className:'welcome-progress', attrs:{'aria-hidden':'true'}});
   progress.appendChild(el('div', {className:'welcome-progress-bar'}));
   host.appendChild(progress);
 
-  // Layout: a two-column grid with the reading content on the left and a
-  // sticky chapter rail (table of contents) on the right. The rail tracks
-  // scroll position and lets the user jump to any chapter.
+  // Two columns: content on the left, sticky chapter rail on the right.
   const layout = el('div', {className:'welcome-layout'});
   const main   = el('main', {className:'welcome-content'});
   const rail   = el('aside', {className:'welcome-rail', attrs:{'aria-label':'Kapitel-Übersicht'}});
@@ -214,13 +200,10 @@ function renderWelcomePane(host){
   layout.appendChild(rail);
   host.appendChild(layout);
 
-  // Each chapter is registered here so the rail can be built and the
-  // scroll-spy can resolve "active" by index.
   const chapters = [];
 
-  // Create a numbered chapter. Returns the body element so callers can append
-  // their content directly. `numbered:false` skips the rail number (used for
-  // the hero, which is the title page rather than a chapter).
+  // Create a numbered chapter. Returns the body element. opts.hero hides the
+  // rail entry (title page).
   function chapter(title, opts){
     opts = opts || {};
     const idx = chapters.length;
@@ -321,7 +304,6 @@ function renderWelcomePane(host){
   types.appendChild(el('p', {className:'welcome-hint', text:'Auf eine Kachel klicken, um eine Live-Vorschau und Details zu sehen.'}));
   const blocksGrid = el('div', {className:'welcome-blocks-grid'});
   const allBlocks = window.Blocks ? window.Blocks.ids().map(id => ({ id, def: window.Blocks.get(id) })).filter(x => x.def) : [];
-  // Group by category
   const byCat = {};
   allBlocks.forEach(({ id, def }) => {
     const cat = def.category || 'Sonstige';
@@ -332,17 +314,12 @@ function renderWelcomePane(host){
     const catLabel = el('div', {className:'welcome-blocks-cat', text: cat});
     blocksGrid.appendChild(catLabel);
     items.forEach(({ id, def }) => {
-      // Card is a real <button> so it is keyboard-focusable, has the right
-      // affordance, and screen readers announce it as clickable.
+      // <button> for keyboard focus + correct screen-reader announcement.
       const card = el('button', {
         className:'welcome-block-card' + (def.graded ? ' graded' : ''),
         attrs:{ type:'button', 'data-block-id': id, 'aria-label': (def.label || id) + ': Details ansehen' }
       });
-      // "bewertet" badge sits INLINE after the title so it can never overlap
-      // the title text. If the title wraps to multiple lines, the badge stays
-      // visually attached to the last word. The icon comes from the canonical
-      // SVG registry (window.BlockIcons) when available; legacy string icons
-      // are still rendered as fallback.
+      // SVG icon from window.BlockIcons, string fallback for legacy blocks.
       const svgIcon = window.BlockIcons && window.BlockIcons.get(id);
       const iconHtml = svgIcon || escapeHtml(def.icon || '◧');
       card.innerHTML =
@@ -453,10 +430,8 @@ function renderWelcomePane(host){
   setupRevealAnimations(host);
 }
 
-// Scroll-spy: highlight the rail item for the chapter whose head is nearest
-// to the top of the viewport, and update the reading-progress bar width.
-// Uses a single rAF-throttled scroll listener for both, so there is one
-// layout read per frame rather than two.
+// Scroll-spy: highlights the rail item for the chapter nearest the top, and
+// updates the reading-progress bar. One rAF-throttled listener handles both.
 function setupWelcomeScrollSpy(chapters, railList){
   if(typeof window._welcomeScrollCleanup === 'function'){
     window._welcomeScrollCleanup();
@@ -469,8 +444,7 @@ function setupWelcomeScrollSpy(chapters, railList){
     if(idx === activeIdx) return;
     activeIdx = idx;
     chapters.forEach((ch, i) => ch.section.classList.toggle('is-active', i === idx));
-    // The rail skips chapters with `hideRail`, so the rail list index doesn't
-    // match the chapter index 1-for-1; resolve via dataset.chapterIdx.
+    // rail list and chapters[] don't align 1:1 because of hideRail entries.
     Array.from(railList.children).forEach(li => {
       const ci = parseInt(li.dataset.chapterIdx, 10);
       li.querySelector('.welcome-rail-link')?.classList.toggle('is-active', ci === idx);
@@ -481,7 +455,7 @@ function setupWelcomeScrollSpy(chapters, railList){
 
   function update(){
     rafId = null;
-    // Active chapter: the last one whose top has crossed ~30% from viewport top.
+    // Active chapter: last one whose top is above ~30% viewport.
     const triggerY = window.innerHeight * 0.30;
     let best = 0;
     for(let i = 0; i < chapters.length; i++){
@@ -490,7 +464,6 @@ function setupWelcomeScrollSpy(chapters, railList){
       else break;
     }
     setActive(best);
-    // Reading progress: scrollY / maxScrollY, expressed as a 0-100% width on the bar.
     if(progressBar){
       const max = document.documentElement.scrollHeight - window.innerHeight;
       const pct = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
@@ -516,13 +489,9 @@ function setupWelcomeScrollSpy(chapters, railList){
   };
 }
 
-// HTML-escape helper for content interpolated into innerHTML strings. The
-// Detail modal opened when a block card on the Welcome page is clicked.
-// Shows the block's label, category, description, scoring info, and a live
-// preview rendered via the block's own `preview()` function (with its
-// default config). Close via the X button, the backdrop, or Escape.
+// Detail modal opened from a welcome-page block card. Shows label/category/
+// description plus a live preview via the block's preview() or mount().
 function openBlockDetailModal(id, def){
-  // If a previous modal is still open, replace it cleanly.
   document.querySelectorAll('.welcome-block-modal').forEach(m => m.remove());
 
   const modal = el('div', {
@@ -532,14 +501,12 @@ function openBlockDetailModal(id, def){
   const backdrop = el('div', {className:'welcome-block-modal-backdrop'});
   const card     = el('div', {className:'welcome-block-modal-card'});
 
-  // Close button (top-right) - used both by mouse and by screen readers.
   const closeBtn = el('button', {
     className:'welcome-block-modal-close',
     attrs:{ type:'button', 'aria-label':'Schließen' }
   });
   closeBtn.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5 L15 15 M15 5 L5 15"/></svg>';
 
-  // Header: large icon + label + category badge + graded badge.
   const head = el('div', {className:'welcome-block-modal-head'});
   const svgIcon = window.BlockIcons && window.BlockIcons.get(id);
   const modalIcon = svgIcon || escapeHtml(def.icon || '◧');
@@ -555,13 +522,12 @@ function openBlockDetailModal(id, def){
   card.appendChild(closeBtn);
   card.appendChild(head);
 
-  // Body: description on the left, live preview on the right.
+  // Body: description left, live preview right.
   const body = el('div', {className:'welcome-block-modal-body'});
   const left = el('div', {className:'welcome-block-modal-text'});
   if(def.description){
     left.appendChild(el('p', {className:'welcome-block-modal-desc', text: def.description}));
   }
-  // Key facts list - derived from the block definition so it stays in sync.
   const facts = [];
   facts.push({ k:'Kategorie', v: def.category || 'Sonstige' });
   facts.push({ k:'Bewertbar', v: def.graded ? 'Ja' : 'Nein' });
@@ -579,11 +545,8 @@ function openBlockDetailModal(id, def){
   });
   left.appendChild(factList);
 
-  // Right side: live preview rendered with the block's previewConfig (if
-  // declared - for question blocks where defaultConfig is intentionally
-  // empty) or defaultConfig as fallback. The preview is the same one the
-  // builder canvas shows - it doubles as a visual screenshot without us
-  // having to maintain static images.
+  // Live preview from def.previewConfig() or def.defaultConfig() - same path
+  // the builder canvas uses, so we don't maintain separate screenshots.
   const right = el('div', {className:'welcome-block-modal-preview'});
   right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text:'Live-Vorschau'}));
   const previewHost = el('div', {className:'welcome-block-modal-preview-host'});
@@ -595,7 +558,7 @@ function openBlockDetailModal(id, def){
     if(typeof def.preview === 'function'){
       def.preview(previewHost, cfg);
     } else if(typeof def.mount === 'function' && window.BlockUtils){
-      // Some blocks (e.g. composition before grading was added) only have mount.
+      // Some blocks only have mount() (e.g. early composition).
       def.mount(previewHost, cfg, {
         utils: window.BlockUtils,
         blockId: 'welcome_preview_' + id,
@@ -616,8 +579,6 @@ function openBlockDetailModal(id, def){
   modal.appendChild(card);
   document.body.appendChild(modal);
 
-  // Focus management: focus the close button so Escape works immediately
-  // and keyboard users land somewhere meaningful.
   closeBtn.focus({ preventScroll: true });
 
   function close(){
@@ -632,15 +593,11 @@ function openBlockDetailModal(id, def){
   backdrop.addEventListener('click', close);
   document.addEventListener('keydown', onKey, true);
 
-  // Trigger the fade-in by deferring the open class to the next frame.
   requestAnimationFrame(() => modal.classList.add('is-open'));
 }
 
-// Scroll-triggered reveal: each below-the-fold reading element fades in and
-// slides up the first time it enters the viewport. Above-the-fold elements
-// render visible immediately (so the hero never flashes blank on load).
-// Once revealed, an element stays in place when scrolled past. Respects
-// prefers-reduced-motion.
+// Below-the-fold reading elements fade in on first viewport entry.
+// Above-the-fold renders visible immediately. Respects prefers-reduced-motion.
 function setupRevealAnimations(host){
   if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -650,9 +607,7 @@ function setupRevealAnimations(host){
   ));
   if(candidates.length === 0 || typeof IntersectionObserver === 'undefined') return;
 
-  // Tag every below-the-fold element so the CSS hides it initially. Done
-  // synchronously here because layout is already complete by the time the
-  // surrounding renderWelcomePane has appended every section.
+  // Tag below-the-fold elements so the CSS hides them initially.
   const innerH = window.innerHeight;
   const hidden = [];
   candidates.forEach(el => {
@@ -673,8 +628,8 @@ function setupRevealAnimations(host){
   }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
   hidden.forEach(el => observer.observe(el));
 
-  // Safety net: some environments skip the initial intersection callback.
-  // After a short delay, force-reveal anything that is in viewport.
+  // Safety net: force-reveal in-viewport elements that didn't get an initial
+  // intersection callback.
   setTimeout(() => {
     hidden.forEach(el => {
       if(el.classList.contains('reveal-visible')) return;
@@ -687,7 +642,7 @@ function setupRevealAnimations(host){
   }, 250);
 }
 
-// Mock-UI Helpers (HTML/CSS-Miniaturen)
+// Mockup helpers (HTML/CSS miniatures used in welcome page steps)
 function mockSidebarAddTask(){
   const wrap = el('div', {className:'welcome-mock welcome-mock-sidebar'});
   wrap.innerHTML =
@@ -696,10 +651,8 @@ function mockSidebarAddTask(){
     '<div class="mm-task mm-task-faint">Aufgabe 2<span class="mm-meta">1 Block</span></div>';
   return wrap;
 }
-// Helper for the welcome-mockup block picker: builds one category-header +
-// row of chips, each chip showing the canonical block-icon (SVG) from the
-// shared BlockIcons registry so the mockup stays in sync with the real
-// picker. `pulse: true` on a chip nudges the eye toward an example.
+// One category header + row of chips; icons from window.BlockIcons so the
+// mockup stays in sync with the real picker. `pulse:true` highlights a chip.
 function mockChips(catLabel, chips, isQuestion){
   const head = '<div class="mm-cat">' + escapeHtml(catLabel) + '</div>';
   const row = chips.map(c => {
@@ -813,9 +766,7 @@ function renderThemePane(host){
   const persistTheme = () => {
     if(!savePersistentTheme(state.theme)) toast('Branding konnte nicht dauerhaft gespeichert werden.', 'error');
   };
-  // Color/text fields all flow through this setter. Pushing the new theme
-  // onto the document root makes the builder reflect brand changes
-  // immediately (live preview), without needing a full re-render.
+  // Pushing the new theme onto the document root live-previews brand changes.
   const get = () => t;
   const set = (k, v) => { t[k] = v; persistTheme(); applyThemeToBuilder(state.theme); };
   [

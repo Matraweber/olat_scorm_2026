@@ -1,9 +1,5 @@
-// ============================================================================
-// audio.js: An audio block - embeds an audio file (uploaded as data-URL or
-// referenced via URL) with the browser's built-in <audio controls> player.
-// Typical use: spoken transcript of a slide, language-learning sample,
-// pronunciation example. Optional title above the player and caption below.
-// ============================================================================
+// audio.js: Embeds an audio file (data-URL or URL) with <audio controls>.
+// Optional title above, caption below.
 (function(){
   'use strict';
 
@@ -17,9 +13,7 @@
       return { src: '', title: '', caption: '' };
     },
     previewConfig(){
-      // The welcome-modal preview detects `_demo: true` and renders a
-      // decorative mock audio player so users can see what the filled
-      // state looks like without us embedding a real audio file.
+      // _demo:true tells preview() to render a mock player.
       return { src: '', _demo: true, title: 'Audiobeispiel: Sprechprobe', caption: 'Quelle: eigene Aufnahme' };
     },
     builderSchema(){
@@ -64,12 +58,8 @@
       return {};
     },
     preview(host, config){
-      // Two paths:
-      //   • Welcome-modal "Live-Vorschau" (config._demo === true)
-      //     → render a decorative mock player so users see what the filled
-      //       state looks like, even though no real audio is embedded.
-      //   • Canvas while editing
-      //     → real <audio controls> if src set, dashed placeholder if not.
+      // _demo: render a mock player (welcome modal).
+      // Otherwise: real <audio> if src set, dashed placeholder if not.
       const wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex; flex-direction:column; height:100%; padding:0.4rem; box-sizing:border-box; gap:0.3rem; overflow:hidden;';
       if(config.title){
@@ -79,9 +69,7 @@
         wrap.appendChild(t);
       }
       if(config._demo){
-        // Decorative mock player - looks like the real browser player but
-        // is just static SVG/HTML. Communicates "this is what your audio
-        // block will look like" without needing a real file.
+        // Mock player (static SVG/HTML) for the welcome modal.
         const demo = document.createElement('div');
         demo.style.cssText = 'display:flex; align-items:center; gap:0.5rem; padding:0.45rem 0.7rem; border-radius:999px; background:#f1f5f9; border:1px solid #d2dce5;';
         demo.innerHTML =
@@ -89,7 +77,7 @@
             '<svg viewBox="0 0 14 14" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M3 2 L12 7 L3 12 Z"/></svg>' +
           '</button>' +
           '<span style="color:#003b5c; font-family:\'SF Mono\',Menlo,Consolas,monospace; font-size:0.78rem;">0:00</span>' +
-          // Decorative waveform - 24 alternating-height bars
+          // Waveform: 30 sine-based bars
           '<svg viewBox="0 0 220 18" width="100%" height="18" preserveAspectRatio="none" style="flex:1; opacity:0.6;" aria-hidden="true">' +
             (() => {
               const bars = [];

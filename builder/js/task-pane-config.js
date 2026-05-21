@@ -1,8 +1,5 @@
-// ============================================================================
-// task-pane-config.js: Renders the right-hand block-configuration pane.
-// Handles three states: empty selection, multi-select (bulk actions), and
-// single-block edit (schema-driven config form + validation warnings).
-// ============================================================================
+// task-pane-config.js: Right-hand block-configuration pane. Three states:
+// empty selection, multi-select (bulk actions), single-block (schema form).
 import { el } from './util.js';
 import { pushHistoryDebounced } from './state.js';
 import { renderField } from './form.js';
@@ -100,11 +97,10 @@ function renderSingleBlockPane(ctx, sel){
 
   if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
 
-  // Action handler: dispatched by `type:'action'` buttons in builderSchema().
-  // Currently understood actions:
-  //   reset             - restore the block's defaultConfig()
-  //   add-shape:<type>  - push a fresh shape of <type> onto sel.config.shapes
-  //                       (block must expose def.newShape(type))
+  // Actions dispatched by `type:'action'` buttons in builderSchema():
+  //   reset             - restore defaultConfig()
+  //   add-shape:<type>  - push a fresh shape onto sel.config.shapes
+  //                       (requires def.newShape(type))
   const prevHandler = configHost._blockActionHandler;
   if(prevHandler) configHost.removeEventListener('block-field-action', prevHandler);
   const actionHandler = e => {

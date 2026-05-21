@@ -1,8 +1,5 @@
-// ============================================================================
-// task-pane-canvas.js: Canvas rendering for the task editor and the
-// direct-manipulation handlers (drag-to-move, drag-to-resize) with snap
-// guides and history snapshots.
-// ============================================================================
+// task-pane-canvas.js: Canvas render + direct-manipulation handlers
+// (drag-to-move, drag-to-resize) with snap guides and history snapshots.
 import { el, uid, cssEscape, toast, confirmDialog } from './util.js';
 import { state, pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
 import { captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
@@ -24,10 +21,8 @@ export function renderCanvas(ctx){
     const def = window.Blocks.get(block.type);
     const card = el('div', {className:'canvas-block-card', attrs:{'data-block-id': block.id}});
     if(selectedBlockIds.has(block.id)) card.classList.add('selected');
-    // First time this block id has been seen on the canvas → mark it as
-    // new so the CSS fade-in animation runs. Subsequent re-renders of the
-    // same block don't get the class so the animation doesn't replay on
-    // every state mutation (typing, dragging, autosave, etc.).
+    // First render of this block id: tag .is-new so the fade-in animation
+    // fires once. Existing blocks stay still on subsequent re-renders.
     if(seenBlockIds && !seenBlockIds.has(block.id)){
       card.classList.add('is-new');
       seenBlockIds.add(block.id);
@@ -44,10 +39,8 @@ export function renderCanvas(ctx){
     const ctrls = el('div', {className:'canvas-block-controls'});
     const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Höhe an Inhalt anpassen'}, text:'↕'});
     const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Duplizieren'}, text:'⧉'});
-    // ★ Save as Block-Vorlage. Prompts for a name + optional description,
-    // captures the block's config (deep-cloned), and prepends it to
-    // state.userBlockTemplates so it appears in the picker's "Eigene
-    // Vorlagen" category. The block itself is not modified.
+    // Save as Block-Vorlage: prepends a deep-cloned snapshot to
+    // state.userBlockTemplates so it shows in the picker's "Eigene Vorlagen".
     const tplBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Als Block-Vorlage speichern'}, text:'★'});
     const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
     fitBtn.addEventListener('click', e => { e.stopPropagation(); autoFitBlock(block); });
@@ -65,7 +58,7 @@ export function renderCanvas(ctx){
       e.stopPropagation();
       const defaultName = (def && def.label) || block.type;
       const name = prompt('Name der Block-Vorlage:', defaultName);
-      if(name === null) return; // cancelled
+      if(name === null) return;
       const trimmed = String(name).trim();
       if(!trimmed){ toast('Vorlage wurde nicht gespeichert (kein Name angegeben).', 'error'); return; }
       const description = prompt('Beschreibung (optional):', '') || '';
@@ -84,14 +77,12 @@ export function renderCanvas(ctx){
         danger: true
       })) return;
       pushHistory();
-      // Animate the card out before splicing it from state. The CSS
-      // `.is-removing` class triggers a quick fade + shrink (180 ms);
-      // after that we run the actual removal + re-render.
+      // Fade + shrink (180 ms) before splicing.
       const i = task.blocks.findIndex(b => b.id === block.id);
       const animate = !window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const doRemove = () => {
         if(i >= 0) task.blocks.splice(i, 1);
-        // Drop from seen-set so a re-added block-id (undo!) animates back in.
+        // Drop from seen-set so undo re-triggers the fade-in animation.
         if(ctx.seenBlockIds) ctx.seenBlockIds.delete(block.id);
         selectedBlockIds.delete(block.id); ctx.persistSelection();
         renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
@@ -120,13 +111,8 @@ export function renderCanvas(ctx){
     canvas.appendChild(card);
   });
   if(task.blocks.length === 0){
-    // Richer empty state: a friendly illustration + headline + primary CTA
-    // that opens the block picker directly. The user no longer has to scan
-    // the toolbar for the "+ Block" button - the path forward is obvious.
+    // Empty state: illustration + headline + CTA that opens the block picker.
     const empty = el('div', { className:'canvas-block-empty' });
-    // SVG illustration - a stack of three card silhouettes hinting at
-    // "compose a page out of blocks". Uses `currentColor` so it picks up
-    // the surrounding muted-foreground color and stays calm.
     const svg = '<svg class="canvas-empty-art" viewBox="0 0 120 64" width="96" height="51" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<rect x="10"  y="10" width="58" height="18" rx="3" opacity="0.55"/>' +
       '<rect x="22"  y="24" width="74" height="18" rx="3" opacity="0.75"/>' +
@@ -156,13 +142,9 @@ export function renderCanvas(ctx){
 
 export function installDragHandlers(ctx, card, block){
   const { task, canvas, configHost, selectedBlockIds } = ctx;
-  // Two parallel entry points:
-  //   • mousedown - preserved for backwards compatibility (real mouse +
-  //     synthetic MouseEvents in tests / programmatic dispatch).
-  //   • pointerdown (pointerType !== 'mouse') - touch / pen on tablets.
-  // We skip pointerdown for mouse so we don't double-fire alongside
-  // mousedown. setPointerCapture on pointerdown keeps up/move events
-  // flowing to this element through a fast drag.
+  // Two entry points: mousedown for real mouse + dispatched MouseEvents
+  // in tests, pointerdown (non-mouse) for touch/pen. setPointerCapture on
+  // pointerdown keeps events flowing during fast drags.
   function startDrag(e, isPointer){
     if(e.target.closest('.canvas-block-resize') || e.target.closest('.canvas-block-controls')) return;
     if(!isPointer && e.button !== 0) return;
@@ -260,11 +242,7 @@ export function installDragHandlers(ctx, card, block){
     }
   }
 
-  // Mouse path: matches the old behavior (and test-friendly because
-  // dispatchEvent(new MouseEvent('mousedown')) triggers this).
   card.addEventListener('mousedown', e => startDrag(e, false));
-  // Touch / pen path: pointerdown only fires for non-mouse pointer types
-  // here, to avoid double-handling with the mousedown listener above.
   card.addEventListener('pointerdown', e => {
     if(e.pointerType === 'mouse') return;
     startDrag(e, true);
@@ -332,17 +310,13 @@ export function installResizeHandler(ctx, handle, card, block){
   });
 }
 
-// Auto-fit pass for newly-instantiated template blocks.
-// Templates ship with hardcoded default heights that rarely match the
-// rendered output for a given config. After the canvas DOM is built and the
-// shadow-DOM mounts have run, this measures each flagged block, updates
-// pos.h, and re-packs the column so nothing overlaps.
+// Autofit pass for fresh template blocks. Template defaults rarely match
+// the real rendered height; measure, update pos.h, re-pack the column.
 function scheduleTemplateAutofitPass(ctx){
   const { task, canvas } = ctx;
   const flagged = (task.blocks || []).filter(b => b && b._needsAutofit);
   if(flagged.length === 0) return;
-  // Two RAFs: the first lets the cards render, the second waits for any
-  // shadow-DOM mounts (preview.js renders block.mount() inside a shadow).
+  // Two rAFs: render the cards, then wait for shadow-DOM mounts.
   requestAnimationFrame(() => requestAnimationFrame(() => {
     let changed = false;
     flagged.forEach(block => {
@@ -363,7 +337,7 @@ function scheduleTemplateAutofitPass(ctx){
   }));
 }
 
-// Re-stack blocks vertically (x=20, snug vertical layout) preserving current Y order.
+// Re-stack blocks at x=20, preserving Y order.
 function repackBlocksVertically(blocks){
   const sorted = (blocks || []).filter(b => b && b.pos).slice().sort((a, b) => a.pos.y - b.pos.y);
   let y = 20;

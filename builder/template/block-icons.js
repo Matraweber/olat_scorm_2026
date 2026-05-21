@@ -1,23 +1,15 @@
-// ============================================================================
-// block-icons.js: One canonical inline-SVG icon set for every registered
-// block type. Keeps the visual rhythm of the icons identical across the
-// builder: same viewBox, same stroke-width, same `currentColor` so they pick
-// up the surrounding text color.
-//
-// Block files set `icon: 'composition'` (or any registry key) and the
-// welcome page / picker resolves the SVG via window.BlockIcons.get(key).
-// If a block uses an unknown key the rendered card falls back to the icon
-// string verbatim (so legacy ASCII labels like 'IMG' still work).
-// ============================================================================
+// block-icons.js: Canonical inline-SVG icon set for every block type.
+// Same viewBox, stroke, and currentColor across the board. Blocks set
+// `icon: '<key>'` and window.BlockIcons.get(key) resolves the SVG.
+// Unknown keys fall back to the icon string verbatim (legacy ASCII labels).
 (function(){
   'use strict';
   if(window.BlockIcons && window.BlockIcons._v >= 94) return;
-  // Bump on every block-icon change so cached older versions don't shadow.
+  // Bump on icon changes so cached older versions don't shadow.
   const _v = 94;
 
-  // Each icon is a 20×20 viewBox, 1.8 px stroke, rounded line caps. The
-  // surrounding chip on the welcome card is 30 px wide → the icon renders
-  // at 18 px which is the visual centerline.
+  // 20x20 viewBox, 1.8 px stroke, rounded caps. Renders at 18 px on the
+  // welcome cards (30 px chip).
   const SVG_OPEN  = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
   const SVG_CLOSE = '</svg>';
   function svg(inner){ return SVG_OPEN + inner + SVG_CLOSE; }

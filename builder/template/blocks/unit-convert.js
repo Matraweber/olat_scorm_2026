@@ -267,8 +267,7 @@
       };
     },
     previewConfig(){
-      // Welcome-page sample: minutes → seconds, a classic intuitive conversion
-      // that doesn't need any unit knowledge to understand the conversion.
+      // Minutes -> seconds: intuitive without prior unit knowledge.
       return {
         blockTitle: '', preset: 'custom',
         questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
@@ -287,11 +286,9 @@
         { key:'preset', label:'Vorlage', type:'select', options: PRESET_OPTIONS,
           help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        // Frage
         { type:'section', label:'Frage', key:'_sec_q' },
         { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {value}, {fromUnit}, {toUnit})', type:'text', showIf: isCustom,
           help:'Beispiel: „Rechnen Sie {value} {fromUnit} in {toUnit} um." Variablen werden bei jeder neuen Aufgabe belegt.' },
-        // Zufallsvariablen
         { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
         { key:'variants', label:'Umrechnungen', type:'list', itemLabel:'Umrechnung',
           showIf: isCustom,
@@ -311,11 +308,9 @@
           ]},
         { key:'randomize',  label:'Variante zufällig wählen',     type:'boolean' },
         { key:'randomSwap', label:'Richtung zufällig vertauschen', type:'boolean' },
-        // Lösung
         { type:'section', label:'Lösung', key:'_sec_solution' },
         { key:'tolerance', label:'Toleranz  (±, relativ)', type:'number', step:'any',
           help:'Abweichung, die noch als korrekt gilt. 0.01 = ±1 %.' },
-        // Bewertung
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];
@@ -335,7 +330,7 @@
       });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
 
-      // Unit label next to the answer input (same pattern as numeric-input's optional unit)
+      // Unit label next to the input, like numeric-input does.
       const unitLbl = document.createElement('span');
       unitLbl.style.cssText = 'font-weight:700; color:var(--primary); margin-left:0.5rem; font-size:1.05rem;';
       if(inp.parentNode) inp.parentNode.insertBefore(unitLbl, inp.nextSibling);
@@ -406,8 +401,7 @@
       const ac = unitPresetConfig(config);
       const variants = (ac.variants || []).filter(v => v && v.fromUnit && v.toUnit);
       const first = variants[0];
-      // Pick a deterministic mid-range example so the welcome preview stays
-      // stable across renders.
+      // Mid-range value so the preview stays stable across renders.
       let value = 5;
       if(first){
         const lo = Number(first.valueMin), hi = Number(first.valueMax);
@@ -417,7 +411,6 @@
         .replace('{value}', value)
         .replace('{fromUnit}', first?.fromUnit || '?')
         .replace('{toUnit}',   first?.toUnit   || '?');
-      // Compute the solution if a factor is known.
       let solution = null;
       if(first && typeof first.factor === 'number') solution = value * first.factor;
 

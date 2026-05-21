@@ -1,9 +1,5 @@
-// ============================================================================
-// summary.js: Zusammenfassung block - a styled key-points list designed
-// to sit at the end of a task and recap the most important takeaways.
-// Author edits a list of bullet points (each with a bold "headline" +
-// optional explanation). Renders as a coloured callout with checkmarks.
-// ============================================================================
+// summary.js: Zusammenfassung - styled key-points callout with checkmarks.
+// Each point has a bold headline + optional explanation.
 (function(){
   'use strict';
 
@@ -64,7 +60,6 @@
           if(!p || (!p.headline && !p.text)) return;
           const li = document.createElement('li');
           li.style.cssText = 'display:flex; gap:0.6rem; align-items:flex-start; line-height:1.45;';
-          // Checkmark
           const mark = document.createElement('span');
           mark.style.cssText = 'flex:0 0 22px; height:22px; width:22px; border-radius:50%; background:var(--accent, #84bf66); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; margin-top:1px;';
           mark.textContent = '✓';
@@ -78,8 +73,6 @@
             body.appendChild(h);
           }
           if(p.headline && p.text){
-            // Separator between headline and explanation. ": " reads naturally
-            // and avoids decorative em-dashes.
             body.appendChild(document.createTextNode(': '));
           }
           if(p.text){
@@ -97,8 +90,7 @@
       return {};
     },
     preview(host, config){
-      // For the welcome-modal and canvas preview, render the same mount but
-      // capped to 3 visible points so the card doesn't grow unbounded.
+      // Cap to 3 points so the preview card doesn't grow unbounded.
       const capped = Object.assign({}, config, {
         points: Array.isArray(config.points) ? config.points.slice(0, 3) : []
       });

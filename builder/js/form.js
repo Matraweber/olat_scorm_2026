@@ -1,37 +1,24 @@
-// ============================================================================
-// form.js: Schema-driven form renderer.
-// `renderField(spec, getObj, setObj)` builds an editor UI for one field
-// based on the spec. Supports: group, list, text, textarea, number, boolean,
+// form.js: Schema-driven form renderer. renderField(spec, getObj, setObj)
+// builds one field. Types: group, list, text, textarea, number, boolean,
 // select, color, image, math-textarea, formula-text, zone-editor.
-// ============================================================================
 import { el } from './util.js';
 import { MATH_CATS, FORMULA_FN_BTNS } from './math-toolbar-data.js';
 
-// ============================================================================
-// Upload validation shared between image / audio / video / file fields.
-//
-// Two-tier limits:
-//   • UPLOAD_WARN_THRESHOLDS - soft yellow warning. Upload still works but
-//     the browser autosave (localStorage, ~5-10 MB quota) will likely fail,
-//     meaning a page reload loses unsaved edits. The final SCORM-ZIP still
-//     ships the file correctly because media-extraction writes it as a
-//     separate binary file.
-//   • UPLOAD_SIZE_LIMITS - hard cap. Above this, FileReader risks running
-//     the tab out of memory. Reject with a friendly error pointing the
-//     user at YouTube/Vimeo for huge videos.
-//
-// The MIME check rejects obviously-wrong types (e.g. PDF in an image slot).
-// ============================================================================
+// Upload limits, shared by image/audio/video/file fields.
+// WARN: autosave (localStorage ~5-10 MB) will likely fail above this, so a
+// reload loses unsaved edits. The final SCORM-ZIP still ships the file
+// because media extraction writes it as a separate binary.
+// SIZE: hard cap. Above this, FileReader risks an OOM.
 const UPLOAD_SIZE_LIMITS = {
-  image:  50 * 1024 * 1024,   //  50 MB - hard cap
-  audio: 200 * 1024 * 1024,   // 200 MB
-  video: 500 * 1024 * 1024,   // 500 MB
+  image:  50 * 1024 * 1024,
+  audio: 200 * 1024 * 1024,
+  video: 500 * 1024 * 1024,
   file:  500 * 1024 * 1024
 };
 const UPLOAD_WARN_THRESHOLDS = {
-  image:  2 * 1024 * 1024,    //  2 MB → warning
-  audio:  5 * 1024 * 1024,    //  5 MB
-  video: 10 * 1024 * 1024,    // 10 MB
+  image:  2 * 1024 * 1024,
+  audio:  5 * 1024 * 1024,
+  video: 10 * 1024 * 1024,
   file:  10 * 1024 * 1024
 };
 export function humanSize(bytes){
@@ -59,7 +46,6 @@ export function validateUpload(file, kind){
   if(kind === 'video' && !mime.startsWith('video/')){
     return { ok:false, error:'Diese Datei ist kein Video' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
   }
-  // Soft warning for files that may break the browser autosave.
   const warnThresh = UPLOAD_WARN_THRESHOLDS[kind];
   let warning = null;
   if(warnThresh && file.size > warnThresh){
@@ -70,14 +56,8 @@ export function validateUpload(file, kind){
   }
   return { ok: true, sizeHuman: humanSize(file.size), warning };
 }
-// Render an inline status row below an upload input. Returns an object with
-// .showError(msg) / .showSuccess(msg) / .showWarning(msg) / .clear() -
-// the renderer uses these to communicate validation outcomes without
-// disrupting the layout.
-//
-//   error   → red, rejected upload
-//   warning → amber, upload succeeded but caveat applies (large file)
-//   success → green, upload accepted with no caveats
+// Inline status row below an upload input.
+// Returns { el, showError, showSuccess, showWarning, clear }.
 function makeUploadStatus(){
   const el = document.createElement('div');
   el.className = 'upload-status';
@@ -106,7 +86,6 @@ function makeUploadStatus(){
 export function renderField(spec, getObj, setObj){
   const obj = getObj() || {};
 
-  // ---------- container types ----------
   if(spec.type === 'group'){
     const fs = el('fieldset', {className:'fieldset'});
     const lg = el('legend', {text: spec.label || spec.key});
@@ -134,9 +113,8 @@ export function renderField(spec, getObj, setObj){
     function defaultItem(){
       const item = {};
       (spec.itemSchema || []).forEach(s => {
-        if(s.type === 'section') return; // visual only, no data
+        if(s.type === 'section') return;
         if(s.type === 'unit-pair'){
-          // Seed the four underlying keys with the spec's declared defaults
           if(s.defaultFromValue != null) item[s.fromKey || 'fromValue']    = s.defaultFromValue;
           if(s.defaultFromUnit  != null) item[s.fromUnitKey || 'fromUnit'] = s.defaultFromUnit;
           if(s.defaultToValue   != null) item[s.toKey || 'toValue']        = s.defaultToValue;
@@ -148,7 +126,7 @@ export function renderField(spec, getObj, setObj){
           if(s.defaultTo   != null) item[s.toKey   || 'toUnit']   = s.defaultTo;
           return;
         }
-        if(s.type === 'action') return; // buttons have no data
+        if(s.type === 'action') return;
         if(s.default != null) item[s.key] = s.default;
         else if(s.type === 'boolean') item[s.key] = false;
         else if(s.type === 'number') item[s.key] = 0;
@@ -166,7 +144,6 @@ export function renderField(spec, getObj, setObj){
         const ihead = el('div', {className:'list-item-head'});
         ihead.appendChild(el('span', {className:'list-item-title', text:(spec.itemLabel || 'Eintrag') + ' ' + (idx+1)}));
 
-        // Optional live summary subtitle
         let summarySpan = null;
         if(spec.itemSummary){
           summarySpan = el('span', {className:'list-item-subtitle', text: spec.itemSummary(item) || ''});
@@ -185,14 +162,13 @@ export function renderField(spec, getObj, setObj){
         ihead.appendChild(ctrls);
         card.appendChild(ihead);
 
-        // Collect showIf conditionals for this item's fields
         const conditionals = [];
         function evalConditionals(){
           conditionals.forEach(c => { c.el.style.display = c.showIf(item) ? '' : 'none'; });
         }
 
-        // Group itemSchema by section dividers so each section label sits
-        // outside its field-row (avoids Safari's grid-column:-1 bug with auto-fit).
+        // Group itemSchema by section dividers so each label sits outside
+        // its field-row (Safari grid-column:-1 bug with auto-fit).
         const groups = [];
         let cur = { label: null, fields: [] };
         (spec.itemSchema || []).forEach(sub => {
@@ -236,22 +212,18 @@ export function renderField(spec, getObj, setObj){
     return block;
   }
 
-  // ---------- section divider ----------
   if(spec.type === 'section'){
     return el('div', {className:'field-section-label', text: spec.label || ''});
   }
 
-  // ---------- unit-pair: bidirectional live unit converter ----------
   if(spec.type === 'unit-pair'){
     return renderUnitPairField(spec, getObj, setObj);
   }
 
-  // ---------- unit-from-to: two unit selects with swap button ----------
   if(spec.type === 'unit-from-to'){
     return renderUnitFromToField(spec, getObj, setObj);
   }
 
-  // ---------- action button (e.g. reset) ----------
   if(spec.type === 'action'){
     const row = el('div', {className:'field-action-row'});
     const btn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: spec.label || 'Aktion'});
@@ -262,7 +234,6 @@ export function renderField(spec, getObj, setObj){
     return row;
   }
 
-  // ---------- scalar fields ----------
   const wrap = el('div', {className: 'field' + (spec.help ? ' field-has-help' : '') + (spec.fullWidth ? ' field-full' : '')});
   if(spec.type !== 'boolean'){
     wrap.appendChild(el('label', {text: spec.label || spec.key}));
@@ -299,9 +270,7 @@ export function renderField(spec, getObj, setObj){
     input.value = cur != null ? String(cur) : ((spec.options && spec.options[0] && spec.options[0].value) || '');
     input.addEventListener('change', () => setObj(spec.key, input.value));
   } else if(spec.type === 'color'){
-    // Native color swatch (shows a colour wheel on macOS/Chrome and a flat
-    // panel on Windows) paired with a hex-text field. Both stay in sync so
-    // power-users can type a hex value while casual users use the swatch.
+    // Native swatch + hex input, kept in sync.
     const cfWrap = el('div', {className:'color-field'});
     const swatch = el('input', {className:'color-field-swatch', attrs:{type:'color'}});
     const hexInp = el('input', {className:'color-field-hex', attrs:{type:'text', maxlength:'7', spellcheck:'false', placeholder:'#RRGGBB'}});
@@ -338,7 +307,8 @@ export function renderField(spec, getObj, setObj){
     return renderFormulaText(spec, getObj, setObj, wrap);
   } else if(spec.type === 'zone-editor') {
     return renderZoneEditor(spec, getObj, setObj, wrap);
-  } else { // plain text
+  } else {
+    // plain text
     input = el('input', {attrs:{type:'text', placeholder: spec.placeholder || ''}});
     const v = obj[spec.key];
     input.value = Array.isArray(v) ? v.join(',') : (v != null ? String(v) : '');
@@ -351,7 +321,7 @@ export function renderField(spec, getObj, setObj){
   return wrap;
 }
 
-// ---------- image field (file upload OR URL) ----------
+// image field: file upload or URL.
 function renderImageField(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
   const inner = el('div');
@@ -364,7 +334,7 @@ function renderImageField(spec, getObj, setObj, wrap){
     const v = validateUpload(f, 'image');
     if(!v.ok){
       status.showError(v.error);
-      fileInp.value = '';  // reset so the same file can be re-tried after correction
+      fileInp.value = '';  // reset so the same file can be retried
       return;
     }
     const r = new FileReader();
@@ -402,10 +372,7 @@ function renderImageField(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- audio field (file upload OR URL) ----------
-// Mirrors renderImageField. Accepts mp3/wav/ogg via a file picker; the file
-// is read as a Data-URL and stored in config.src so it travels with the
-// SCORM-ZIP without needing a separate /media folder.
+// audio field: file upload or URL. Same shape as renderImageField.
 function renderAudioField(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
   const inner = el('div');
@@ -451,10 +418,8 @@ function renderAudioField(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- video field (file upload OR URL) ----------
-// Same shape as renderAudioField but accepts video/* and previews with
-// a <video controls> element so the user can verify the clip in-place
-// before saving.
+// video field: file upload or URL. Previews with <video controls> or
+// embed iframe for YouTube/Vimeo links.
 function renderVideoField(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
   const inner = el('div');
@@ -488,8 +453,7 @@ function renderVideoField(spec, getObj, setObj, wrap){
     previewWrap.innerHTML = '';
     const v = (getObj() || {})[spec.key];
     if(!v) return;
-    // Detect platform embeds via the video block's helper. Mirrors the
-    // runtime so the editor preview matches what the learner will see.
+    // Mirror runtime detection so the editor preview matches the learner view.
     const def = window.Blocks && window.Blocks.get('video');
     const info = def && typeof def.detectVideoSource === 'function' ? def.detectVideoSource(v) : null;
     if(info && (info.kind === 'youtube' || info.kind === 'vimeo')){
@@ -523,9 +487,7 @@ function renderVideoField(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- generic file field (any extension) ----------
-// For Datei-Download block: accepts any MIME type, displays filename + size,
-// and auto-fills a sibling `filename` field when the user picks a file.
+// Generic file upload (any MIME). Auto-fills a sibling `filename` field.
 function renderFileField(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
   const inner = el('div');
@@ -540,8 +502,7 @@ function renderFileField(spec, getObj, setObj, wrap){
     const r = new FileReader();
     r.onload = () => {
       setObj(spec.key, r.result);
-      // If the owning object has a `filename` field and it's empty, seed it
-      // with the uploaded file's name so the download has a sensible default.
+      // Seed a sibling `filename` field if present and still empty.
       const cur = getObj() || {};
       if('filename' in cur && !cur.filename) setObj('filename', f.name);
       status.showSuccess('Datei eingebettet (' + v.sizeHuman + ')');
@@ -582,7 +543,7 @@ function renderFileField(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- math-textarea: toolbar + textarea + live KaTeX preview ----------
+// math-textarea: toolbar + textarea + live KaTeX preview.
 function renderMathTextarea(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
 
@@ -665,7 +626,7 @@ function renderMathTextarea(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- formula-text: function helper buttons + text input ----------
+// formula-text: function helper buttons + text input.
 function renderFormulaText(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
 
@@ -699,7 +660,7 @@ function renderFormulaText(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- zone-editor: drag rectangles onto an image (for hotzone block) ----------
+// zone-editor: drag rectangles onto an image (hotzone block).
 function renderZoneEditor(spec, getObj, setObj, wrap){
   const ze = el('div', {className:'zone-editor'});
   const status = el('div', {className:'zone-editor-status'});
@@ -803,13 +764,12 @@ function renderZoneEditor(spec, getObj, setObj, wrap){
     e.preventDefault();
   });
 
-  // Watch the sibling `src` field via interval (form re-render doesn't notify peer fields)
+  // Poll the sibling `src` field; peer fields don't notify on change.
   const watcher = setInterval(() => {
     const cur = (getObj() || {}).src;
     if(cur !== lastRenderedSrc) render();
   }, 500);
 
-  // Cleanup when wrap is detached from DOM
   const mo = new MutationObserver(() => {
     if(!document.body.contains(wrap)){
       clearInterval(watcher);
@@ -829,7 +789,7 @@ function renderZoneEditor(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// ---------- unit-pair field: two number+unit selects with live bidirectional conversion ----------
+// unit-pair: two number+unit selects with live bidirectional conversion.
 function renderUnitPairField(spec, getObj, setObj){
   const units   = spec.units  || {};
   const convert = spec.convertFn;
@@ -840,7 +800,7 @@ function renderUnitPairField(spec, getObj, setObj){
 
   const obj = getObj() || {};
 
-  // Build grouped <optgroup> selects
+  // Build optgroup-grouped selects.
   const cats = {};
   Object.entries(units).forEach(([id, u]) => {
     if(!cats[u.cat]) cats[u.cat] = [];
@@ -941,12 +901,11 @@ function renderUnitPairField(spec, getObj, setObj){
 
   fromValInp.addEventListener('input', syncFromLeft);
   fromUnitSel.addEventListener('change', syncFromLeft);
-  toUnitSel.addEventListener('change', syncFromLeft);   // recompute output when toUnit changes
+  toUnitSel.addEventListener('change', syncFromLeft);
   toValInp.addEventListener('input', syncFromRight);
 
   swapBtn.addEventListener('click', e => {
     e.preventDefault();
-    // Swap from/to values and units atomically
     const fv = fromValInp.value, fu = fromUnitSel.value;
     const tv = toValInp.value,   tu = toUnitSel.value;
     fromValInp.value = tv; toValInp.value = fv;
@@ -957,14 +916,13 @@ function renderUnitPairField(spec, getObj, setObj){
   return outer;
 }
 
-// ---------- unit-from-to field: two unit selects + swap button (no value inputs) ----------
+// unit-from-to: two unit selects + swap button (no value inputs).
 function renderUnitFromToField(spec, getObj, setObj){
   const units = spec.units || {};
   const fk = spec.fromKey || 'fromUnit';
   const tk = spec.toKey   || 'toUnit';
   const obj = getObj() || {};
 
-  // Group units by category for optgroup display
   const cats = {};
   Object.entries(units).forEach(([id, u]) => {
     if(!cats[u.cat]) cats[u.cat] = [];

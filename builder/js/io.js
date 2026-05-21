@@ -1,7 +1,4 @@
-// ============================================================================
-// io.js: Import/export: JSON config, SCORM-1.2 ZIP packaging, and the
-// in-browser preview iframe construction.
-// ============================================================================
+// io.js: JSON config, SCORM-1.2 ZIP packaging, preview iframe.
 import {
   el, escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
 } from './util.js';
@@ -9,9 +6,7 @@ import { state, render, defaultTheme, scheduleAutosave } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
 
-// ---- File fetchers (cache-busted) ----
-// *Rel variants prepend 'template/' for runtime templates;
-// the plain variants take a path relative to the builder/ root (e.g. 'lib/katex/...').
+// *Rel variants prepend 'template/'; plain variants take a path relative to builder/.
 async function fetchTextRel(path){
   const r = await fetch(withBust('template/' + path));
   if(!r.ok) throw new Error('Konnte Template-Datei nicht laden: ' + path);
@@ -33,7 +28,7 @@ async function fetchBinary(absPath){
   return await r.blob();
 }
 
-// KaTeX bundle: shipped inside the SCORM ZIP at /katex/ for fully-offline math rendering.
+// KaTeX bundle: shipped inside the SCORM ZIP for offline math rendering.
 const KATEX_FONTS = [
   'KaTeX_AMS-Regular.woff2','KaTeX_Caligraphic-Bold.woff2','KaTeX_Caligraphic-Regular.woff2',
   'KaTeX_Fraktur-Bold.woff2','KaTeX_Fraktur-Regular.woff2','KaTeX_Main-Bold.woff2',
@@ -89,10 +84,8 @@ async function gatherTemplateFiles(usedBlocks){
   return files;
 }
 
-// ---- ZIP build / download / load ----
-// MIME → file-extension mapping used when extracting data-URLs to separate
-// binary files. Only common media types need explicit entries; everything
-// else falls back to the right-of-slash subtype (e.g. application/pdf → pdf).
+// MIME -> extension for extracting data-URLs into separate binaries.
+// Unknown types fall back to the subtype after the slash.
 const MIME_EXT = {
   'image/jpeg': 'jpg',
   'image/jpg':  'jpg',
@@ -120,8 +113,6 @@ function extFromMime(mime){
   return sub.split(';')[0].split('+')[0] || 'bin';
 }
 
-// Convert a base64 string to a Uint8Array. Used by the data-URL extractor
-// below - atob() decodes per-character, so we pack the codes into bytes.
 function base64ToBytes(b64){
   const bin = atob(b64);
   const len = bin.length;
@@ -130,26 +121,19 @@ function base64ToBytes(b64){
   return out;
 }
 
-// Walk every block in a clean task list, replace any string config field
-// starting with "data:" by a `media/{blockId}_{key}.{ext}` path, and return
-// the new task list plus the binary files that need to be added to the ZIP.
-//
-// Why: embedding multi-MB videos/audio as base64 in tasks.json inflates the
-// payload by ~33% and gets bundled twice (once in tasks.json, once in
-// index.html via window.__SCORM_TASKS__). Splitting them out keeps the JSON
-// small and lets the browser stream the media files normally.
+// Replace base64 data-URLs in block configs with `media/{blockId}_{key}.{ext}`
+// paths, returning the rewritten tasks plus the extracted binaries. base64
+// in JSON inflates the payload by ~33% and gets bundled twice (tasks.json +
+// inline in index.html), so we split media into real files.
 function extractMediaFromTasks(tasks){
-  // Map<string, Uint8Array> - path → binary
   const mediaFiles = new Map();
-  // Counter for filename collisions within a single block (multiple fields)
   function maybeExtract(value, blockId, key){
     if(typeof value !== 'string' || !value.startsWith('data:')) return value;
     const m = value.match(/^data:([^;,]+)(?:;base64)?,(.+)$/);
     if(!m) return value;
     const mime = m[1].trim();
     const body = m[2];
-    // Only base64-encoded payloads need extraction. Plain (url-encoded)
-    // data-URLs are typically tiny (small SVGs, fragments) - leave them.
+    // Plain (url-encoded) data-URLs are typically tiny SVGs - leave them.
     const isBase64 = /;base64,/.test(value);
     if(!isBase64) return value;
     const ext = extFromMime(mime);
@@ -197,8 +181,7 @@ async function buildZip(){
   const manifestTpl = await fetchTextRel('imsmanifest.xml');
   const blockFiles = used.map(b => 'blocks/' + BLOCK_FILES[b]).filter(Boolean);
 
-  // First pass: clean tasks for export (drops UI-only fields, migrates legacy).
-  // Second pass: extract any data-URLs to separate files in media/.
+  // Clean tasks (drop UI-only fields), then extract data-URLs into media/.
   const cleanedTasks = state.course.tasks.map(t => {
     const clean = cleanTaskForExport(t);
     return { id: t.id, title: t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
@@ -245,8 +228,6 @@ async function buildZip(){
     zip.file(rel, tmpl[rel]);
   });
   await addKatexToZip(zip);
-  // Add the extracted media binaries. JSZip stores Uint8Array as-is, no
-  // base64 indirection, so the on-disk size matches the original file.
   for(const [path, bytes] of mediaFiles){
     zip.file(path, bytes);
   }
@@ -254,10 +235,7 @@ async function buildZip(){
   return zip;
 }
 
-// Pre-export validation gate. Runs validateCourse() and, if any issues are
-// found, shows a modal listing them with two choices: "Trotzdem exportieren"
-// or "Korrigieren". Returns a promise that resolves with true (proceed) or
-// false (cancel).
+// Modal listing validation issues; resolves true (proceed) or false (cancel).
 function confirmExportWithIssues(report){
   return new Promise(resolve => {
     const overlay = document.createElement('div');
@@ -306,8 +284,6 @@ function confirmExportWithIssues(report){
 
 export async function downloadZip(){
   try {
-    // Validate before doing any work. If issues, show the gate. The user can
-    // either close it and fix things, or proceed anyway.
     const report = validateCourse(state.course);
     if(report.issues.length || report.courseIssues.length){
       const proceed = await confirmExportWithIssues(report);
@@ -316,17 +292,12 @@ export async function downloadZip(){
     toast('Paket wird erzeugt … 0 %');
     const zip = await buildZip();
     if(!zip) return;
-    // JSZip emits an onUpdate callback during generation with a `percent`
-    // (0-100). We surface that in the toast so the user sees the package
-    // actually building - important for courses with many images where the
-    // operation can take several seconds. The toast call resets the
-    // 3-second auto-dismiss timer each time, so it stays visible throughout.
+    // Surface JSZip's percent in the toast (each toast call resets the
+    // 3 s auto-dismiss). Repaint only when the integer percent changes.
     let lastPercent = -1;
     const blob = await zip.generateAsync({ type:'blob' }, (metadata) => {
       const p = metadata && typeof metadata.percent === 'number'
         ? Math.round(metadata.percent) : null;
-      // Only repaint when the integer percent actually changes - avoids
-      // burning frames on identical strings (JSZip calls this very often).
       if(p == null || p === lastPercent) return;
       lastPercent = p;
       toast('Paket wird erzeugt … ' + p + ' %');
@@ -344,13 +315,9 @@ export async function downloadZip(){
   }
 }
 
-// Walk a task list and re-embed any `media/...` path references back as
-// data-URLs. This is the inverse of extractMediaFromTasks: it lets the
-// builder edit videos/audio loaded from a SCORM-ZIP without losing the
-// payload (the in-memory state always works with data-URLs so save/edit
-// flows stay simple).
+// Inverse of extractMediaFromTasks: re-embed `media/...` paths as data-URLs
+// so the in-memory state stays uniformly data-URL based on import.
 async function reembedMediaInTasks(tasks, zip){
-  // Common media file extensions → MIME for re-encoding to data-URL.
   const EXT_MIME = {
     jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
     svg:'image/svg+xml', webp:'image/webp',
@@ -399,9 +366,7 @@ async function reembedMediaInTasks(tasks, zip){
 
 export async function loadZipFile(file){
   if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return; }
-  // Surface progress immediately so the user knows the click registered,
-  // parsing a multi-MB ZIP can take a couple of seconds without any visual
-  // feedback otherwise.
+  // Parsing a multi-MB ZIP takes a moment, signal that the click registered.
   toast('Paket wird gelesen …');
   try {
     const buf = await file.arrayBuffer();
@@ -424,7 +389,6 @@ export async function loadZipFile(file){
       const rawTasks = (cfg.tasks || []).map(t =>
         migrateTaskIfNeeded(Object.assign({id: t.id || uid('t_')}, t))
       );
-      // Re-embed media files (if any) so the builder can edit them.
       toast('Medien werden eingebettet …');
       const tasks = await reembedMediaInTasks(rawTasks, zip);
       state.course = {
@@ -445,7 +409,6 @@ export async function loadZipFile(file){
   } catch(err){ console.error(err); toast('ZIP-Fehler: ' + err.message, 'error'); }
 }
 
-// ---- JSON export / import ----
 export function exportJson(){
   const courseClean = Object.assign({}, state.course, {
     tasks: (state.course.tasks || []).map(cleanTaskForExport)
@@ -471,7 +434,6 @@ export async function loadJsonFile(file){
   } catch(err){ toast('Fehler: ' + err.message, 'error'); }
 }
 
-// ---- Preview iframe ----
 export async function showPreview(){
   try {
     toast('Vorschau wird vorbereitet …');
@@ -495,7 +457,7 @@ export async function showPreview(){
     const themeJson = JSON.stringify(previewTheme);
     let bodyInner = extractBodyInner(tmpl['index.html']);
     bodyInner = bodyInner.replace(/<script[^>]+src=[^>]+><\/script>/gi, '').replace(/<!--\s*BLOCK_SCRIPTS\s*-->/g, '');
-    // srcdoc iframes need an explicit <base> for relative URLs (e.g. local KaTeX) to resolve.
+    // srcdoc iframes need <base> for relative URLs (e.g. local KaTeX).
     const baseHref = window.location.href.replace(/[^/]*$/, '');
     const html = [
       '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Vorschau</title>',
@@ -518,7 +480,6 @@ export async function showPreview(){
   } catch(err){ console.error(err); toast('Vorschau-Fehler: ' + err.message, 'error'); }
 }
 
-// ---- JSON-editor mode (textarea-based) ----
 export function syncJsonEditor(){
   document.getElementById('jsonEditor').value = JSON.stringify({course: state.course, theme: state.theme}, null, 2);
   const s = document.getElementById('jsonStatus'); s.textContent = ''; s.className = 'json-status';
@@ -530,7 +491,7 @@ export function applyJsonEditor(){
     if(parsed.theme) state.theme = parsed.theme;
     const s = document.getElementById('jsonStatus'); s.textContent = 'Übernommen.'; s.className = 'json-status ok';
     scheduleAutosave();
-    // render() would replace the textarea; use renderActivePane-equivalent indirectly via state-only update
+    // render() would replace the textarea, so only refresh the task list.
     import('./panes.js').then(m => m.renderTaskList());
   } catch(err){
     const s = document.getElementById('jsonStatus'); s.textContent = 'Fehler: ' + err.message; s.className = 'json-status error';

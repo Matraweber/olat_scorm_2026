@@ -1,7 +1,5 @@
-// ============================================================================
-// state.js: Global app state, defaults, history (undo/redo), clipboard.
-// `render` and `renderActivePane` are set by main.js to break circular imports.
-// ============================================================================
+// state.js: Global state, defaults, history (undo/redo), clipboard.
+// render/renderActivePane are set by main.js to break circular imports.
 import { toast } from './util.js';
 
 export function defaultCourse(){
@@ -50,10 +48,8 @@ export function clearPersistentTheme(){
   catch(e){}
 }
 
-// Push the four theme colors onto the document root as CSS custom-properties
-// so the Builder-UI live-previews any change. The SCORM output already
-// renders with these values; the builder needed an extra hop to stay in sync.
-// Called from main.js on boot and from the theme pane on every field change.
+// Push theme colors onto the document root so the builder UI live-previews
+// changes (the SCORM output already uses these vars natively).
 export function applyThemeToBuilder(theme){
   const t = mergeTheme(theme);
   const r = document.documentElement;
@@ -64,21 +60,16 @@ export function applyThemeToBuilder(theme){
   if(t.accentDarkColor)  r.style.setProperty('--accent-dark',  t.accentDarkColor);
 }
 
-// ============================================================================
-// Autosave: every change to `state.course` is mirrored to localStorage so the
-// browser tab can be closed without losing work. On next load main.js asks the
-// user whether to restore the saved course or start fresh.
-// ============================================================================
+// Autosave: mirror state.course to localStorage. On next load main.js
+// offers to restore the saved course.
 let _autosaveTimer = null;
-let _onAutosave = null;     // optional callback for UI ("Gespeichert vor 3 s")
-let _onAutosavePending = null; // optional callback when a save was just scheduled
+let _onAutosave = null;
+let _onAutosavePending = null;
 
 export function setAutosaveListener(fn){ _onAutosave = typeof fn === 'function' ? fn : null; }
 export function setAutosavePendingListener(fn){ _onAutosavePending = typeof fn === 'function' ? fn : null; }
 
-// Returns true iff the saved course is non-empty (= has at least one task or
-// a non-default title). Lets main.js skip the recovery prompt for pristine
-// snapshots that wouldn't add anything.
+// True if the course has any task or a non-default title.
 function courseHasContent(c){
   if(!c) return false;
   const def = defaultCourse();
@@ -111,11 +102,10 @@ export function loadAutosaveMeta(){
   } catch(e){ return null; }
 }
 
-// Write through immediately (no debounce). Caller decides timing.
+// Write through immediately. Caller decides timing.
 export function saveAutosave(course){
   try {
     if(!courseHasContent(course)){
-      // Avoid littering localStorage with empty defaults.
       localStorage.removeItem(AUTOSAVE_KEY);
       localStorage.removeItem(AUTOSAVE_META_KEY);
       return;
@@ -129,8 +119,7 @@ export function saveAutosave(course){
     }));
     if(_onAutosave) try { _onAutosave({ ts }); } catch(e){}
   } catch(e){
-    // Quota exceeded or private-mode browser - silently ignore so we never
-    // disrupt the user. The user can still manually export via the SCORM ZIP.
+    // Quota exceeded / private mode: ignore. Manual ZIP export still works.
   }
 }
 
@@ -138,10 +127,8 @@ export function clearAutosave(){
   try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_META_KEY); } catch(e){}
 }
 
-// Debounced variant for hot paths (typing, dragging). 800 ms after the last
-// call we write through. A flush-on-unload safety net catches the last edit
-// (registered by main.js). We also notify the pending listener (UI shows
-// "Wird gespeichert …") so the indicator reflects the in-flight state.
+// Debounced for hot paths (typing, dragging): 800 ms idle = one write.
+// main.js also registers a flush on unload for the last edit.
 export function scheduleAutosave(){
   if(!_autosaveTimer && _onAutosavePending){
     try { _onAutosavePending(); } catch(e){}
@@ -157,13 +144,13 @@ export function flushAutosave(){
 export const state = {
   course: defaultCourse(),
   theme: loadPersistentTheme(),
-  selected: { kind: 'welcome' },  // {kind:'welcome'|'course'|'theme'} or {kind:'task', idx}
+  // {kind:'welcome'|'course'|'theme'} or {kind:'task', idx}
+  selected: { kind: 'welcome' },
   jsonMode: false,
   userTemplates: []
 };
 
-// ---- Render dispatchers (set up by main.js via setRenderer) ----
-// Stubs ensure modules can call render() at module-load time without throwing.
+// Stubs so modules can call render() at import time before main.js sets them.
 let _render = () => {};
 let _renderActivePane = () => {};
 export function setRenderer(renderFn, renderActivePaneFn){
@@ -173,9 +160,7 @@ export function setRenderer(renderFn, renderActivePaneFn){
 export function render(){ _render(); }
 export function renderActivePane(){ _renderActivePane(); }
 
-// ============================================================================
 // History (undo / redo)
-// ============================================================================
 const history = { past: [], future: [] };
 const HISTORY_LIMIT = 50;
 function snapshotState(){ return JSON.stringify({course: state.course, theme: state.theme}); }
@@ -231,9 +216,7 @@ export function redo(){
   toast('Wiederherstellen');
 }
 
-// ============================================================================
-// Clipboard (blocks, persisted via localStorage)
-// ============================================================================
+// Clipboard for blocks, persisted via localStorage.
 const CLIPBOARD_KEY = 'scorm-builder-clipboard';
 function clipboardPut(payload){ try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(payload)); } catch(e){} }
 function clipboardGet(){

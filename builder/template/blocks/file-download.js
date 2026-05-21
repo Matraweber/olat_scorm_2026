@@ -1,18 +1,12 @@
-// ============================================================================
-// file-download.js: Datei-Download block - attaches an arbitrary file
-// (PDF, ZIP, DOCX, …) to the lesson. The runtime renders a download
-// button/link with the original filename, a friendly title, and an
-// optional description ("Skript zur Vorlesung", "Hausaufgabe Woche 3", …).
-// ============================================================================
+// file-download.js: Lesson attachment block. Renders a download button
+// with title + description.
 (function(){
   'use strict';
 
-  // Try to derive a human-readable size string from a data-URL. Returns ''
-  // for unknown sources (regular URLs that aren't data-URLs).
+  // Human-readable size from a data-URL. Returns '' for plain URLs.
   function dataUrlSize(src){
     if(!src || !src.startsWith('data:')) return '';
     const b64 = src.split(',')[1] || '';
-    // base64 → bytes: every 4 chars decode to ~3 bytes (minus padding)
     const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
     const bytes = Math.max(0, (b64.length * 3 / 4) - padding);
     if(bytes < 1024) return bytes + ' B';
@@ -21,9 +15,7 @@
     return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
   }
 
-  // Best-effort filename for the download attribute. Prefers the explicit
-  // `filename` field, then derives from the URL path, finally falls back
-  // to a generic name.
+  // Prefer config.filename; otherwise derive from URL.
   function downloadFilename(config){
     if(config.filename) return config.filename;
     if(config.src && !config.src.startsWith('data:')){
@@ -64,19 +56,15 @@
       wrap.className = 'file-download-block';
       wrap.style.cssText = 'display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem; border:1px solid var(--line, #d2dce5); border-radius:10px; background:#f7fafc;';
 
-      // Document icon (left)
       const ico = document.createElement('div');
       ico.style.cssText = 'flex:0 0 36px; width:36px; height:44px; border-radius:5px 5px 4px 4px; background:#003b5c; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.7rem; letter-spacing:0.04em; position:relative;';
-      // Filename extension as icon label (e.g. "PDF", "ZIP", "DOCX")
       const ext = (config.filename || '').split('.').pop().toUpperCase();
       ico.textContent = ext && ext.length <= 4 ? ext : 'FILE';
-      // Folded-corner detail
       const corner = document.createElement('div');
       corner.style.cssText = 'position:absolute; top:0; right:0; width:10px; height:10px; background:linear-gradient(225deg, #fff 50%, transparent 50%);';
       ico.appendChild(corner);
       wrap.appendChild(ico);
 
-      // Body
       const body = document.createElement('div');
       body.style.cssText = 'flex:1; min-width:0;';
       if(config.title){
@@ -99,8 +87,7 @@
       body.appendChild(fileInfo);
       wrap.appendChild(body);
 
-      // Download button. In _demo mode we render the styled button without
-      // a real href so the welcome-modal preview shows the filled layout.
+      // _demo mode renders the styled button without an href.
       if(config.src || config._demo){
         const btn = document.createElement(config.src ? 'a' : 'span');
         if(config.src){
@@ -120,8 +107,6 @@
       return {};
     },
     preview(host, config){
-      // Identical to mount() for this block - there's no "interactive" version
-      // and the layout is already compact enough for the canvas card.
       this.mount(host, config, {});
     }
   });

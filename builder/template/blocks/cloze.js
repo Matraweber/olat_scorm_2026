@@ -28,9 +28,7 @@
     previewConfig(){
       return {
         blockTitle: '', preset: 'custom',
-        // Two short blanks demonstrate both input types:
-        //   {{Berlin}}             = freie Texteingabe
-        //   {{=Jupiter|Saturn|Mars}} = Dropdown (erste Option = richtig)
+        // {{...}} = Texteingabe, {{=a|b|c}} = Dropdown (a richtig).
         text: 'Die Hauptstadt Deutschlands heißt {{Berlin}}. Der größte Planet im Sonnensystem ist {{=Jupiter|Saturn|Mars}}.',
         ignoreCase: true, shuffleDropdown: true, maxPoints: 2
       };
@@ -45,11 +43,9 @@
           {value:'ohm-law',    label:'Beispiel: Physik, Ohmsches Gesetz'}
         ], help:'Lücken-Syntax: {{antwort}} = Texteingabe · {{a|b}} = Alternativen · {{=richtig|falsch}} = Dropdown.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        // Lückentext
         { type:'section', label:'Lückentext', key:'_sec_text', showIf: isCustom },
         { key:'text', label:'Text mit Lücken', type:'textarea', rows:5, showIf: isCustom,
           help:'Lücken-Syntax:\n• {{antwort}} → Texteingabe\n• {{a|b|c}} → Eingabe mit Alternativen (alle richtig)\n• {{=richtig|falsch1|falsch2}} → Dropdown (erste Option = richtig)' },
-        // Einstellungen & Bewertung
         { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
         { key:'ignoreCase',      label:'Groß-/Kleinschreibung ignorieren', type:'boolean' },
         { key:'shuffleDropdown', label:'Dropdown-Optionen mischen',        type:'boolean' },

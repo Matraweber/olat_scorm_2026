@@ -1,13 +1,7 @@
-// ============================================================================
-// util.js: DOM helpers, string/file utilities, toast notifications
-// No imports from other app modules. May be imported by anyone.
-// ============================================================================
+// util.js: DOM helpers, string/file utilities, toast.
+// No imports from other app modules.
 
-/**
- * Create an element with options.
- * @param {string} tag
- * @param {Object} [opts] - { className, id, text, html, attrs, style, on, children }
- */
+// el(tag, { className, id, text, html, attrs, style, on, children })
 export function el(tag, opts){
   const e = document.createElement(tag);
   if(!opts) return e;
@@ -49,10 +43,7 @@ export function cssEscape(s){
   return String(s).replace(/([!"#$%&'()*+,./:;<=>?@\[\\\]^`{|}~])/g, '\\$1');
 }
 
-/**
- * Append a cache-busting query parameter to a URL so we always get the latest version
- * of template files when generating preview iframes or SCORM ZIPs.
- */
+// Cache-bust template fetches so preview iframes and ZIPs use fresh files.
 export function withBust(url){
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
 }
@@ -82,17 +73,9 @@ export function toast(msg, type){
   _toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-// Styled confirmation dialog - replaces the native `confirm()` modal so
-// the visual matches the rest of the builder. Returns a Promise<boolean>.
-// Options:
-//   • title         optional bold heading line
-//   • message       primary body text (required)
-//   • confirmLabel  button text for "OK" (default: "OK")
-//   • cancelLabel   button text for "Cancel" (default: "Abbrechen")
-//   • danger        if true, the confirm button gets a red destructive style
-//
-// Falls back to native `confirm()` if the DOM isn't available (e.g. SSR /
-// very early call before <body> exists).
+// Styled replacement for window.confirm(). Returns Promise<boolean>.
+// Options: title, message, confirmLabel, cancelLabel, danger.
+// Falls back to native confirm() if document.body is unavailable.
 export function confirmDialog(opts){
   if(typeof document === 'undefined' || !document.body){
     return Promise.resolve(window.confirm(opts && opts.message ? opts.message : 'OK?'));
@@ -135,15 +118,12 @@ export function confirmDialog(opts){
       else if(e.key === 'Enter' && e.target !== cancelBtn){ e.preventDefault(); cleanup(true); }
     }
     function onBackdrop(e){
-      // Click on backdrop (the overlay itself) cancels. Click on card does not.
       if(e.target === overlay) cleanup(false);
     }
     okBtn.addEventListener('click', () => cleanup(true));
     cancelBtn.addEventListener('click', () => cleanup(false));
     document.addEventListener('keydown', onKey, true);
     overlay.addEventListener('mousedown', onBackdrop);
-    // Focus the confirm button so Enter submits and screen readers announce
-    // the modal. Use setTimeout so the layout settles first.
     setTimeout(() => okBtn.focus({ preventScroll: true }), 0);
   });
 }

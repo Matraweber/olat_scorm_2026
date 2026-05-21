@@ -1,11 +1,6 @@
-// ============================================================================
-// task-pane.js: Orchestrator for the free-canvas task editor. Builds the
-// shared `ctx` object and wires up the head/toolbar/zoom/tab-bar. The heavy
-// lifting lives in sibling modules:
-//   • task-pane-canvas.js: canvas render + drag/resize handlers
-//   • task-pane-config.js: right-side block config pane + multi-select UI
-//   • task-pane-bulk.js: bulk align/distribute/duplicate/delete
-// ============================================================================
+// task-pane.js: Orchestrator for the canvas task editor. Builds the shared
+// `ctx`, wires up head/toolbar/zoom/tab-bar. Heavy lifting in sibling
+// modules: task-pane-canvas.js, task-pane-config.js, task-pane-bulk.js.
 import { el, uid, cssEscape, confirmDialog, toast } from './util.js';
 import { state, pushHistory, renderActivePane } from './state.js';
 import { CANVAS_WIDTH, ensurePos, ensureAllPos, fitHeightForCard } from './canvas.js';
@@ -18,25 +13,23 @@ import { renderConfigPane, posLabel } from './task-pane-config.js';
 import { bulkDelete, bulkDuplicate } from './task-pane-bulk.js';
 import { validateUpload } from './form.js';
 
-// Currently-active task pane context: used by global keyboard handler.
+// Active task-pane context, exposed for the global keyboard handler.
 export let activeTaskCtx = null;
 
 export function renderTaskPane(host, idx){
   const task = state.course.tasks[idx];
   if(!task){ state.selected = {kind:'course'}; renderActivePane(); return; }
-  // Keep task.blocks aliased to active tab's blocks if tabs mode is on
+  // task.blocks must point at the active tab's blocks when tabs are on.
   syncTaskBlocksAlias(task);
   task.blocks = task.blocks || [];
   ensureAllPos(task.blocks);
 
-  // Multi-select state (Set of block IDs).
   const selectedBlockIds = new Set(Array.isArray(task._uiSelectedBlockIds) ? task._uiSelectedBlockIds : []);
   function persistSelection(){ task._uiSelectedBlockIds = Array.from(selectedBlockIds); }
 
-  // Zoom state (per-task)
   let zoom = (typeof task._uiZoom === 'number' && task._uiZoom > 0) ? task._uiZoom : 1.0;
 
-  // ===== Header: task number + editable title + toolbar =====
+  // Header: task number + editable title + toolbar
   const head = el('div', {className:'task-edit-head'});
   head.appendChild(el('span', {className:'task-num', text: 'Aufgabe ' + (idx+1)}));
   const titleInput = el('input', {className:'task-title-input', attrs:{type:'text', placeholder:'Titel der Aufgabe (in der Navigation sichtbar)'}});
@@ -52,7 +45,7 @@ export function renderTaskPane(host, idx){
   saveTplBtn.title = 'Aufgabe als Vorlage speichern';
   saveTplBtn.addEventListener('click', () => openSaveTemplateModal(task));
 
-  // Tabs toggle (Visualisierung + Aufgabe)
+  // Tabs toggle
   const tabsBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}});
   function refreshTabsBtn(){
     tabsBtn.textContent = hasTabs(task) ? 'Tabs deaktivieren' : '+ Tabs aktivieren';
@@ -80,7 +73,6 @@ export function renderTaskPane(host, idx){
   });
   toolbar.appendChild(addBtn); toolbar.appendChild(saveTplBtn); toolbar.appendChild(tabsBtn);
 
-  // Zoom controls
   const zoomBar = el('div', {className:'canvas-zoom-bar'});
   const zoomOut = el('button', {className:'icon-btn', attrs:{type:'button', title:'Verkleinern (Strg + Mausrad)'}, text:'−'});
   const zoomVal = el('span', {className:'zoom-value', text: Math.round(zoom*100) + '%'});
@@ -91,7 +83,7 @@ export function renderTaskPane(host, idx){
   head.appendChild(toolbar);
   host.appendChild(head);
 
-  // ===== Optional tab nav bar =====
+  // Optional tab nav bar
   if(hasTabs(task)){
     const tabBar = el('div', {className:'builder-tab-bar'});
     task.tabs.forEach((tab, ti) => {
@@ -114,7 +106,7 @@ export function renderTaskPane(host, idx){
     host.appendChild(tabBar);
   }
 
-  // ===== Body: canvas (left) + config-pane (right) =====
+  // Body: canvas + config-pane
   const body = el('div', {className:'task-edit-body'});
   const canvasWrap = el('div', {className:'builder-canvas-wrap'});
   const zoomContainer = el('div', {className:'canvas-zoom-container'});
@@ -127,7 +119,6 @@ export function renderTaskPane(host, idx){
   body.appendChild(configHost);
   host.appendChild(body);
 
-  // ===== Local helpers shared via ctx =====
   function applyZoom(){
     canvas.style.transform = 'scale(' + zoom + ')';
     zoomContainer.style.width  = (CANVAS_WIDTH * zoom) + 'px';
@@ -146,13 +137,10 @@ export function renderTaskPane(host, idx){
     setZoom(zoom + (e.deltaY < 0 ? 0.1 : -0.1));
   }, {passive: false});
 
-  // Pinch-zoom on canvas (two-finger touch)
-  // Track two active touch pointers; map the distance ratio to a zoom
-  // multiplier. Single-finger touches fall through to native scroll /
-  // pointer-drag on cards. Released as a separate handler (not pointer
-  // events) because Pointer Events don't surface multi-touch geometry as
-  // conveniently as touch events.
-  let _pinchStart = null; // { dist, zoom }
+  // Pinch-zoom (two-finger touch). Single-finger falls through to native
+  // scroll / pointer-drag. Uses touch events because Pointer Events make
+  // multi-touch geometry awkward.
+  let _pinchStart = null;
   function touchDist(t1, t2){
     const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
     return Math.hypot(dx, dy);
@@ -163,7 +151,7 @@ export function renderTaskPane(host, idx){
   }, { passive: true });
   canvasWrap.addEventListener('touchmove', e => {
     if(!_pinchStart || e.touches.length !== 2) return;
-    e.preventDefault(); // suppress the browser's own pinch-zoom of the page
+    e.preventDefault(); // suppress browser page pinch-zoom
     const d = touchDist(e.touches[0], e.touches[1]);
     setZoom(_pinchStart.zoom * (d / _pinchStart.dist));
   }, { passive: false });
@@ -172,10 +160,8 @@ export function renderTaskPane(host, idx){
   canvasWrap.addEventListener('touchcancel', endPinch);
 
   function adjustCanvasHeight(){
-    // Empty canvas: stretch a bit so the empty-state card (illustration +
-    // headline + CTA + hint) has vertical breathing room and doesn't poke
-    // out at the top/bottom of the dashed grid. Filled canvas: snap to the
-    // bottom of the lowest block plus 80 px padding.
+    // Empty canvas: stretch a bit so the empty-state card fits with breathing
+    // room. Filled: snap to the lowest block + 80 px padding.
     let maxBottom = task.blocks.length === 0 ? 420 : 320;
     task.blocks.forEach(b => { if(b.pos.y + b.pos.h + 80 > maxBottom) maxBottom = b.pos.y + b.pos.h + 80; });
     canvas.style.height = maxBottom + 'px';
@@ -196,10 +182,9 @@ export function renderTaskPane(host, idx){
     });
   }
 
-  // Debounced re-render of a single block's preview. Heavy mount() calls
-  // (e.g. plot blocks) shouldn't run on every keystroke in the config form.
-  // After the preview re-renders, the block's height is auto-fit so config
-  // edits don't leave empty space or clip content.
+  // Debounced single-block preview re-render. Heavy mount() calls (plot
+  // blocks, etc.) shouldn't run on every keystroke. After re-render the
+  // height is auto-fit so config edits don't leave gaps or clip content.
   const _refreshTimers = new Map();
   function scheduleBlockPreviewRefresh(block){
     const id = block.id;
@@ -210,7 +195,7 @@ export function renderTaskPane(host, idx){
       if(!card) return;
       const body = card.querySelector('.canvas-block-body');
       if(body) renderBlockPreview(body, block);
-      // Wait one frame for the (possibly shadow-DOM) mount, then fit the card.
+      // One frame for the shadow-DOM mount, then fit.
       requestAnimationFrame(() => {
         const newH = fitHeightForCard(card);
         if(newH != null && Math.abs(newH - block.pos.h) > 15){
@@ -222,13 +207,11 @@ export function renderTaskPane(host, idx){
     }, 250));
   }
 
-  // Track which block IDs have already been rendered at least once. New
-  // blocks (ids that aren't in the set yet) get a `.is-new` class on first
-  // mount so the CSS fade-in animation triggers - existing blocks don't
-  // re-animate on every re-render.
+  // IDs already rendered once. New blocks get a `.is-new` class for the CSS
+  // fade-in; existing ones don't re-animate on every re-render.
   const seenBlockIds = new Set(task.blocks.map(b => b.id));
 
-  // ===== Shared ctx passed to sibling modules =====
+  // Shared ctx for sibling modules
   const ctx = {
     task, canvas, configHost,
     selectedBlockIds,
@@ -240,16 +223,13 @@ export function renderTaskPane(host, idx){
     updateSelectionVisuals,
     refreshTabCounts,
     scheduleBlockPreviewRefresh,
-    // Empty-state CTA needs a way to open the block picker. We expose the
-    // wired handler so the renderer doesn't have to re-import the modal.
     openAddBlockPicker: () => openBlockTypeModal(addBlockOfType),
     renderCanvas: () => renderCanvas(ctx),
     renderConfigPane: () => renderConfigPane(ctx),
   };
 
-  // Called from the picker. Accepts either:
-  //   • a block-type id (string)         - built-in block, use defaultConfig()
-  //   • a user-saved block-template obj  - deep-clone the saved config
+  // Called from the picker. Accepts a block-type id (string) or a saved
+  // block-template object.
   function addBlockOfType(blockTypeOrTemplate){
     pushHistory();
     let block;
@@ -270,7 +250,7 @@ export function renderTaskPane(host, idx){
     bumpBlockUsage(block.type);
     selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
     ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
-    // After mount, snap the new card's height to its actual rendered content.
+    // Snap the new card's height to its rendered content.
     requestAnimationFrame(() => {
       const card = canvas.querySelector('[data-block-id="' + cssEscape(block.id) + '"]');
       const newH = fitHeightForCard(card);
@@ -290,12 +270,10 @@ export function renderTaskPane(host, idx){
     }
   });
 
-  // Drag-and-drop files onto the canvas
-  // Dropping image files anywhere on the canvas creates one Image block per
-  // file at the drop point (with a small diagonal stagger for multi-drops).
-  // Non-image files are ignored with a single toast. The visual "drop zone"
-  // is signalled by a .drop-target class while a drag is in progress.
-  let dragDepth = 0; // counter handles dragenter/leave firing on children
+  // Drag-and-drop image files onto the canvas: one Image block per file at
+  // the drop point (diagonal stagger for multi-drops). Non-image files are
+  // ignored. .drop-target signals the active drop zone.
+  let dragDepth = 0; // counters dragenter/leave firing on children
   function hasFiles(e){
     if(!e.dataTransfer) return false;
     const types = e.dataTransfer.types;
@@ -330,12 +308,11 @@ export function renderTaskPane(host, idx){
     const rejected = files.length - images.length;
     if(rejected > 0){
       toast(rejected === 1
-        ? 'Datei ignoriert - nur Bilddateien können auf die Canvas gezogen werden.'
-        : rejected + ' Dateien ignoriert - nur Bilddateien können auf die Canvas gezogen werden.', 'error');
+        ? 'Datei ignoriert: nur Bilddateien können auf die Canvas gezogen werden.'
+        : rejected + ' Dateien ignoriert: nur Bilddateien können auf die Canvas gezogen werden.', 'error');
     }
     if(images.length === 0) return;
-    // Drop position in canvas-logical pixels: divide by current zoom because
-    // the canvas itself is transform: scale(zoom).
+    // Canvas-logical pixels: divide by zoom (canvas is transform: scale).
     const rect = canvas.getBoundingClientRect();
     const dropX = Math.max(0, Math.round((e.clientX - rect.left) / zoom));
     const dropY = Math.max(0, Math.round((e.clientY - rect.top)  / zoom));
@@ -349,15 +326,13 @@ export function renderTaskPane(host, idx){
       const id = uid('b_');
       const block = {
         id, type: 'image', config: cfg,
-        // Drop point is the TOP-LEFT corner of the new block; stagger
-        // subsequent files diagonally so they don't all overlap.
+        // Drop point = top-left of the new block; diagonal stagger so
+        // multi-drops don't overlap.
         pos: { x: dropX + i * 24, y: dropY + i * 24, w: 480, h: 320 }
       };
       task.blocks.push(block);
       bumpBlockUsage('image');
       newIds.push(id);
-      // Read as data URL (same flow form.js uses) so the file rides along in
-      // the SCORM ZIP without needing a /media folder mirror.
       const r = new FileReader();
       r.onload = () => {
         block.config.src = r.result;
@@ -380,9 +355,8 @@ export function renderTaskPane(host, idx){
       : images.length + ' Bilder als Blöcke hinzugefügt.');
   });
 
-  // When an interactive in-canvas editor (e.g. Komposition's drag-to-move)
-  // mutates a block's config, refresh the right-side config pane so any
-  // numerical fields stay in sync with what the user just drew.
+  // In-canvas editors (e.g. Komposition drag-to-move) dispatch this when
+  // they mutate the config; sync the right-side form.
   canvas.addEventListener('block-config-changed', () => {
     ctx.renderConfigPane();
     adjustCanvasHeight();

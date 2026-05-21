@@ -1,12 +1,9 @@
-// ============================================================================
-// modals.js: Block-type picker, task-create (Leer + Vorlagen),
-// save-template, preview modal open/close logic.
-// ============================================================================
+// modals.js: Block-type picker, task-create, save-template, preview modal.
 import { el, uid, toast, confirmDialog } from './util.js';
 import { state, pushHistory, render } from './state.js';
 import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates, captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
 
-// ===== Task-create modal =====
+// Task-create modal
 export function openTaskCreateModal(){
   document.getElementById('btnCreateEmpty').onclick = () => {
     pushHistory();
@@ -27,7 +24,6 @@ function renderTemplateList(){
   const builtin = (window.BUILTIN_TEMPLATES || []).slice();
   builtin.sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label));
 
-  // Group builtin templates by category
   const cats = {};
   builtin.forEach(tpl => {
     const cat = tpl.category || 'Allgemein';
@@ -39,7 +35,6 @@ function renderTemplateList(){
     cats[cat].forEach(tpl => host.appendChild(makeTplRow(tpl, false)));
   });
 
-  // User templates
   if (state.userTemplates.length > 0) {
     host.appendChild(el('div', { className: 'tpl-section-head', text: 'Eigene Vorlagen' }));
     state.userTemplates.forEach(tpl => host.appendChild(makeTplRow(tpl, true)));
@@ -63,7 +58,7 @@ function makeTplRow(tpl, isUser){
     e.stopPropagation();
     pushHistory();
     const newTask = instantiateTemplate(tpl);
-    // Flag template-instantiated blocks so the canvas auto-fits them to actual content
+    // Flag for the post-render autofit pass on the canvas.
     const flag = (blocks) => (blocks || []).forEach(b => { b._needsAutofit = true; });
     if(newTask.tabs && newTask.tabs.length) newTask.tabs.forEach(t => flag(t.blocks));
     else flag(newTask.blocks);
@@ -103,13 +98,12 @@ function makeTplRow(tpl, isUser){
     row.appendChild(delBtn);
   }
 
-  // Clicking the row itself triggers insert
   row.addEventListener('click', () => insertBtn.click());
 
   return row;
 }
 
-// ===== Save-template modal =====
+// Save-template modal
 export function openSaveTemplateModal(task){
   const blocks = task.blocks || [];
   if (blocks.length === 0) { toast('Diese Aufgabe enthält keine Blöcke.', 'warn'); return; }
@@ -135,26 +129,20 @@ export function openSaveTemplateModal(task){
   m.classList.remove('hidden');
 }
 
-// ===== Block-type modal =====
-// `onPick` is called with either:
-//   • a block-type id (string)   for built-in blocks
-//   • a block-template object    for user-saved block-vorlagen
-// Callers in task-pane.js inspect the shape and instantiate accordingly.
+// Block-type modal.
+// onPick receives either a block-type id (string) for built-ins, or a
+// block-template object for user-saved Vorlagen.
 export function openBlockTypeModal(onPick){
   const nav    = document.getElementById('blockCatNav');
   const list   = document.getElementById('blockTypeList');
-  // Note: `search` is reassigned below after we cloneNode-swap the element
-  // to drop stale listeners from a previous modal open. Functions in this
-  // closure that read `search.value` must reference the up-to-date binding.
+  // `search` is reassigned after a cloneNode swap below to drop stale
+  // listeners. Closures must read the live binding.
   let   search = document.getElementById('blockPickerSearch');
   nav.innerHTML  = '';
   list.innerHTML = '';
   if(search) search.value = '';
 
-  // Sort by category first (stable grouping in the nav), then by user
-  // usage-count DESC (meistgenutzte zuerst), then alphabetically as
-  // tiebreaker. `state.blockUsage` is a { type: count } map persisted in
-  // localStorage and bumped each time a block is added.
+  // Sort: category, then usage count DESC, then label.
   const usage = (state.blockUsage && typeof state.blockUsage === 'object') ? state.blockUsage : {};
   const useCount = (def) => usage[def.id] || 0;
   const all = window.Blocks.all().slice().sort((a, b) =>
@@ -168,11 +156,8 @@ export function openBlockTypeModal(onPick){
     (byCat[cat] = byCat[cat] || []).push(def);
   });
 
-  // Block-Vorlagen (user-saved snippets)
-  // Each is represented as a synthetic "def" with `isTemplate=true` and the
-  // original template object attached as `tpl`. The renderRow function
-  // checks the flag and routes the click to onPick with the template object
-  // instead of a block id.
+  // User-saved Block-Vorlagen: synthesize a "def" with isTemplate=true.
+  // renderRow checks the flag and routes onPick to the tpl object.
   const userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
   if(userBlockTemplates.length > 0){
     byCat['Eigene Vorlagen'] = userBlockTemplates.map(tpl => {
@@ -189,10 +174,8 @@ export function openBlockTypeModal(onPick){
     });
   }
 
-  // Canonical category order - keeps the picker nav stable regardless of
-  // block-file load order. Unknown categories (e.g. future additions) get
-  // appended alphabetically at the end. "Eigene Vorlagen" lands last
-  // because it only exists after the user has saved at least one snippet.
+  // Canonical category order, stable regardless of block-file load order.
+  // Unknown categories sort alphabetically at the end.
   const CAT_ORDER = ['Medien & Inhalt', 'Frage', 'MINT', 'Visualisierung', 'Eigene Vorlagen'];
   const cats = Object.keys(byCat).sort((a, b) => {
     const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
@@ -207,7 +190,6 @@ export function openBlockTypeModal(onPick){
     const row = el('button', { className: 'block-type-row', attrs: { type: 'button' } });
     if(def.isTemplate) row.classList.add('block-type-row-template');
     const ico = el('span', { className: 'block-type-ico' });
-    // For templates: use the base block's icon if available
     const iconKey = def.isTemplate
       ? (window.Blocks.get(def.tpl.blockType)?.id || def.tpl.blockType)
       : def.id;
@@ -218,8 +200,6 @@ export function openBlockTypeModal(onPick){
     const body = el('div', { className: 'block-type-body' });
     const labelEl = el('span', { className: 'block-type-label', text: def.label });
     if(def.isTemplate){
-      // Show a "Vorlage" badge so users can distinguish saved snippets
-      // from built-in block types.
       labelEl.appendChild(el('span', { className: 'block-type-badge block-type-badge-template', text: 'Vorlage' }));
     } else if(def.graded){
       labelEl.appendChild(el('span', { className: 'block-type-badge', text: 'gewertet' }));
@@ -228,7 +208,6 @@ export function openBlockTypeModal(onPick){
     if (def.description) body.appendChild(el('span', { className: 'block-type-desc', text: def.description }));
     row.appendChild(body);
 
-    // Templates also get a small "✕" delete control on hover
     if(def.isTemplate){
       const del = el('button', {
         className: 'block-type-template-delete',
@@ -247,7 +226,6 @@ export function openBlockTypeModal(onPick){
         if(idx >= 0){
           state.userBlockTemplates.splice(idx, 1);
           import('./tasks.js').then(m => m.saveUserBlockTemplates());
-          // Re-render the picker so the row disappears
           openBlockTypeModal(onPick);
         }
       });
@@ -256,8 +234,6 @@ export function openBlockTypeModal(onPick){
 
     row.addEventListener('click', () => {
       document.getElementById('blockTypeModal').classList.add('hidden');
-      // Built-in blocks: pass the id string. Templates: pass the template
-      // object so the caller can deep-clone the config.
       onPick(def.isTemplate ? def.tpl : def.id);
     });
     return row;
@@ -272,19 +248,17 @@ export function openBlockTypeModal(onPick){
     (byCat[cat] || []).forEach(def => list.appendChild(renderRow(def)));
   }
 
-  // Live search: as the user types, replace the category-filtered list with
-  // a global flat list of matches. An empty query restores the category view.
+  // Live search across built-ins and user templates. Empty query restores
+  // the category view.
   function applySearch(){
     if(!search) return;
     const q = search.value.trim().toLowerCase();
     if(!q){
-      // Re-enable nav clickability and restore the active category.
       nav.classList.remove('search-active');
       showCat(activeCat);
       return;
     }
     nav.classList.add('search-active');
-    // Search across built-in blocks AND user templates so both are findable.
     const allRows = all.concat(byCat['Eigene Vorlagen'] || []);
     const matches = allRows.filter(def => {
       const hay = (def.label + ' ' + (def.description || '') + ' ' + (def.category || '')).toLowerCase();
@@ -310,7 +284,6 @@ export function openBlockTypeModal(onPick){
     });
     btn.dataset.cat = cat;
     btn.addEventListener('click', () => {
-      // Clicking a category clears the search and shows that category.
       if(search) search.value = '';
       nav.classList.remove('search-active');
       showCat(cat);
@@ -319,9 +292,7 @@ export function openBlockTypeModal(onPick){
   });
 
   if(search){
-    // Avoid stacking listeners across modal opens by replacing the input.
-    // Update the outer `search` binding so other closures (applySearch,
-    // category-click handler, etc.) read from the live element.
+    // Replace the input to drop stale listeners from a previous modal open.
     const fresh = search.cloneNode(true);
     search.replaceWith(fresh);
     search = fresh;
@@ -338,7 +309,6 @@ export function openBlockTypeModal(onPick){
         if(first){ e.preventDefault(); first.click(); }
       }
     });
-    // Focus the search field on open so the user can immediately type.
     setTimeout(() => fresh.focus({ preventScroll: true }), 0);
   }
 

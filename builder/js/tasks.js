@@ -1,14 +1,9 @@
-// ============================================================================
-// tasks.js: Task data manipulation: migration, tab helpers, validation,
-//            template management (built-in & user-defined).
-// ============================================================================
+// tasks.js: Migration, tab helpers, validation, template management.
 import { state } from './state.js';
 import { uid, toast } from './util.js';
 
-// ----- Tab helpers --------------------------------------------------------
-// When `task.tabs` exists with >=2 entries, `task.blocks` is kept as a
-// *reference alias* to `task.tabs[activeTab].blocks` so all existing code
-// paths (which read/write task.blocks) continue to work unchanged.
+// task.blocks is kept as a reference alias to task.tabs[activeTab].blocks
+// when tabs are on, so all task.blocks code paths keep working unchanged.
 export function hasTabs(task){
   return task && Array.isArray(task.tabs) && task.tabs.length >= 2;
 }
@@ -17,7 +12,7 @@ export function syncTaskBlocksAlias(task){
   const i = (task._uiActiveTab != null) ? task._uiActiveTab : 0;
   task._uiActiveTab = Math.max(0, Math.min(task.tabs.length - 1, i));
   task.tabs[task._uiActiveTab].blocks = task.tabs[task._uiActiveTab].blocks || [];
-  task.blocks = task.tabs[task._uiActiveTab].blocks; // alias, same array reference
+  task.blocks = task.tabs[task._uiActiveTab].blocks; // same array reference
 }
 export function enableTabsOn(task){
   if(hasTabs(task)) return;
@@ -35,19 +30,19 @@ export function disableTabsOn(task){
   delete task._uiActiveTab;
 }
 export function cleanTaskForExport(task){
-  // Strip UI-only fields and avoid double-serializing task.blocks when tabs exist
+  // Strip UI-only fields; drop the blocks alias when tabs are on.
   const copy = JSON.parse(JSON.stringify(task));
   delete copy._uiSelectedBlockIds; delete copy._uiZoom; delete copy._uiActiveTab;
   const stripFlags = (arr) => (arr || []).forEach(b => { delete b._needsAutofit; });
   stripFlags(copy.blocks);
   if(copy.tabs) copy.tabs.forEach(t => stripFlags(t.blocks));
   if(hasTabs(copy)){
-    delete copy.blocks; // alias would otherwise duplicate tabs[0].blocks
+    delete copy.blocks;
   }
   return copy;
 }
 
-// ----- Migration of legacy single-task model into block-based -----------
+// Migration of legacy single-task model into block-based
 export function migrateTaskIfNeeded(task){
   if(task.tabs && Array.isArray(task.tabs)){
     task.tabs.forEach(t => { t.blocks = t.blocks || []; });
@@ -75,14 +70,11 @@ export function migrateTaskIfNeeded(task){
   return { id: task.id || uid('t_'), title: task.title || 'Aufgabe', blocks };
 }
 
-// ----- Validation --------------------------------------------------------
+// Validation
 export function validateBlock(block){
   const warnings = [];
   const cfg = block.config || {};
-  // Each block-template may declare `validate(cfg) => string[]` that returns
-  // human-readable warnings (empty array if clean). Blocks without a validator
-  // are assumed always-valid; the pre-export check still catches missing
-  // common fields elsewhere.
+  // Blocks may declare validate(cfg) => string[]. Missing = always-valid.
   const def = window.Blocks.get(block.type);
   if(def && typeof def.validate === 'function'){
     try {
@@ -105,11 +97,9 @@ export function validateTask(task){
   return out;
 }
 
-// Course-level validation rolls up per-block warnings and adds course-level
-// checks. Result shape:
+// Course-level validation. Returns:
 //   { issues: [{ taskIdx, taskTitle, blockId, blockLabel, message }],
 //     courseIssues: [{ message }] }
-// Used by the SCORM export modal to decide whether to gate or warn the user.
 export function validateCourse(course){
   const issues = [];
   const courseIssues = [];
@@ -129,7 +119,7 @@ export function validateCourse(course){
   return { issues, courseIssues };
 }
 
-// ----- Template (built-in & user) ---------------------------------------
+// Templates (built-in & user)
 const USER_TEMPLATES_KEY = 'scorm-builder-user-templates';
 export function loadUserTemplates(){
   try {
@@ -144,10 +134,8 @@ export function saveUserTemplates(){
   catch(e){ toast('Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
 }
 
-// ----- Block-level templates ("Block-Vorlagen") -------------------------
-// Each entry: { id, label, description?, blockType, config }.
-// `config` is deep-cloned from the source block at save time; instantiating
-// a template clones again so the new block doesn't share references.
+// Block-Vorlagen. Entry shape: { id, label, description?, blockType, config }.
+// `config` is deep-cloned on save and again on instantiate.
 const USER_BLOCK_TEMPLATES_KEY = 'scorm-builder-user-block-templates';
 export function loadUserBlockTemplates(){
   try {
@@ -161,11 +149,8 @@ export function saveUserBlockTemplates(){
   try { localStorage.setItem(USER_BLOCK_TEMPLATES_KEY, JSON.stringify(state.userBlockTemplates || [])); }
   catch(e){ toast('Block-Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
 }
-// ----- Block-Usage tracking ----------------------------------------------
-// `state.blockUsage` is a map { [blockType]: count } that drives the
-// "meistgenutzte zuerst"-Sortierung im Block-Picker. Bumped every time
-// a block is added (toolbar pick, drop, duplicate, paste, template).
-// Persistiert pro Browser, damit die Reihenfolge über Sessions stabil bleibt.
+// Block-Usage: { [blockType]: count } drives the "meistgenutzte zuerst"
+// Sortierung im Picker. Bumped beim Hinzufügen, persistiert pro Browser.
 const BLOCK_USAGE_KEY = 'scorm-builder-block-usage';
 export function loadBlockUsage(){
   try {
@@ -177,7 +162,7 @@ export function loadBlockUsage(){
 }
 export function saveBlockUsage(){
   try { localStorage.setItem(BLOCK_USAGE_KEY, JSON.stringify(state.blockUsage || {})); }
-  catch(e){} // quota errors are not user-fatal here
+  catch(e){}
 }
 export function bumpBlockUsage(type){
   if(!type) return;
@@ -200,11 +185,11 @@ export function instantiateBlockTemplate(tpl){
     id: uid('b_'),
     type: tpl.blockType,
     config: JSON.parse(JSON.stringify(tpl.config || {}))
-    // pos is set by ensurePos() when the new block is added to a task
+    // pos is set by ensurePos() on add
   };
 }
 export function instantiateTemplate(tpl){
-  // Deep-clone, generate fresh IDs for task and every block
+  // Deep-clone, fresh IDs for task and every block.
   const t = JSON.parse(JSON.stringify(tpl.task || {title:'Aufgabe', blocks:[]}));
   t.id = uid('t_');
   if(t.tabs && Array.isArray(t.tabs) && t.tabs.length){
@@ -217,7 +202,7 @@ export function instantiateTemplate(tpl){
   return t;
 }
 export function captureTaskAsTemplateData(task){
-  // Strip transient IDs so the task can be re-instantiated cleanly later
+  // Drop IDs so the task re-instantiates with fresh ones.
   const cleanBlocks = arr => (arr || []).map(b => ({type: b.type, config: JSON.parse(JSON.stringify(b.config || {}))}));
   if(task.tabs && task.tabs.length){
     return { title: task.title, tabs: task.tabs.map(t => ({title: t.title, blocks: cleanBlocks(t.blocks)})) };

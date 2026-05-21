@@ -1,9 +1,7 @@
-// ============================================================================
-// math-toolbar-data.js: Pure data for the math-textarea field type.
-//   - MATH_CATS: 8 categories of LaTeX snippets for the symbol toolbar.
-//   - FORMULA_FN_BTNS: function helper buttons for the formula-text field.
-// Each item: { s: display, t?: tooltip, i: insert-snippet, c?: cursor offset }
-// ============================================================================
+// math-toolbar-data.js: Data for the math-textarea field.
+// MATH_CATS: 8 categories of LaTeX snippets.
+// FORMULA_FN_BTNS: helper buttons for the formula-text field.
+// Item shape: { s: display, t?: tooltip, i: insert-snippet, c?: cursor offset }
 
 export const MATH_CATS = [
   { label:'Brüche', items:[

@@ -23,10 +23,7 @@
     },
     summary(cfg){ return ((cfg.pool || []).length) + ' Punkte im Pool'; },
     previewConfig(){
-      // For the welcome-modal "Live-Vorschau": pick a point with enough
-      // magnitude that the vector + angle arc read clearly. z = 3 + 2i
-      // sits comfortably inside ±5.5, gives a 33° angle (visible arc),
-      // and a vector that reaches ~60% of the plot's half-width.
+      // z = 3 + 2i: visible angle arc (~33 deg) inside ±5.5, vector reaches ~60% of half-width.
       return {
         blockTitle: '',
         pool: [{a:3, b:2}],
