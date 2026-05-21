@@ -26,6 +26,14 @@
         maxPoints: 1
       };
     },
+    summary(cfg){ return cfg.questionTemplate || '(Frage leer)'; },
+    validate(cfg){
+      if(cfg.preset && cfg.preset !== 'custom') return [];
+      const w = [];
+      if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push('Frage-Vorlage fehlt.');
+      if(!cfg.formula || !String(cfg.formula).trim()) w.push('Lösungsformel fehlt.');
+      return w;
+    },
     previewConfig(){
       return {
         blockTitle: '', preset: 'custom',
@@ -42,12 +50,12 @@
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Numerische Eingabe' },
         { key:'preset', label:'Vorlage', type:'select', options: PRESET_OPTIONS,
-          help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell” für eigene Fragen.' },
+          help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
         // Frage
         { type:'section', label:'Frage', key:'_sec_q' },
         { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {name})', type:'math-textarea', rows:2, showIf: isCustom,
-          help:'Beispiel: „Berechnen Sie {a} + {b}.” Variablen werden beim Start zufällig belegt.' },
+          help:'Beispiel: „Berechnen Sie {a} + {b}." Variablen werden beim Start zufällig belegt.' },
         // Variablen
         { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
         { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
@@ -58,7 +66,7 @@
             return item.name + ':  ' + range + (item.integer ? '  (ganz)' : '');
           },
           itemSchema:[
-            { key:'name',    label:'Name',           type:'text',    placeholder:'z. B.  a' },
+            { key:'name',    label:'Name',           type:'text',    placeholder:'z. B. a' },
             { key:'min',     label:'von',             type:'number',  step:'any' },
             { key:'max',     label:'bis',             type:'number',  step:'any' },
             { key:'integer', label:'Nur Ganzzahlen',  type:'boolean' }
@@ -69,7 +77,7 @@
           help:'Darf alle Variablen-Namen und Standardfunktionen (sqrt, sin, cos, …) enthalten.' },
         { key:'tolerance', label:'Toleranz  (±)', type:'number', step:'any',
           help:'Abweichung, die noch als korrekt gilt. 0 = exakt.' },
-        { key:'unit', label:'Einheit (optional)', type:'text', placeholder:'z. B.  m/s  oder  kg' },
+        { key:'unit', label:'Einheit (optional)', type:'text', placeholder:'z. B. m/s oder kg' },
         // Bewertung
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
@@ -145,23 +153,57 @@
       return {};
     },
     preview(host, config){
-      const u = window.BlockUtils;
       const activeConfig = numericPresetConfig(config);
-      const wrap = u.tagPreview(host, { icon:'#', label:'Numerische Eingabe' });
-      const q = document.createElement('div');
-      q.style.cssText = 'color:#0f2d44; margin-bottom:0.5rem; font-family:"Courier New",monospace; line-height:1.4;';
-      q.textContent = activeConfig.questionTemplate || '(Aufgabe)';
-      wrap.appendChild(q);
+      // Pick a deterministic-looking example so the placeholder values stay
+      // identical across renders (no random shuffle in the welcome preview).
+      const sample = { a: 7, b: 3, p: 20, g: 150, x: 4, y: 3 };
+      const questionText = (activeConfig.questionTemplate || '(Aufgabe)')
+        .replace(/\{(\w+)\}/g, (_, name) => (sample[name] != null ? sample[name] : '?'));
+      // Evaluate the formula with the same sample so the "Lösung"-Hint shows
+      // a concrete number, not the symbolic expression.
+      let solution = null;
       if(activeConfig.formula){
-        const f = document.createElement('div');
-        f.style.cssText = 'font-size:0.72rem; color:#5d6872; font-family:"Courier New",monospace; margin-bottom:0.4rem;';
-        f.textContent = 'Lösung = ' + activeConfig.formula + (activeConfig.unit ? ' [' + activeConfig.unit + ']' : '');
-        wrap.appendChild(f);
+        try {
+          solution = window.BlockUtils.safeMathExpr(activeConfig.formula, sample);
+          if(typeof solution === 'number') solution = Math.round(solution * 100) / 100;
+        } catch(e){}
       }
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#fff; border:1px solid #d8e0e6; border-radius:18px; padding:1.2rem;';
+      const h3 = document.createElement('h3');
+      h3.textContent = 'Frage';
+      h3.style.cssText = 'color:#003b5c; margin:0 0 0.6rem; font-size:1rem;';
+      card.appendChild(h3);
+      const q = document.createElement('p');
+      q.textContent = questionText;
+      q.style.cssText = 'margin:0 0 1rem; color:#111; line-height:1.45;';
+      card.appendChild(q);
+      const inpRow = document.createElement('div');
+      inpRow.style.cssText = 'display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;';
       const inp = document.createElement('div');
-      inp.style.cssText = 'border:1px solid #c6d1d8; border-radius:6px; padding:0.4rem 0.6rem; background:#f5f8fa; color:#888; font-size:0.8rem;';
-      inp.textContent = '⏤ Zahl eingeben';
-      wrap.appendChild(inp);
+      inp.style.cssText = 'flex:1; border:1px solid #c6d1d8; border-radius:8px; padding:0.55rem 0.75rem; background:#f5f8fa; color:#888; font-size:0.88rem;';
+      inp.textContent = 'Zahl eingeben…';
+      inpRow.appendChild(inp);
+      if(activeConfig.unit){
+        const u = document.createElement('span');
+        u.style.cssText = 'font-weight:700; color:#5d6872;';
+        u.textContent = activeConfig.unit;
+        inpRow.appendChild(u);
+      }
+      card.appendChild(inpRow);
+      const btn = document.createElement('span');
+      btn.textContent = 'Korrektur';
+      btn.style.cssText = 'display:inline-block; background:#003b5c; color:#fff; padding:0.55rem 1.1rem; border-radius:999px; font-weight:700; font-size:0.88rem;';
+      card.appendChild(btn);
+      if(solution != null){
+        const hint = document.createElement('div');
+        hint.style.cssText = 'background:#f5f8fa; border:1px solid #d8e0e6; border-left:6px solid #a1d884; border-radius:14px; padding:0.7rem 0.9rem; margin-top:1rem;';
+        hint.innerHTML = '<div style="font-weight:700; color:#003b5c; margin-bottom:0.2rem;">Beispiel-Lösung</div>' +
+          '<div style="color:#0f2d44; font-family:Courier New,monospace;">' + activeConfig.formula + ' = ' + solution +
+          (activeConfig.unit ? ' ' + activeConfig.unit : '') + '</div>';
+        card.appendChild(hint);
+      }
+      host.appendChild(card);
     }
   });
 

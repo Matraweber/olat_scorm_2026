@@ -3,7 +3,7 @@
 // in-browser preview iframe construction.
 // ============================================================================
 import {
-  el, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
+  el, escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
 } from './util.js';
 import { state, render, defaultTheme, scheduleAutosave } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
@@ -302,9 +302,6 @@ function confirmExportWithIssues(report){
     document.addEventListener('keydown', onKey, true);
     overlay.querySelector('#exportGateFix').focus({ preventScroll: true });
   });
-}
-function escapeHtml(s){
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 export async function downloadZip(){

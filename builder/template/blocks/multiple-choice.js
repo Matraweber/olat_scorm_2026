@@ -22,6 +22,21 @@
         penalizeWrong: true
       };
     },
+    summary(cfg){
+      const d = document.createElement('div');
+      d.innerHTML = String(cfg.question || '');
+      const q = (d.textContent || '').trim();
+      return (q || '(Frage leer)') + ' · ' + ((cfg.choices || []).length) + ' Antworten';
+    },
+    validate(cfg){
+      if(cfg.preset && cfg.preset !== 'custom') return [];
+      const w = [];
+      if(!cfg.question || !String(cfg.question).trim()) w.push('Frage ist leer.');
+      if(!Array.isArray(cfg.choices) || cfg.choices.length < 2) w.push('Mindestens zwei Antwortmöglichkeiten erforderlich.');
+      else if(!cfg.choices.some(c => c.correct)) w.push('Keine richtige Antwort markiert.');
+      else if(cfg.choices.every(c => c.correct)) w.push('Alle Antworten als richtig markiert.');
+      return w;
+    },
     previewConfig(){
       return {
         blockTitle: '', preset: 'custom',
@@ -79,12 +94,7 @@
 
       const list = document.createElement('div'); list.className = 'choice-list';
       const choices = (activeConfig.choices || []).slice();
-      if(activeConfig.shuffle){
-        for(let i = choices.length - 1; i > 0; i--){
-          const j = Math.floor(Math.random() * (i + 1));
-          [choices[i], choices[j]] = [choices[j], choices[i]];
-        }
-      }
+      if(activeConfig.shuffle) window.BlockUtils.shuffle(choices);
       const groupName = api.blockId + '_grp';
       const inputs = [];
       choices.forEach((c, i) => {
@@ -171,7 +181,7 @@
       });
       card.appendChild(list);
       const btnRow = document.createElement('div');
-      
+      btnRow.style.cssText = 'margin-top:1rem;';
       const btn = document.createElement('span');
       btn.textContent = 'Korrektur';
       btn.style.cssText = 'display:inline-block; background:#003b5c; color:#fff; padding:0.55rem 1.1rem; border-radius:999px; font-weight:700; font-size:0.88rem;';

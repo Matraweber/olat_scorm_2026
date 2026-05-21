@@ -14,7 +14,7 @@
   Blocks.register('function-question', {
     label: 'Funktion ablesen',
     description: 'Funktionsgraph anzeigen. Werte, Nullstellen und Extrempunkte ablesen.',
-    category: 'Frage',
+    category: 'MINT',
     icon: 'ƒ',
     graded: true,
     defaultConfig(){
@@ -29,6 +29,7 @@
         maxPoints: 1
       };
     },
+    summary(cfg){ return ((cfg.functions || []).length) + ' Funktion(en)'; },
     builderSchema(){
       const MODE_LABEL = {
         'custom':      'Eigene Frage',

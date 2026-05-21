@@ -49,11 +49,6 @@ export function cssEscape(s){
   return String(s).replace(/([!"#$%&'()*+,./:;<=>?@\[\\\]^`{|}~])/g, '\\$1');
 }
 
-export function cssEscapeSafe(s){
-  if(window.CSS && window.CSS.escape) return CSS.escape(s);
-  return String(s).replace(/[^A-Za-z0-9_-]/g, '\\$&');
-}
-
 /**
  * Append a cache-busting query parameter to a URL so we always get the latest version
  * of template files when generating preview iframes or SCORM ZIPs.

@@ -3,10 +3,11 @@
   Blocks.register('note-box', {
     label: 'Hinweisbox',
     description: 'Hervorgehobener Hinweiskasten (Info oder Warnung).',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'ℹ',
     graded: false,
     defaultConfig(){ return { title: 'Hinweis', html: 'Wichtiger Hinweis für die Lernenden.', variant: 'info' }; },
+    summary(cfg){ return cfg.title || 'Hinweis'; },
     builderSchema(){
       return [
         { key:'title', label:'Titel', type:'text' },

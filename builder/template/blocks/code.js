@@ -3,7 +3,7 @@
   Blocks.register('code', {
     label: 'Code-Block',
     description: 'Quellcode mit fester Schrift, optional mit Sprach-Tag.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: '</>',
     graded: false,
     defaultConfig(){ return { code: 'function hello() {\n  console.log("Hallo, Welt!");\n}', language: 'javascript', title: '' }; },

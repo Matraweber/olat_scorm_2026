@@ -4,16 +4,16 @@
 // buttons, the JSON-mode toggle, sidebar collapse, and global keyboard shortcuts.
 // ============================================================================
 import {
-  state, setRenderer, defaultCourse, loadPersistentTheme,
+  state, setRenderer, defaultCourse, loadPersistentTheme, applyThemeToBuilder,
   undo, redo, copySelectedBlocks, pasteBlocks,
   isAutosaveAvailable, loadAutosave, loadAutosaveMeta, clearAutosave,
   flushAutosave, setAutosaveListener, setAutosavePendingListener, scheduleAutosave
 } from './state.js';
 import { renderTaskList, renderActivePaneImpl } from './panes.js';
-import { loadUserTemplates, loadUserBlockTemplates } from './tasks.js';
+import { loadUserTemplates, loadUserBlockTemplates, loadBlockUsage } from './tasks.js';
 import { openTaskCreateModal } from './modals.js';
 import { downloadZip, exportJson, loadJsonFile, loadZipFile, showPreview, syncJsonEditor, applyJsonEditor } from './io.js';
-import { toast, confirmDialog } from './util.js';
+import { toast, confirmDialog, escapeHtml } from './util.js';
 import { getActiveTaskCtx } from './task-pane.js';
 
 // ----- Wire render dispatchers into state.js -----
@@ -35,6 +35,9 @@ window.scormBuilderRender = render;
 
 // ----- Event wiring -----
 function init(){
+  // Push the persisted theme onto the document root immediately so the
+  // builder UI uses the user's brand colors from frame 1, not the default.
+  applyThemeToBuilder(state.theme);
   document.getElementById('btnNew').addEventListener('click', async () => {
     if(!await confirmDialog({
       title: 'Neue Lerneinheit?',
@@ -44,6 +47,7 @@ function init(){
     })) return;
     state.course = defaultCourse();
     state.theme = loadPersistentTheme();
+    applyThemeToBuilder(state.theme);
     state.selected = {kind:'course'};
     render();
   });
@@ -169,6 +173,7 @@ function init(){
 
   state.userTemplates = loadUserTemplates();
   state.userBlockTemplates = loadUserBlockTemplates();
+  state.blockUsage = loadBlockUsage();
 
   // ----- Datei dropdown -----------------------------------------------
   setupFileMenu();
@@ -377,9 +382,6 @@ function maybeOfferRecovery(){
   overlay.querySelector('#autosaveRestore').focus({ preventScroll: true });
 }
 
-function escapeHtml(s){
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();

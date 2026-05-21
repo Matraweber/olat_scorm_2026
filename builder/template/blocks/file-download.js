@@ -36,7 +36,7 @@
   Blocks.register('file-download', {
     label: 'Datei-Download',
     description: 'Lerneinheits-Anhang zum Download anbieten, z. B. PDF-Skript, ZIP-Übung oder Vorlagen.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'file-download',
     graded: false,
     defaultConfig(){
@@ -54,7 +54,7 @@
     builderSchema(){
       return [
         { key:'title', label:'Titel (vor dem Download-Button)', type:'text', placeholder:'z. B. „Vorlesungs-Skript Woche 3"' },
-        { key:'src', label:'Datei (Upload oder URL)', type:'file', help:'Hochgeladene Dateien werden als Data-URL eingebettet und reisen mit ins SCORM-Paket.' },
+        { key:'src', label:'Datei (Upload oder URL)', type:'file', help:'Hochgeladene Dateien werden als Data-URL ins SCORM-Paket eingebettet.' },
         { key:'filename', label:'Anzeigename / Speichername', type:'text', placeholder:'z. B. „skript-woche-3.pdf"' },
         { key:'description', label:'Beschreibung (optional, unter dem Button)', type:'text', placeholder:'Format, Seitenzahl, Hinweise …' }
       ];

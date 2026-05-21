@@ -49,7 +49,7 @@
   Blocks.register('video', {
     label: 'Video',
     description: 'Videodatei oder YouTube-/Vimeo-URL einbetten. Datei-Upload oder Link.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'video',
     graded: false,
     detectVideoSource,

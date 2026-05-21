@@ -3,7 +3,7 @@
   Blocks.register('number-base', {
     label: 'Zahlensysteme (Bin/Dez/Hex)',
     description: 'Umrechnung zwischen Binär, Oktal, Dezimal und Hexadezimal.',
-    category: 'Frage',
+    category: 'MINT',
     icon: '0x',
     graded: true,
     defaultConfig(){
@@ -16,6 +16,7 @@
         maxPoints: 1
       };
     },
+    summary(){ return 'Zahlensystem-Umrechnung'; },
     builderSchema(){
       const baseOpts = [
         {value:'bin', label:'Binär (Basis 2)'},

@@ -17,6 +17,13 @@
         partialKeywords: false
       };
     },
+    summary(cfg){ return cfg.question || '(Frage leer)'; },
+    validate(cfg){
+      const w = [];
+      if(!cfg.question || !String(cfg.question).trim()) w.push('Frage ist leer.');
+      if(!Array.isArray(cfg.answers) || cfg.answers.length === 0 || cfg.answers.every(a => !a.value)) w.push('Keine akzeptierten Antworten definiert.');
+      return w;
+    },
     previewConfig(){
       return {
         blockTitle: '', preset: 'custom', answerMode: 'iexact',

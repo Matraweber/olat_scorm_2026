@@ -6,16 +6,17 @@
 //   • task-pane-config.js: right-side block config pane + multi-select UI
 //   • task-pane-bulk.js: bulk align/distribute/duplicate/delete
 // ============================================================================
-import { el, uid, cssEscape, confirmDialog } from './util.js';
+import { el, uid, cssEscape, confirmDialog, toast } from './util.js';
 import { state, pushHistory, renderActivePane } from './state.js';
 import { CANVAS_WIDTH, ensurePos, ensureAllPos, fitHeightForCard } from './canvas.js';
-import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn } from './tasks.js';
+import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn, bumpBlockUsage } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { openBlockTypeModal, openSaveTemplateModal } from './modals.js';
 import { renderBlockPreview } from './preview.js';
 import { renderCanvas } from './task-pane-canvas.js';
 import { renderConfigPane, posLabel } from './task-pane-config.js';
 import { bulkDelete, bulkDuplicate } from './task-pane-bulk.js';
+import { validateUpload } from './form.js';
 
 // Currently-active task pane context: used by global keyboard handler.
 export let activeTaskCtx = null;
@@ -145,6 +146,31 @@ export function renderTaskPane(host, idx){
     setZoom(zoom + (e.deltaY < 0 ? 0.1 : -0.1));
   }, {passive: false});
 
+  // Pinch-zoom on canvas (two-finger touch)
+  // Track two active touch pointers; map the distance ratio to a zoom
+  // multiplier. Single-finger touches fall through to native scroll /
+  // pointer-drag on cards. Released as a separate handler (not pointer
+  // events) because Pointer Events don't surface multi-touch geometry as
+  // conveniently as touch events.
+  let _pinchStart = null; // { dist, zoom }
+  function touchDist(t1, t2){
+    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  }
+  canvasWrap.addEventListener('touchstart', e => {
+    if(e.touches.length !== 2) return;
+    _pinchStart = { dist: touchDist(e.touches[0], e.touches[1]), zoom };
+  }, { passive: true });
+  canvasWrap.addEventListener('touchmove', e => {
+    if(!_pinchStart || e.touches.length !== 2) return;
+    e.preventDefault(); // suppress the browser's own pinch-zoom of the page
+    const d = touchDist(e.touches[0], e.touches[1]);
+    setZoom(_pinchStart.zoom * (d / _pinchStart.dist));
+  }, { passive: false });
+  function endPinch(){ _pinchStart = null; }
+  canvasWrap.addEventListener('touchend', endPinch);
+  canvasWrap.addEventListener('touchcancel', endPinch);
+
   function adjustCanvasHeight(){
     // Empty canvas: stretch a bit so the empty-state card (illustration +
     // headline + CTA + hint) has vertical breathing room and doesn't poke
@@ -241,6 +267,7 @@ export function renderTaskPane(host, idx){
     }
     ensurePos(block, task.blocks);
     task.blocks.push(block);
+    bumpBlockUsage(block.type);
     selectedBlockIds.clear(); selectedBlockIds.add(block.id); persistSelection();
     ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
     // After mount, snap the new card's height to its actual rendered content.
@@ -261,6 +288,96 @@ export function renderTaskPane(host, idx){
       updateSelectionVisuals();
       ctx.renderConfigPane();
     }
+  });
+
+  // Drag-and-drop files onto the canvas
+  // Dropping image files anywhere on the canvas creates one Image block per
+  // file at the drop point (with a small diagonal stagger for multi-drops).
+  // Non-image files are ignored with a single toast. The visual "drop zone"
+  // is signalled by a .drop-target class while a drag is in progress.
+  let dragDepth = 0; // counter handles dragenter/leave firing on children
+  function hasFiles(e){
+    if(!e.dataTransfer) return false;
+    const types = e.dataTransfer.types;
+    return types && Array.from(types).indexOf('Files') >= 0;
+  }
+  canvas.addEventListener('dragenter', e => {
+    if(!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    canvas.classList.add('drop-target');
+  });
+  canvas.addEventListener('dragover', e => {
+    if(!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  canvas.addEventListener('dragleave', e => {
+    if(!hasFiles(e)) return;
+    dragDepth--;
+    if(dragDepth <= 0){
+      dragDepth = 0;
+      canvas.classList.remove('drop-target');
+    }
+  });
+  canvas.addEventListener('drop', e => {
+    if(!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    canvas.classList.remove('drop-target');
+    const files = Array.from(e.dataTransfer.files || []);
+    const images = files.filter(f => (f.type || '').startsWith('image/'));
+    const rejected = files.length - images.length;
+    if(rejected > 0){
+      toast(rejected === 1
+        ? 'Datei ignoriert - nur Bilddateien können auf die Canvas gezogen werden.'
+        : rejected + ' Dateien ignoriert - nur Bilddateien können auf die Canvas gezogen werden.', 'error');
+    }
+    if(images.length === 0) return;
+    // Drop position in canvas-logical pixels: divide by current zoom because
+    // the canvas itself is transform: scale(zoom).
+    const rect = canvas.getBoundingClientRect();
+    const dropX = Math.max(0, Math.round((e.clientX - rect.left) / zoom));
+    const dropY = Math.max(0, Math.round((e.clientY - rect.top)  / zoom));
+    pushHistory();
+    const newIds = [];
+    images.forEach((file, i) => {
+      const v = validateUpload(file, 'image');
+      if(!v.ok){ toast('„' + file.name + '": ' + v.error, 'error'); return; }
+      const def = window.Blocks.get('image');
+      const cfg = def && def.defaultConfig ? def.defaultConfig() : {};
+      const id = uid('b_');
+      const block = {
+        id, type: 'image', config: cfg,
+        // Drop point is the TOP-LEFT corner of the new block; stagger
+        // subsequent files diagonally so they don't all overlap.
+        pos: { x: dropX + i * 24, y: dropY + i * 24, w: 480, h: 320 }
+      };
+      task.blocks.push(block);
+      bumpBlockUsage('image');
+      newIds.push(id);
+      // Read as data URL (same flow form.js uses) so the file rides along in
+      // the SCORM ZIP without needing a /media folder mirror.
+      const r = new FileReader();
+      r.onload = () => {
+        block.config.src = r.result;
+        const card = canvas.querySelector('[data-block-id="' + cssEscape(id) + '"]');
+        if(card){
+          const body = card.querySelector('.canvas-block-body');
+          if(body) renderBlockPreview(body, block);
+        }
+      };
+      r.onerror = () => toast('„' + file.name + '" konnte nicht gelesen werden.', 'error');
+      r.readAsDataURL(file);
+    });
+    if(newIds.length === 0) return;
+    selectedBlockIds.clear();
+    newIds.forEach(id => selectedBlockIds.add(id));
+    persistSelection();
+    ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
+    toast(images.length === 1
+      ? 'Bild als Block hinzugefügt.'
+      : images.length + ' Bilder als Blöcke hinzugefügt.');
   });
 
   // When an interactive in-canvas editor (e.g. Komposition's drag-to-move)

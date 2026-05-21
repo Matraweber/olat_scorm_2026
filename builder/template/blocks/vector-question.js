@@ -3,7 +3,7 @@
   Blocks.register('vector-question', {
     label: 'Vektor 2D ablesen',
     description: '2D-Vektor: Komponenten, Betrag, Winkel ablesen.',
-    category: 'Frage',
+    category: 'MINT',
     icon: '→',
     graded: true,
     defaultConfig(){
@@ -19,6 +19,7 @@
         maxPoints: 1
       };
     },
+    summary(cfg){ return ((cfg.pool || []).length) + ' Vektoren im Pool'; },
     builderSchema(){
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Vektor-Aufgabe' },

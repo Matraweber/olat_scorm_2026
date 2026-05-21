@@ -8,16 +8,10 @@
 (function(){
   'use strict';
 
-  function el(tag, props){
-    const e = document.createElement(tag);
-    if(props && props.style) e.style.cssText = props.style;
-    return e;
-  }
-
   Blocks.register('survey', {
     label: 'Umfrage',
     description: 'Anonymes Feedback (Sternebewertung, Auswahl, Freitext). Wird nicht bewertet.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'survey',
     graded: false,
     defaultConfig(){

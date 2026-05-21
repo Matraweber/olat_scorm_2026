@@ -3,8 +3,8 @@
 // renderActivePaneImpl dispatches to course / theme / task-pane based on the
 // current selection. The task editor lives in task-pane.js + sibling modules.
 // ============================================================================
-import { el, toast, confirmDialog } from './util.js';
-import { state, pushHistory, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme } from './state.js';
+import { el, toast, confirmDialog, escapeHtml } from './util.js';
+import { state, pushHistory, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder } from './state.js';
 import { renderField } from './form.js';
 import { renderTaskPane } from './task-pane.js';
 
@@ -12,8 +12,12 @@ import { renderTaskPane } from './task-pane.js';
 export function renderTaskList(){
   const list = document.getElementById('taskList');
   list.innerHTML = '';
-  // Empty-state: no tasks yet. Show a subtle hint pointing at the "+ Aufgabe"
-  // button so first-time users aren't staring at a blank sidebar.
+  // Toggle the header "+ Aufgabe" button based on whether the empty-state
+  // already provides a CTA. With zero tasks the empty-state card has its own
+  // "+ Erste Aufgabe" button - showing both creates three "Aufgabe erstellen"
+  // calls-to-action in a single viewport, which felt repetitive.
+  const headerAddBtn = document.getElementById('btnAddTask');
+  if(headerAddBtn) headerAddBtn.hidden = state.course.tasks.length === 0;
   if(state.course.tasks.length === 0){
     const empty = el('li', { className: 'task-empty' });
     empty.innerHTML =
@@ -23,13 +27,14 @@ export function renderTaskList(){
         '<rect x="14" y="34" width="40" height="10" rx="2"/>' +
       '</svg>' +
       '<p class="task-empty-title">Noch keine Aufgaben</p>' +
-      '<p class="task-empty-body">Erstelle die erste Aufgabe, um Lerninhalte hinzuzufügen.</p>';
+      '<p class="task-empty-body">Die erste Aufgabe anlegen, um Lerninhalte hinzuzufügen.</p>';
     const cta = el('button', {
       className: 'btn btn-primary btn-sm task-empty-cta',
       attrs: { type: 'button' },
       text: '+ Erste Aufgabe'
     });
     cta.addEventListener('click', () => {
+      // Click the (now-hidden) header button to trigger the same flow.
       const btn = document.getElementById('btnAddTask');
       if(btn) btn.click();
     });
@@ -239,7 +244,7 @@ function renderWelcomePane(host){
   heroBody.insertAdjacentHTML('afterbegin',
     '<span class="welcome-kicker">SCORM Builder · Umwelt-Campus Birkenfeld</span>'
   );
-  heroBody.appendChild(el('p', {className:'welcome-lede', text:'Mit dem SCORM Builder erstellen Sie Lerneinheiten für OLAT direkt im Browser, ohne Installation. Diese Seite erklärt den Ablauf in fünf Kapiteln.'}));
+  heroBody.appendChild(el('p', {className:'welcome-lede', text:'OLAT-Lerneinheiten direkt im Browser bauen. Ohne Installation, ohne Konto.'}));
   const heroCta = el('div', {className:'welcome-cta-row'});
   const newTaskBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
   newTaskBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
@@ -256,12 +261,12 @@ function renderWelcomePane(host){
   const stepDefs = [
     {
       n: 1, title: 'Aufgabe anlegen',
-      body: 'Klicken Sie links in der Seitenleiste auf <strong>+ Aufgabe</strong>. Sie wählen zwischen einer leeren Aufgabe oder einer Vorlage (z. B. „Wahrheitstabelle", „Numerische Eingabe mit Variablen").',
+      body: 'In der Seitenleiste auf <strong>+ Aufgabe</strong>. Wählbar: leere Aufgabe oder eine Vorlage (z. B. „Wahrheitstabelle", „Numerische Eingabe mit Variablen").',
       mock: mockSidebarAddTask()
     },
     {
       n: 2, title: 'Block hinzufügen',
-      body: 'Innerhalb der Aufgabe klicken Sie auf <strong>+ Block</strong>. Es öffnet sich ein Menü mit allen verfügbaren Block-Typen.',
+      body: 'Innerhalb der Aufgabe auf <strong>+ Block</strong>. Ein Menü zeigt alle verfügbaren Block-Typen.',
       mock: mockBlockPicker()
     },
     {
@@ -271,12 +276,12 @@ function renderWelcomePane(host){
     },
     {
       n: 4, title: 'Vorschau ansehen',
-      body: 'Klicken Sie oben rechts auf <strong>Vorschau</strong>. So sehen Studierende die fertige Lerneinheit. Sie können Antworten direkt ausprobieren.',
+      body: 'Oben rechts auf <strong>Vorschau</strong>. Zeigt die Lerneinheit aus Studierenden-Sicht, Antworten lassen sich direkt ausprobieren.',
       mock: mockTopbarBtn('Vorschau', 'secondary')
     },
     {
       n: 5, title: 'SCORM-ZIP erzeugen',
-      body: 'Mit <strong>SCORM-ZIP erzeugen</strong> wird ein vollständiges SCORM-1.2-Paket heruntergeladen. Diese ZIP-Datei laden Sie in OLAT als Lerneinheit hoch.',
+      body: '<strong>SCORM-ZIP erzeugen</strong> lädt ein vollständiges SCORM-1.2-Paket herunter. Die ZIP-Datei wird in OLAT als Lerneinheit hochgeladen.',
       mock: mockTopbarBtn('SCORM-ZIP erzeugen', 'primary')
     }
   ];
@@ -311,7 +316,7 @@ function renderWelcomePane(host){
 
   // 03 Block-Typen
   const types = chapter('Block-Typen');
-  types.appendChild(el('p', {className:'welcome-lead', text:'Inhalts-Blöcke sind statisch, Frage-Blöcke werden bewertet. Eine Aufgabe kann beliebig viele Blöcke enthalten.'}));
+  types.appendChild(el('p', {className:'welcome-lead', text:'Medien- & Text-Blöcke sind statisch, Frage- und MINT-Blöcke werden bewertet. Eine Aufgabe kann beliebig viele Blöcke enthalten.'}));
 
   types.appendChild(el('p', {className:'welcome-hint', text:'Auf eine Kachel klicken, um eine Live-Vorschau und Details zu sehen.'}));
   const blocksGrid = el('div', {className:'welcome-blocks-grid'});
@@ -422,7 +427,7 @@ function renderWelcomePane(host){
 
   // Closing call-to-action
   const foot = el('section', {className:'welcome-foot'});
-  foot.innerHTML = '<p>Diese Hilfe finden Sie jederzeit in der Seitenleiste unter <strong>Willkommen / Hilfe</strong>.</p>';
+  foot.innerHTML = '<p>Diese Seite ist jederzeit über <strong>Willkommen / Hilfe</strong> in der Seitenleiste erreichbar.</p>';
   const footBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
   footBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
   foot.appendChild(footBtn);
@@ -512,17 +517,6 @@ function setupWelcomeScrollSpy(chapters, railList){
 }
 
 // HTML-escape helper for content interpolated into innerHTML strings. The
-// welcome page builds card markup from block definitions whose `label`,
-// `description` and `icon` come from registered blocks - defensive escaping
-// keeps things consistent even if a definition later contains markup chars.
-function escapeHtml(s){
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 // Detail modal opened when a block card on the Welcome page is clicked.
 // Shows the block's label, category, description, scoring info, and a live
 // preview rendered via the block's own `preview()` function (with its
@@ -702,15 +696,38 @@ function mockSidebarAddTask(){
     '<div class="mm-task mm-task-faint">Aufgabe 2<span class="mm-meta">1 Block</span></div>';
   return wrap;
 }
+// Helper for the welcome-mockup block picker: builds one category-header +
+// row of chips, each chip showing the canonical block-icon (SVG) from the
+// shared BlockIcons registry so the mockup stays in sync with the real
+// picker. `pulse: true` on a chip nudges the eye toward an example.
+function mockChips(catLabel, chips, isQuestion){
+  const head = '<div class="mm-cat">' + escapeHtml(catLabel) + '</div>';
+  const row = chips.map(c => {
+    const icon = (window.BlockIcons && window.BlockIcons.get(c.id)) || '';
+    const cls  = 'mm-chip' + (isQuestion ? ' mm-chip-q' : '') + (c.pulse ? ' mm-pulse' : '');
+    return '<span class="' + cls + '">' + icon + '<span>' + escapeHtml(c.label) + '</span></span>';
+  }).join('');
+  return head + '<div class="mm-row">' + row + '</div>';
+}
 function mockBlockPicker(){
   const wrap = el('div', {className:'welcome-mock welcome-mock-picker'});
   wrap.innerHTML =
     '<div class="mm-modal-head">Block hinzufügen</div>' +
     '<div class="mm-modal-body">' +
-      '<div class="mm-cat">Inhalt</div>' +
-      '<div class="mm-row"><span class="mm-chip">¶ Text</span><span class="mm-chip">⌨ Code</span><span class="mm-chip">IMG Bild</span></div>' +
-      '<div class="mm-cat">Frage</div>' +
-      '<div class="mm-row"><span class="mm-chip mm-chip-q mm-pulse">☑ Multiple Choice</span><span class="mm-chip mm-chip-q">↕ Sortieren</span><span class="mm-chip mm-chip-q"># Numerisch</span></div>' +
+      mockChips('Medien & Inhalt', [
+        { id: 'rich-text',       label: 'Text' },
+        { id: 'image',           label: 'Bild' },
+        { id: 'video',           label: 'Video' }
+      ], false) +
+      mockChips('Frage', [
+        { id: 'multiple-choice', label: 'Multiple Choice', pulse: true },
+        { id: 'sort-list',       label: 'Sortieren' },
+        { id: 'numeric-input',   label: 'Numerisch' }
+      ], true) +
+      mockChips('MINT', [
+        { id: 'truth-table',     label: 'Wahrheitstabelle' },
+        { id: 'unit-convert',    label: 'Einheiten' }
+      ], true) +
     '</div>';
   return wrap;
 }
@@ -786,6 +803,7 @@ function renderThemePane(host){
     pushHistory();
     clearPersistentTheme();
     state.theme = defaultTheme();
+    applyThemeToBuilder(state.theme);
     renderActivePane();
     toast('Standard-Branding wiederhergestellt.');
   });
@@ -795,7 +813,11 @@ function renderThemePane(host){
   const persistTheme = () => {
     if(!savePersistentTheme(state.theme)) toast('Branding konnte nicht dauerhaft gespeichert werden.', 'error');
   };
-  const get = () => t; const set = (k, v) => { t[k] = v; persistTheme(); };
+  // Color/text fields all flow through this setter. Pushing the new theme
+  // onto the document root makes the builder reflect brand changes
+  // immediately (live preview), without needing a full re-render.
+  const get = () => t;
+  const set = (k, v) => { t[k] = v; persistTheme(); applyThemeToBuilder(state.theme); };
   [
     { key:'kicker', label:'Kicker (Badge oben links)', type:'text' },
     { key:'fontFamily', label:'Schriftart (CSS font-family)', type:'text' },

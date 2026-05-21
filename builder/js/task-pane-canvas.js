@@ -156,12 +156,18 @@ export function renderCanvas(ctx){
 
 export function installDragHandlers(ctx, card, block){
   const { task, canvas, configHost, selectedBlockIds } = ctx;
-  card.addEventListener('mousedown', e => {
+  // Two parallel entry points:
+  //   • mousedown - preserved for backwards compatibility (real mouse +
+  //     synthetic MouseEvents in tests / programmatic dispatch).
+  //   • pointerdown (pointerType !== 'mouse') - touch / pen on tablets.
+  // We skip pointerdown for mouse so we don't double-fire alongside
+  // mousedown. setPointerCapture on pointerdown keeps up/move events
+  // flowing to this element through a fast drag.
+  function startDrag(e, isPointer){
     if(e.target.closest('.canvas-block-resize') || e.target.closest('.canvas-block-controls')) return;
-    if(e.button !== 0) return;
+    if(!isPointer && e.button !== 0) return;
     e.preventDefault();
 
-    // Selection logic on MOUSEDOWN
     const wasSelected = selectedBlockIds.has(block.id);
     const shift = e.shiftKey;
     if(shift){
@@ -184,14 +190,15 @@ export function installDragHandlers(ctx, card, block){
     movingBlocks.forEach(b => { startPos[b.id] = {x: b.pos.x, y: b.pos.y}; });
     const startX = e.clientX, startY = e.clientY;
     let dragged = false;
+    const pointerId = isPointer ? e.pointerId : null;
+    if(isPointer){ try { card.setPointerCapture(pointerId); } catch(_){} }
     takeHistorySnap();
 
     function onMove(ev){
+      if(isPointer && ev.pointerId !== pointerId) return;
       const sdx = ev.clientX - startX, sdy = ev.clientY - startY;
       if(!dragged && (Math.abs(sdx) > 3 || Math.abs(sdy) > 3)){
         dragged = true;
-        // Flip the card to "grabbing" while the drag is active so the cursor
-        // gives clear feedback. Removed on mouseup.
         movingBlocks.forEach(b => {
           const c = canvas.querySelector('[data-block-id="' + cssEscape(b.id) + '"]');
           if(c) c.classList.add('dragging');
@@ -216,11 +223,18 @@ export function installDragHandlers(ctx, card, block){
       const meta = configHost.querySelector('.block-config-meta');
       if(meta && movingBlocks.length === 1) meta.textContent = posLabel(movingBlocks[0]);
     }
-    function onUp(){
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+    function onUp(ev){
+      if(isPointer && ev.pointerId !== pointerId) return;
+      if(isPointer){
+        card.removeEventListener('pointermove', onMove);
+        card.removeEventListener('pointerup', onUp);
+        card.removeEventListener('pointercancel', onUp);
+        try { card.releasePointerCapture(pointerId); } catch(_){}
+      } else {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
       hideSnapGuides(canvas);
-      // Clear the grabbing cursor state on every moved card.
       movingBlocks.forEach(b => {
         const c = canvas.querySelector('[data-block-id="' + cssEscape(b.id) + '"]');
         if(c) c.classList.remove('dragging');
@@ -236,14 +250,31 @@ export function installDragHandlers(ctx, card, block){
       }
       ctx.adjustCanvasHeight();
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    if(isPointer){
+      card.addEventListener('pointermove', onMove);
+      card.addEventListener('pointerup', onUp);
+      card.addEventListener('pointercancel', onUp);
+    } else {
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
+  }
+
+  // Mouse path: matches the old behavior (and test-friendly because
+  // dispatchEvent(new MouseEvent('mousedown')) triggers this).
+  card.addEventListener('mousedown', e => startDrag(e, false));
+  // Touch / pen path: pointerdown only fires for non-mouse pointer types
+  // here, to avoid double-handling with the mousedown listener above.
+  card.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'mouse') return;
+    startDrag(e, true);
   });
 }
 
 export function installResizeHandler(ctx, handle, card, block){
   const { task, canvas, configHost, selectedBlockIds } = ctx;
-  handle.addEventListener('mousedown', e => {
+  function startResize(e, isPointer){
+    if(!isPointer && e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
     selectedBlockIds.clear(); selectedBlockIds.add(block.id); ctx.persistSelection();
@@ -251,9 +282,12 @@ export function installResizeHandler(ctx, handle, card, block){
     ctx.renderConfigPane();
     const startX = e.clientX, startY = e.clientY;
     const startW = block.pos.w, startH = block.pos.h;
+    const pointerId = isPointer ? e.pointerId : null;
+    if(isPointer){ try { handle.setPointerCapture(pointerId); } catch(_){} }
     takeHistorySnap();
     let didResize = false;
     function onMove(ev){
+      if(isPointer && ev.pointerId !== pointerId) return;
       const z = ctx.zoom;
       const dx = (ev.clientX - startX) / z;
       const dy = (ev.clientY - startY) / z;
@@ -267,15 +301,34 @@ export function installResizeHandler(ctx, handle, card, block){
       const meta = configHost.querySelector('.block-config-meta');
       if(meta) meta.textContent = posLabel(block);
     }
-    function onUp(){
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+    function onUp(ev){
+      if(isPointer && ev.pointerId !== pointerId) return;
+      if(isPointer){
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        try { handle.releasePointerCapture(pointerId); } catch(_){}
+      } else {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
       hideSnapGuides(canvas);
       ctx.adjustCanvasHeight();
       if(didResize) commitHistorySnap(); else discardHistorySnap();
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    if(isPointer){
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    } else {
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
+  }
+  handle.addEventListener('mousedown', e => startResize(e, false));
+  handle.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'mouse') return;
+    startResize(e, true);
   });
 }
 

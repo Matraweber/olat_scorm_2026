@@ -3,7 +3,7 @@
   Blocks.register('truth-table', {
     label: 'Wahrheitstabelle',
     description: 'Boolesche Ausdrücke (AND, OR, NOT, XOR) auswerten, pro Zeile 0/1.',
-    category: 'Frage',
+    category: 'MINT',
     icon: '01',
     graded: true,
     defaultConfig(){
@@ -15,6 +15,16 @@
         randomize: true,
         maxPoints: 1
       };
+    },
+    summary(cfg){ return ((cfg.expressions || []).length) + ' Ausdrücke'; },
+    validate(cfg){
+      if(cfg.expressionPreset && cfg.expressionPreset !== 'custom') return [];
+      if(!cfg.expressionPreset && (!Array.isArray(cfg.expressions) || cfg.expressions.length === 0)) return [];
+      const w = [];
+      if(!Array.isArray(cfg.expressions) || cfg.expressions.length === 0 || cfg.expressions.every(e => !e.expr)){
+        w.push('Keine booleschen Ausdrücke definiert.');
+      }
+      return w;
     },
     builderSchema(){
       const isCustom = c => (c.expressionPreset || 'custom') === 'custom';

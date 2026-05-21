@@ -151,8 +151,16 @@ export function openBlockTypeModal(onPick){
   list.innerHTML = '';
   if(search) search.value = '';
 
+  // Sort by category first (stable grouping in the nav), then by user
+  // usage-count DESC (meistgenutzte zuerst), then alphabetically as
+  // tiebreaker. `state.blockUsage` is a { type: count } map persisted in
+  // localStorage and bumped each time a block is added.
+  const usage = (state.blockUsage && typeof state.blockUsage === 'object') ? state.blockUsage : {};
+  const useCount = (def) => usage[def.id] || 0;
   const all = window.Blocks.all().slice().sort((a, b) =>
-    (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label)
+    (a.category || '').localeCompare(b.category || '')
+    || (useCount(b) - useCount(a))
+    || a.label.localeCompare(b.label)
   );
   const byCat = {};
   all.forEach(def => {
@@ -181,7 +189,18 @@ export function openBlockTypeModal(onPick){
     });
   }
 
-  const cats = Object.keys(byCat);
+  // Canonical category order - keeps the picker nav stable regardless of
+  // block-file load order. Unknown categories (e.g. future additions) get
+  // appended alphabetically at the end. "Eigene Vorlagen" lands last
+  // because it only exists after the user has saved at least one snippet.
+  const CAT_ORDER = ['Medien & Inhalt', 'Frage', 'MINT', 'Visualisierung', 'Eigene Vorlagen'];
+  const cats = Object.keys(byCat).sort((a, b) => {
+    const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
+    if(ia !== -1 && ib !== -1) return ia - ib;
+    if(ia !== -1) return -1;
+    if(ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
   let activeCat = cats[0];
 
   function renderRow(def){

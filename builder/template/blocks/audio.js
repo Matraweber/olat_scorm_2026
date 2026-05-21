@@ -10,7 +10,7 @@
   Blocks.register('audio', {
     label: 'Audio',
     description: 'Audiodatei abspielen, z. B. Sprachaufnahme oder Hörbeispiel. Datei-Upload oder URL.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'audio',
     graded: false,
     defaultConfig(){
@@ -25,7 +25,7 @@
     builderSchema(){
       return [
         { key:'title', label:'Titel (über dem Player, optional)', type:'text' },
-        { key:'src', label:'Audioquelle (Data-URL oder URL/Pfad)', type:'audio', help:'Hochgeladene Audiodateien werden als Data-URL eingebettet und reisen mit ins SCORM-Paket. URL muss MP3/WAV/OGG sein.' },
+        { key:'src', label:'Audioquelle (Data-URL oder URL/Pfad)', type:'audio', help:'Hochgeladene Audiodateien werden als Data-URL ins SCORM-Paket eingebettet. URL muss MP3/WAV/OGG sein.' },
         { key:'caption', label:'Bildunterschrift (unter dem Player, optional)', type:'text' }
       ];
     },

@@ -250,7 +250,7 @@
   Blocks.register('unit-convert', {
     label: 'Einheitenumrechnung',
     description: 'Physikalische Einheiten umrechnen mit zufälligen Werten.',
-    category: 'Frage',
+    category: 'MINT',
     icon: '⇌',
     graded: true,
 
@@ -264,6 +264,19 @@
         randomSwap: false,
         tolerance: 0.01,
         maxPoints: 1
+      };
+    },
+    previewConfig(){
+      // Welcome-page sample: minutes → seconds, a classic intuitive conversion
+      // that doesn't need any unit knowledge to understand the conversion.
+      return {
+        blockTitle: '', preset: 'custom',
+        questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
+        variants: [
+          { valueMin: 2, valueMax: 10, integer: true, fromUnit: 'min', toUnit: 's', factor: 60 }
+        ],
+        randomize: false, randomSwap: false,
+        tolerance: 0.01, maxPoints: 1
       };
     },
 
@@ -390,39 +403,59 @@
     },
 
     preview(host, config){
-      const u = window.BlockUtils;
       const ac = unitPresetConfig(config);
-      const wrap = u.tagPreview(host, { icon:'⇌', label:'Einheitenumrechnung' });
-
-      // Question template (mono font, like numeric-input)
-      const q = document.createElement('div');
-      q.style.cssText = 'color:#0f2d44; margin-bottom:0.5rem; font-family:"Courier New",monospace; line-height:1.4;';
-      q.textContent = ac.questionTemplate || '(Frage-Vorlage)';
-      wrap.appendChild(q);
-
-      // Variants summary (small mono, like numeric-input's formula)
       const variants = (ac.variants || []).filter(v => v && v.fromUnit && v.toUnit);
-      if(variants.length > 0){
-        const f = document.createElement('div');
-        f.style.cssText = 'font-size:0.72rem; color:#5d6872; font-family:"Courier New",monospace; margin-bottom:0.4rem;';
-        const first = variants[0];
-        const range = (first.valueMin ?? '?') + '…' + (first.valueMax ?? '?');
-        const more = variants.length > 1 ? '  +' + (variants.length - 1) + ' weitere' : '';
-        const swap = ac.randomSwap ? '  ⇄' : '';
-        f.textContent = range + ' ' + first.fromUnit + ' → ' + first.toUnit + more + swap;
-        wrap.appendChild(f);
-      } else {
-        const f = document.createElement('div');
-        f.style.cssText = 'font-size:0.72rem; color:#888; font-style:italic; margin-bottom:0.4rem;';
-        f.textContent = '(Keine Aufgaben definiert)';
-        wrap.appendChild(f);
+      const first = variants[0];
+      // Pick a deterministic mid-range example so the welcome preview stays
+      // stable across renders.
+      let value = 5;
+      if(first){
+        const lo = Number(first.valueMin), hi = Number(first.valueMax);
+        if(!Number.isNaN(lo) && !Number.isNaN(hi)) value = Math.round((lo + hi) / 2);
       }
+      const questionText = (ac.questionTemplate || 'Rechnen Sie {value} {fromUnit} in {toUnit} um.')
+        .replace('{value}', value)
+        .replace('{fromUnit}', first?.fromUnit || '?')
+        .replace('{toUnit}',   first?.toUnit   || '?');
+      // Compute the solution if a factor is known.
+      let solution = null;
+      if(first && typeof first.factor === 'number') solution = value * first.factor;
 
-      // Answer placeholder (like numeric-input)
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#fff; border:1px solid #d8e0e6; border-radius:18px; padding:1.2rem;';
+      const h3 = document.createElement('h3');
+      h3.textContent = 'Frage';
+      h3.style.cssText = 'color:#003b5c; margin:0 0 0.6rem; font-size:1rem;';
+      card.appendChild(h3);
+      const q = document.createElement('p');
+      q.textContent = questionText;
+      q.style.cssText = 'margin:0 0 1rem; color:#111; line-height:1.45;';
+      card.appendChild(q);
+      const inpRow = document.createElement('div');
+      inpRow.style.cssText = 'display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;';
       const inp = document.createElement('div');
-      inp.style.cssText = 'border:1px solid #c6d1d8; border-radius:6px; padding:0.4rem 0.6rem; background:#f5f8fa; color:#888; font-size:0.8rem;';
-      inp.textContent = '⏤ Zahl eingeben';
-      wrap.appendChild(inp);
+      inp.style.cssText = 'flex:1; border:1px solid #c6d1d8; border-radius:8px; padding:0.55rem 0.75rem; background:#f5f8fa; color:#888; font-size:0.88rem;';
+      inp.textContent = 'Zahl eingeben…';
+      inpRow.appendChild(inp);
+      if(first?.toUnit){
+        const u = document.createElement('span');
+        u.style.cssText = 'font-weight:700; color:#5d6872;';
+        u.textContent = first.toUnit;
+        inpRow.appendChild(u);
+      }
+      card.appendChild(inpRow);
+      const btn = document.createElement('span');
+      btn.textContent = 'Korrektur';
+      btn.style.cssText = 'display:inline-block; background:#003b5c; color:#fff; padding:0.55rem 1.1rem; border-radius:999px; font-weight:700; font-size:0.88rem;';
+      card.appendChild(btn);
+      if(solution != null){
+        const hint = document.createElement('div');
+        hint.style.cssText = 'background:#f5f8fa; border:1px solid #d8e0e6; border-left:6px solid #a1d884; border-radius:14px; padding:0.7rem 0.9rem; margin-top:1rem;';
+        hint.innerHTML = '<div style="font-weight:700; color:#003b5c; margin-bottom:0.2rem;">Beispiel-Lösung</div>' +
+          '<div style="color:#0f2d44; font-family:Courier New,monospace;">' + value + ' ' + first.fromUnit + ' = ' + solution + ' ' + first.toUnit + '</div>';
+        card.appendChild(hint);
+      }
+      host.appendChild(card);
     }
   });
 })();

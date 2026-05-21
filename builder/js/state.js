@@ -50,6 +50,20 @@ export function clearPersistentTheme(){
   catch(e){}
 }
 
+// Push the four theme colors onto the document root as CSS custom-properties
+// so the Builder-UI live-previews any change. The SCORM output already
+// renders with these values; the builder needed an extra hop to stay in sync.
+// Called from main.js on boot and from the theme pane on every field change.
+export function applyThemeToBuilder(theme){
+  const t = mergeTheme(theme);
+  const r = document.documentElement;
+  if(!r || !r.style) return;
+  if(t.primaryColor)     r.style.setProperty('--primary',      t.primaryColor);
+  if(t.primaryLight)     r.style.setProperty('--primary-light', t.primaryLight);
+  if(t.accentColor)      r.style.setProperty('--accent',       t.accentColor);
+  if(t.accentDarkColor)  r.style.setProperty('--accent-dark',  t.accentDarkColor);
+}
+
 // ============================================================================
 // Autosave: every change to `state.course` is mirrored to localStorage so the
 // browser tab can be closed without losing work. On next load main.js asks the

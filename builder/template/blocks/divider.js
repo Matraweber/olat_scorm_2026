@@ -3,10 +3,11 @@
   Blocks.register('divider', {
     label: 'Trennlinie',
     description: 'Horizontale Trennlinie mit etwas Abstand.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: '━',
     graded: false,
     defaultConfig(){ return {}; },
+    summary(){ return 'Trennlinie'; },
     builderSchema(){ return []; },
     mount(host, config, api){
       const hr = document.createElement('hr');

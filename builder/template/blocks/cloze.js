@@ -13,15 +13,26 @@
         ignoreCase: true, shuffleDropdown: true, maxPoints: 1
       };
     },
+    summary(cfg){
+      const d = document.createElement('div');
+      d.innerHTML = String(cfg.text || '');
+      const t = (d.textContent || '').trim();
+      return t.length > 80 ? t.slice(0, 80) + '…' : (t || '(leer)');
+    },
+    validate(cfg){
+      if(cfg.preset && cfg.preset !== 'custom') return [];
+      const w = [];
+      if(!cfg.text || !String(cfg.text).includes('{{')) w.push('Keine Lücken im Text ({{Antwort}}).');
+      return w;
+    },
     previewConfig(){
       return {
         blockTitle: '', preset: 'custom',
-        // Three short blanks demonstrate all three input types:
-        //   {{Berlin}}         = freie Texteingabe
-        //   {{Wasser|H2O}}     = Alternativen
-        //   {{=Saturn|Jupiter}}= Dropdown (erste Option = richtig)
-        text: 'Die Hauptstadt Deutschlands heißt {{Berlin}}. Das chemische Symbol für Wasser ist {{H2O|Wasser}}. Der größte Planet im Sonnensystem ist {{=Jupiter|Saturn|Mars}}.',
-        ignoreCase: true, shuffleDropdown: true, maxPoints: 3
+        // Two short blanks demonstrate both input types:
+        //   {{Berlin}}             = freie Texteingabe
+        //   {{=Jupiter|Saturn|Mars}} = Dropdown (erste Option = richtig)
+        text: 'Die Hauptstadt Deutschlands heißt {{Berlin}}. Der größte Planet im Sonnensystem ist {{=Jupiter|Saturn|Mars}}.',
+        ignoreCase: true, shuffleDropdown: true, maxPoints: 2
       };
     },
     builderSchema(){
@@ -73,12 +84,7 @@
           ph.value = ''; ph.textContent = 'wählen…'; ph.disabled = true; ph.selected = true;
           sel.appendChild(ph);
           let opts = p.options.slice();
-          if(activeConfig.shuffleDropdown !== false){
-            for(let i = opts.length - 1; i > 0; i--){
-              const j = Math.floor(Math.random() * (i + 1));
-              [opts[i], opts[j]] = [opts[j], opts[i]];
-            }
-          }
+          if(activeConfig.shuffleDropdown !== false) window.BlockUtils.shuffle(opts);
           opts.forEach(o => {
             const op = document.createElement('option');
             op.value = o; op.textContent = o;

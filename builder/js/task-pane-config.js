@@ -23,15 +23,8 @@ export function renderConfigPane(ctx){
   if(selBlocks.length === 0){
     configHost.appendChild(el('div', {
       className: 'block-config-empty',
-      html: 'Klicke einen Block auf der Canvas, um ihn zu bearbeiten.<br><br>' +
-            '<strong>Tipps:</strong><br>' +
-            '• Shift + Klick: mehrere Blöcke auswählen<br>' +
-            '• Pfeiltasten: pixelweise verschieben (Shift = 10 px)<br>' +
-            '• Entf: Block löschen<br>' +
-            '• Strg + Mausrad: Zoom<br>' +
-            '• Strg + S: Sofort speichern<br>' +
-            '• Strg + ⇧ + S: SCORM-ZIP exportieren<br>' +
-            '• ?: alle Tastaturkürzel anzeigen'
+      html: 'Wählen Sie einen Block auf der Canvas, um ihn zu bearbeiten.' +
+            '<br><span class="block-config-empty-hint"><kbd>?</kbd> öffnet alle Tastaturkürzel.</span>'
     }));
     return;
   }
@@ -49,7 +42,7 @@ function renderMultiSelectPane(ctx, selBlocks){
   const head = el('div', {className:'block-config-head'});
   head.appendChild(el('h3', {html: 'Mehrfachauswahl <span class="multi-count-badge">' + selBlocks.length + '</span>'}));
   configHost.appendChild(head);
-  configHost.appendChild(el('div', {className:'field-help', text:'Wähle eine Aktion für alle ausgewählten Blöcke.'}));
+  configHost.appendChild(el('div', {className:'field-help', text:'Aktion für alle markierten Blöcke wählen.'}));
 
   const actions = el('div', {className:'bulk-actions'});
 

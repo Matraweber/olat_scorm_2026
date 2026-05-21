@@ -13,6 +13,14 @@
         imgHeight: 70, shuffle: true, maxPoints: 1
       };
     },
+    summary(cfg){ return ((cfg.pairs || []).length) + ' Paare'; },
+    validate(cfg){
+      if(cfg.preset && cfg.preset !== 'custom') return [];
+      const w = [];
+      if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) w.push('Mindestens zwei Paare erforderlich.');
+      else if(cfg.pairs.some(p => !p.left || !p.right)) w.push('Mindestens ein Paar hat eine leere Seite.');
+      return w;
+    },
     previewConfig(){
       return {
         blockTitle: '', preset: 'custom',
@@ -86,7 +94,7 @@
       const pairs = (activeConfig.pairs || []).filter(p => p && (p.left || p.leftImg || p.right || p.rightImg));
       const lefts  = pairs.map((p, i) => ({ id:'L'+i, text:p.left||'',  img:p.leftImg||''  }));
       const rights = pairs.map((p, i) => ({ id:'R'+i, text:p.right||'', img:p.rightImg||'', correctLeftId:'L'+i }));
-      const rightOrder = activeConfig.shuffle ? shuffle(rights.slice()) : rights.slice();
+      const rightOrder = activeConfig.shuffle ? window.BlockUtils.shuffle(rights.slice()) : rights.slice();
 
       const grid = document.createElement('div');
       grid.className = 'match-grid';
@@ -310,13 +318,6 @@
     }
   });
 
-  function shuffle(a){
-    for(let i = a.length - 1; i > 0; i--){
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
 
   function matchPresetConfig(config){
     if(!config || !config.preset || config.preset === 'custom') return config || {};

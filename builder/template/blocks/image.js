@@ -21,11 +21,18 @@
   Blocks.register('image', {
     label: 'Bild',
     description: 'Bild mit optionaler Bildunterschrift. Quelle: hochladen oder URL.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'IMG',
     graded: false,
     defaultConfig(){
       return { src: '', caption: '', width: 'auto', alt: '' };
+    },
+    summary(cfg){ return cfg.src ? 'Bild gesetzt' : '(noch kein Bild)'; },
+    validate(cfg){
+      const w = [];
+      if(!cfg.src) w.push('Kein Bild gesetzt.');
+      if(cfg.src && !cfg.alt) w.push('Alt-Text fehlt (Barrierefreiheit).');
+      return w;
     },
     previewConfig(){
       return {
@@ -37,7 +44,7 @@
     },
     builderSchema(){
       return [
-        { key:'src', label:'Bildquelle (Data-URL oder URL/Pfad)', type:'image', help:'Hochgeladene Bilder werden als Data-URL eingebettet und reisen mit ins SCORM-Paket.' },
+        { key:'src', label:'Bildquelle (Data-URL oder URL/Pfad)', type:'image', help:'Hochgeladene Bilder werden als Data-URL ins SCORM-Paket eingebettet.' },
         { key:'alt', label:'Alt-Text (Barrierefreiheit)', type:'text' },
         { key:'caption', label:'Bildunterschrift (optional)', type:'text' },
         { key:'width', label:'Breite (CSS, z. B. 400px, 60%, auto)', type:'text' }

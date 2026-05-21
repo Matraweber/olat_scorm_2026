@@ -10,7 +10,7 @@
   Blocks.register('summary', {
     label: 'Zusammenfassung',
     description: 'Lernziel- oder Kernaussagen-Liste mit Häkchen. Wird typischerweise am Ende einer Aufgabe platziert.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'summary',
     graded: false,
     defaultConfig(){

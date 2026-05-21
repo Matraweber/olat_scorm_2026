@@ -387,5 +387,17 @@
     }, 100);
   };
 
+  // Random helpers
+  // Fisher-Yates in-place shuffle. Returns the same array reference for
+  // chaining. Used by block runtimes to randomise answer order.
+  utils.shuffle = function(arr){
+    if(!Array.isArray(arr)) return arr;
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  };
+
   window.BlockUtils = utils;
 })();

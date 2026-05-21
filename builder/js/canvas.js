@@ -2,7 +2,7 @@
 // canvas.js: Canvas constants, default sizes, position helpers, snap algorithm,
 //             snap guides, block summary, autofit, drop-marker helpers.
 // ============================================================================
-import { el, cssEscapeSafe, stripHtmlText } from './util.js';
+import { el, cssEscape } from './util.js';
 import { state, pushHistory, render } from './state.js';
 
 // ---- Block-files registry (used for ZIP packaging and template loading) ----
@@ -186,26 +186,16 @@ export function findInsertIndex(listEl, y){
 }
 
 // ---- Short summary text used when block preview can't render ----
+// Each block-template may declare `summary(cfg)` returning a one-line
+// description for the task-list / fallback rendering. If absent we fall back
+// to the block's label so unknown / legacy blocks still produce something
+// readable.
 export function blockSummary(block){
-  const cfg = block.config || {};
-  switch(block.type){
-    case 'heading': return cfg.text || '(leer)';
-    case 'rich-text': { const t = stripHtmlText(cfg.html); return t.length > 80 ? t.slice(0, 80) + '…' : (t || '(leerer Text)'); }
-    case 'note-box': return cfg.title || 'Hinweis';
-    case 'image': return cfg.src ? 'Bild gesetzt' : '(noch kein Bild)';
-    case 'divider': return 'Trennlinie';
-    case 'multiple-choice': return (stripHtmlText(cfg.question) || '(Frage leer)') + ' · ' + ((cfg.choices||[]).length) + ' Antworten';
-    case 'numeric-input': return cfg.questionTemplate || '(Frage leer)';
-    case 'text-input': return cfg.question || '(Frage leer)';
-    case 'cloze': { const t = stripHtmlText(cfg.text); return t.length > 80 ? t.slice(0, 80) + '…' : (t || '(leer)'); }
-    case 'match-pairs': return ((cfg.pairs||[]).length) + ' Paare';
-    case 'truth-table': return ((cfg.expressions||[]).length) + ' Ausdrücke';
-    case 'number-base': return 'Zahlensystem-Umrechnung';
-    case 'complex-question': return ((cfg.pool||[]).length) + ' Punkte im Pool';
-    case 'function-question': return ((cfg.functions||[]).length) + ' Funktion(en)';
-    case 'vector-question': return ((cfg.pool||[]).length) + ' Vektoren im Pool';
-    default: return (window.Blocks.get(block.type) || {}).label || block.type;
+  const def = window.Blocks.get(block.type);
+  if(def && typeof def.summary === 'function'){
+    try { return def.summary(block.config || {}); } catch(e){}
   }
+  return (def && def.label) || block.type;
 }
 
 // ---- Content-fit height measurement helpers ----
@@ -239,7 +229,7 @@ export function fitHeightForCard(card){
 
 // ---- Auto-fit block height to its rendered content (button + Enter handler) ----
 export function autoFitBlock(block){
-  const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscapeSafe(block.id) + '"]');
+  const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscape(block.id) + '"]');
   const newH = fitHeightForCard(card);
   if(newH == null) return;
   pushHistory();

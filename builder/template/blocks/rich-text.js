@@ -3,10 +3,16 @@
   Blocks.register('rich-text', {
     label: 'Fließtext',
     description: 'Absatz mit Formatierung (fett, kursiv, Listen, Links).',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: '¶',
     graded: false,
     defaultConfig(){ return { html: '' }; },
+    summary(cfg){
+      const d = document.createElement('div');
+      d.innerHTML = String(cfg.html || '');
+      const t = (d.textContent || '').trim();
+      return t.length > 80 ? t.slice(0, 80) + '…' : (t || '(leerer Text)');
+    },
     previewConfig(){
       return {
         html: '<p>Dieser Block enthält <strong>formatierten Text</strong>. Erlaubt sind unter anderem <em>kursive Auszeichnung</em>, Listen und Links.</p>'

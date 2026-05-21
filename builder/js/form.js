@@ -34,13 +34,13 @@ const UPLOAD_WARN_THRESHOLDS = {
   video: 10 * 1024 * 1024,    // 10 MB
   file:  10 * 1024 * 1024
 };
-function humanSize(bytes){
+export function humanSize(bytes){
   if(bytes < 1024) return bytes + ' B';
   if(bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   if(bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
   return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
-function validateUpload(file, kind){
+export function validateUpload(file, kind){
   if(!file) return { ok: false, error: 'Keine Datei ausgewählt.' };
   const limit = UPLOAD_SIZE_LIMITS[kind] || UPLOAD_SIZE_LIMITS.file;
   if(file.size > limit){

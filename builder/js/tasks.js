@@ -79,41 +79,16 @@ export function migrateTaskIfNeeded(task){
 export function validateBlock(block){
   const warnings = [];
   const cfg = block.config || {};
-  switch(block.type){
-    case 'multiple-choice':
-      if(cfg.preset && cfg.preset !== 'custom') break;
-      if(!cfg.question || !String(cfg.question).trim()) warnings.push('Frage ist leer.');
-      if(!Array.isArray(cfg.choices) || cfg.choices.length < 2) warnings.push('Mindestens zwei Antwortmöglichkeiten erforderlich.');
-      else if(!cfg.choices.some(c => c.correct)) warnings.push('Keine richtige Antwort markiert.');
-      else if(cfg.choices.every(c => c.correct)) warnings.push('Alle Antworten als richtig markiert.');
-      break;
-    case 'match-pairs':
-      if(cfg.preset && cfg.preset !== 'custom') break;
-      if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) warnings.push('Mindestens zwei Paare erforderlich.');
-      else if(cfg.pairs.some(p => !p.left || !p.right)) warnings.push('Mindestens ein Paar hat eine leere Seite.');
-      break;
-    case 'numeric-input':
-      if(cfg.preset && cfg.preset !== 'custom') break;
-      if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) warnings.push('Frage-Vorlage fehlt.');
-      if(!cfg.formula || !String(cfg.formula).trim()) warnings.push('Lösungsformel fehlt.');
-      break;
-    case 'text-input':
-      if(!cfg.question || !String(cfg.question).trim()) warnings.push('Frage ist leer.');
-      if(!Array.isArray(cfg.answers) || cfg.answers.length === 0 || cfg.answers.every(a => !a.value)) warnings.push('Keine akzeptierten Antworten definiert.');
-      break;
-    case 'image':
-      if(!cfg.src) warnings.push('Kein Bild gesetzt.');
-      if(cfg.src && !cfg.alt) warnings.push('Alt-Text fehlt (Barrierefreiheit).');
-      break;
-    case 'cloze':
-      if(cfg.preset && cfg.preset !== 'custom') break;
-      if(!cfg.text || !String(cfg.text).includes('{{')) warnings.push('Keine Lücken im Text ({{Antwort}}).');
-      break;
-    case 'truth-table':
-      if(cfg.expressionPreset && cfg.expressionPreset !== 'custom') break;
-      if(!cfg.expressionPreset && (!Array.isArray(cfg.expressions) || cfg.expressions.length === 0)) break;
-      if(!Array.isArray(cfg.expressions) || cfg.expressions.length === 0 || cfg.expressions.every(e => !e.expr)) warnings.push('Keine booleschen Ausdrücke definiert.');
-      break;
+  // Each block-template may declare `validate(cfg) => string[]` that returns
+  // human-readable warnings (empty array if clean). Blocks without a validator
+  // are assumed always-valid; the pre-export check still catches missing
+  // common fields elsewhere.
+  const def = window.Blocks.get(block.type);
+  if(def && typeof def.validate === 'function'){
+    try {
+      const result = def.validate(cfg);
+      if(Array.isArray(result)) result.forEach(w => warnings.push(String(w)));
+    } catch(e){}
   }
   return warnings;
 }
@@ -186,6 +161,31 @@ export function saveUserBlockTemplates(){
   try { localStorage.setItem(USER_BLOCK_TEMPLATES_KEY, JSON.stringify(state.userBlockTemplates || [])); }
   catch(e){ toast('Block-Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
 }
+// ----- Block-Usage tracking ----------------------------------------------
+// `state.blockUsage` is a map { [blockType]: count } that drives the
+// "meistgenutzte zuerst"-Sortierung im Block-Picker. Bumped every time
+// a block is added (toolbar pick, drop, duplicate, paste, template).
+// Persistiert pro Browser, damit die Reihenfolge über Sessions stabil bleibt.
+const BLOCK_USAGE_KEY = 'scorm-builder-block-usage';
+export function loadBlockUsage(){
+  try {
+    const raw = localStorage.getItem(BLOCK_USAGE_KEY);
+    if(!raw) return {};
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch(e){ return {}; }
+}
+export function saveBlockUsage(){
+  try { localStorage.setItem(BLOCK_USAGE_KEY, JSON.stringify(state.blockUsage || {})); }
+  catch(e){} // quota errors are not user-fatal here
+}
+export function bumpBlockUsage(type){
+  if(!type) return;
+  if(!state.blockUsage || typeof state.blockUsage !== 'object') state.blockUsage = {};
+  state.blockUsage[type] = (state.blockUsage[type] || 0) + 1;
+  saveBlockUsage();
+}
+
 export function captureBlockAsTemplate(block, label, description){
   return {
     id: uid('btpl_'),

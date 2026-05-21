@@ -632,7 +632,7 @@
           const noBtn = document.createElement('button');
           noBtn.type = 'button';
           noBtn.className = 'comp-tool-btn comp-tool-btn-sm' + (transparent ? ' comp-tool-btn-active' : '');
-          noBtn.title = transparent ? 'Transparent ein: klick für Farbe' : 'Auf transparent setzen';
+          noBtn.title = transparent ? 'Transparent aktiv - klicken für Farbe' : 'Auf transparent setzen';
           noBtn.innerHTML = ACTION_ICONS.transparent;
           noBtn.addEventListener('click', e => {
             e.stopPropagation();
@@ -2124,7 +2124,7 @@
   Blocks.register('composition', {
     label: 'Komposition',
     description: 'Skizze aus Linien, Kreisen, Pfeilen und Beschriftungen. Optional als Aufgabe bewertbar.',
-    category: 'Inhalt',
+    category: 'Visualisierung',
     icon: '◧',
     // graded:true tells the builder this block can award points. The actual
     // runtime behavior depends on config.gradingMode: 'none' (default) is a

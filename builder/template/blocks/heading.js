@@ -3,10 +3,11 @@
   Blocks.register('heading', {
     label: 'Überschrift',
     description: 'Zwischenüberschrift im Aufgabentext.',
-    category: 'Inhalt',
+    category: 'Medien & Inhalt',
     icon: 'H',
     graded: false,
     defaultConfig(){ return { text: 'Überschrift', level: 2 }; },
+    summary(cfg){ return cfg.text || '(leer)'; },
     builderSchema(){
       return [
         { key:'text', label:'Text', type:'text' },

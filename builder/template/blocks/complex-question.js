@@ -3,7 +3,7 @@
   Blocks.register('complex-question', {
     label: 'Komplexe Zahl ablesen',
     description: 'Plot in Gaußscher Zahlenebene zeigen, Re/Im/|z|/φ abfragen.',
-    category: 'Frage',
+    category: 'MINT',
     icon: 'z',
     graded: true,
     defaultConfig(){
@@ -21,6 +21,7 @@
         maxPoints: 1
       };
     },
+    summary(cfg){ return ((cfg.pool || []).length) + ' Punkte im Pool'; },
     previewConfig(){
       // For the welcome-modal "Live-Vorschau": pick a point with enough
       // magnitude that the vector + angle arc read clearly. z = 3 + 2i

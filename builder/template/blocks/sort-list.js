@@ -51,12 +51,8 @@
       const u = api.utils;
       const generated = sortListPreset(config);
       const correct = generated.items.filter(Boolean);
-      // Shuffle for display
-      const order = correct.map((_, i) => i);
-      for(let i = order.length - 1; i > 0; i--){
-        const j = Math.floor(Math.random() * (i + 1));
-        [order[i], order[j]] = [order[j], order[i]];
-      }
+      // Shuffle indices for display
+      const order = u.shuffle(correct.map((_, i) => i));
 
       const ui = u.simpleQuestionCard(host, { title: config.blockTitle || 'Aufgabe', qBoxTitle: 'Sortieren', question: generated.question || config.question || '' });
       const { content, buttons, fb } = ui;

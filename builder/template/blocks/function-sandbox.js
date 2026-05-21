@@ -22,7 +22,7 @@
       return [
         // Funktion
         { type:'section', label:'Funktion', key:'_sec_fn' },
-        { key:'title', label:'Titel (optional)', type:'text', placeholder:'z. B.  Sinus erkunden' },
+        { key:'title', label:'Titel (optional)', type:'text', placeholder:'z. B. Sinus erkunden' },
         { key:'expr',  label:'f(x) =', type:'text', placeholder:'a*sin(b*x + c)',
           help:'Slider-Variablen (a, b, c, …) dürfen hier vorkommen.' },
         // Koordinatenbereich
