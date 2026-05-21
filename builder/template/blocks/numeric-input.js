@@ -11,7 +11,7 @@
   Blocks.register('numeric-input', {
     label: 'Numerische Eingabe',
     description: 'Numerische Frage mit Zufallsvariablen und Lösungs-Formel.',
-    category: 'Frage',
+    category: 'MINT',
     icon: '#',
     graded: true,
     defaultConfig(){
@@ -55,7 +55,23 @@
         // Frage
         { type:'section', label:'Frage', key:'_sec_q' },
         { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {name})', type:'math-textarea', rows:2, showIf: isCustom,
-          help:'Beispiel: „Berechnen Sie {a} + {b}." Variablen werden beim Start zufällig belegt.' },
+          help:'Beispiel: „Berechnen Sie {a} + {b}." Variablen werden beim Start zufällig belegt. Die Lösungs-Formel wird automatisch abgeleitet.',
+          onChange: (val, cfg, set) => {
+            // Auto-derive the formula whenever the question changes, unless
+            // the user has explicitly customised it (signaled by storing the
+            // last auto-derived value in cfg._derivedFormula).
+            const derived = deriveFormula(val);
+            const previous = cfg._derivedFormula || '';
+            const userTouched = cfg.formula && cfg.formula !== previous;
+            if(!userTouched){
+              set('formula', derived);
+              set('_derivedFormula', derived);
+              // Push the new value into the open formula input without
+              // re-rendering the entire config pane (preserves focus).
+              const fld = document.querySelector('[data-formula-field-key="formula"]');
+              if(fld) fld.dispatchEvent(new CustomEvent('formula-field-set', { detail: { value: derived } }));
+            }
+          } },
         // Variablen
         { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
         { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
@@ -67,17 +83,26 @@
           },
           itemSchema:[
             { key:'name',    label:'Name',           type:'text',    placeholder:'z. B. a' },
-            { key:'min',     label:'von',             type:'number',  step:'any' },
-            { key:'max',     label:'bis',             type:'number',  step:'any' },
+            { key:'min',     label:'von',             type:'number',  step:'any',
+              onChange:(val, item, set) => {
+                // Untere Grenze ueber obere -> obere mit-anheben.
+                if(val != null && item.max != null && val > item.max) set('max', val);
+              }},
+            { key:'max',     label:'bis',             type:'number',  step:'any',
+              onChange:(val, item, set) => {
+                // Obere unter untere -> untere mit-absenken.
+                if(val != null && item.min != null && val < item.min) set('min', val);
+              }},
             { key:'integer', label:'Nur Ganzzahlen',  type:'boolean' }
           ]},
         // Lösung
         { type:'section', label:'Lösung', key:'_sec_formula' },
         { key:'formula', label:'Lösungs-Formel', type:'formula-text', placeholder:'sqrt(a^2 + b^2)', showIf: isCustom,
-          help:'Darf alle Variablen-Namen und Standardfunktionen (sqrt, sin, cos, …) enthalten.' },
+          help:'Wird automatisch aus der Frage abgeleitet. Bei Bedarf manuell überschreiben.' },
         { key:'tolerance', label:'Toleranz  (±)', type:'number', step:'any',
           help:'Abweichung, die noch als korrekt gilt. 0 = exakt.' },
-        { key:'unit', label:'Einheit (optional)', type:'text', placeholder:'z. B. m/s oder kg' },
+        { key:'unit', label:'Antwort-Einheit (optional)', type:'text', placeholder:'z. B. m/s oder kg',
+          help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehoert in den Fragetext.' },
         // Bewertung
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
@@ -92,7 +117,7 @@
         h3: activeConfig.blockTitle || 'Aufgabe',
         qBoxTitle: 'Frage',
         inputLabel: 'Antwort' + (activeConfig.unit ? ' (' + activeConfig.unit + ')' : ''),
-        inputPlaceholder: 'Zahl eingeben'
+        inputPlaceholder: 'Zahl oder Bruch (z. B. 0.75 oder 3/4)'
       });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
 
@@ -108,12 +133,22 @@
         return vars;
       }
       function fillTemplate(tpl, vars){
-        return String(tpl || '').replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
-          if(name in vars){
-            const v = vars[name];
-            return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+        function formatValue(v){
+          return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+        }
+        // Within $...$ blocks (KaTeX) the braces around {a} are LaTeX
+        // argument groups - keep them so constructs like \frac{a}{b} stay
+        // valid after substitution. Outside math, drop the braces.
+        return String(tpl || '').replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName) => {
+          if(match.startsWith('$')){
+            // Math context: replace {name} but keep wrapping braces.
+            return match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
+              if(name in vars) return '{' + formatValue(vars[name]) + '}';
+              return m;
+            });
           }
-          return m;
+          if(plainName && plainName in vars) return formatValue(vars[plainName]);
+          return match;
         });
       }
       function sameInstance(a, b){
@@ -131,14 +166,15 @@
         current = next;
         inp.value = '';
         qText.textContent = fillTemplate(activeConfig.questionTemplate, vars);
+        u.renderMath(qText);
         if(showMsg) fb.neutral('Neue Aufgabe generiert.');
       }
       function grade(){
         if(current.expected == null){ fb.bad('Lösung konnte nicht berechnet werden (Formel prüfen).'); return; }
         const got = u.parseNum(inp.value);
-        if(got == null){ fb.bad('Bitte eine gültige Zahl eingeben.'); return; }
+        if(got == null){ fb.bad('Bitte eine gültige Zahl oder Bruch (z. B. 3/4) eingeben.'); return; }
         if(u.nearlyEqual(got, current.expected, Number(activeConfig.tolerance) || 0.01)){
-          fb.ok('Korrekt. (Lösung: ' + (Math.round(current.expected*1000)/1000) + (activeConfig.unit ? ' ' + activeConfig.unit : '') + ')');
+          fb.ok('Korrekt. (Loesung: ' + u.formatSolution(current.expected) + (activeConfig.unit ? ' ' + activeConfig.unit : '') + ')');
           api.reportScore(activeConfig.maxPoints || 1);
         } else {
           fb.bad('Nicht korrekt.');
@@ -200,8 +236,72 @@
         card.appendChild(hint);
       }
       host.appendChild(card);
+    },
+    // Custom builder-actions. Dispatched from the right-pane action buttons.
+    applyAction(action, cfg){
+      if(action === 'derive-formula'){
+        const derived = deriveFormula(cfg.questionTemplate || '');
+        if(derived){
+          cfg.formula = derived;
+          return true;
+        }
+      }
+      return false;
     }
   });
+
+  // Best-effort: turn "Berechnen Sie {a} + {b}." into "a + b". Walks the
+  // template, drops natural-language tokens, normalizes operator symbols.
+  // Try to extract a JavaScript-evaluable formula from a question template.
+  // Strategy: prefer math inside $...$ delimiters (KaTeX), then convert LaTeX
+  // constructs to ASCII, then strip natural-language fluff.
+  function deriveFormula(template){
+    if(!template) return '';
+    let s = String(template);
+    // 1. Prefer the contents inside $...$ if present (KaTeX block).
+    const dollarMatch = s.match(/\$([^$]+)\$/);
+    if(dollarMatch) s = dollarMatch[1];
+    // 2. Convert LaTeX constructs to ASCII expressions BEFORE the brace strip.
+    //    \frac{X}{Y} -> (X)/(Y)
+    //    \sqrt{X}    -> sqrt(X)
+    //    \cdot       -> *
+    //    {X}^{Y}     -> (X)^(Y)
+    function unwrapBraces(str){
+      // {a+b}^{2} pattern: braces denote LaTeX argument groups (single token).
+      return str.replace(/\{([^{}]*)\}/g, '($1)');
+    }
+    // First handle \frac, \sqrt etc. with their {...}-args.
+    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)');
+    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
+    s = s.replace(/\\cdot/g, '*');
+    s = s.replace(/\\times/g, '*');
+    s = s.replace(/\\div/g, '/');
+    s = s.replace(/\\pi/g, 'pi');
+    s = s.replace(/\\left|\\right/g, '');
+    // After LaTeX-replacements, convert remaining {x} placeholders to plain x.
+    s = unwrapBraces(s);
+    // Normalize math symbols.
+    s = s.replace(/[·×∙]/g, '*')
+         .replace(/÷|:/g, '/')
+         .replace(/−/g, '-')
+         .replace(/√/g, 'sqrt');
+    // Strip German connector words.
+    s = s.replace(/\b(Berechnen Sie|Berechne|Was ist|Wie viel ist|Wieviel ist|Bestimmen Sie|Bestimme|Gib an|Bestimme den Wert von|Geben Sie an)\b/gi, ' ');
+    // Find the longest contiguous math-allowed substring around variables.
+    const allowed = /[A-Za-z_0-9+\-*/^().,\s]/;
+    let best = '';
+    let current = '';
+    for(let i = 0; i < s.length; i++){
+      const c = s[i];
+      if(allowed.test(c)) current += c;
+      else { if(current.length > best.length) best = current; current = ''; }
+    }
+    if(current.length > best.length) best = current;
+    best = best.trim().replace(/^[\s.,]+|[\s.,]+$/g, '');
+    // Collapse multiple whitespace runs into a single space.
+    best = best.replace(/\s+/g, ' ');
+    return best;
+  }
 
   function numericPresetConfig(config){
     const preset = config.preset || 'custom';

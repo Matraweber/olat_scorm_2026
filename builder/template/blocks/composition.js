@@ -840,11 +840,20 @@
             const sol = document.createElement('input');
             sol.type = 'text';
             sol.className = 'comp-tool-text';
-            sol.placeholder = 'Lösung…';
+            sol.placeholder = 'Loesung...';
             sol.value = sel.correctText || '';
-            sol.title = 'Erwartete Eingabe';
+            sol.title = 'Erwartete Eingabe (statisch)';
             sol.addEventListener('input', () => { sel.correctText = sol.value; commit(); });
             styleGroup.appendChild(sol);
+            // Optional formula: evaluated against variables - "a*b" etc.
+            const fml = document.createElement('input');
+            fml.type = 'text';
+            fml.className = 'comp-tool-text';
+            fml.placeholder = 'Formel (z. B. a*b)';
+            fml.value = sel.formula || '';
+            fml.title = 'Formel mit Variablen; ueberschreibt statische Loesung';
+            fml.addEventListener('input', () => { sel.formula = fml.value; commit(); });
+            styleGroup.appendChild(fml);
           }
         }
         if(gMode === 'hotspot'){
@@ -1819,67 +1828,151 @@
 
   // Mode: fillblanks - label shapes with blank=true become inputs.
   function runFillBlanks(ui, config, api, maxPoints){
-    const svg = appendSvg(ui.content, config, 'comp-blanks-' + (api?.blockId || ''));
-    const shapes = config.shapes || [];
-    const blanks = [];
+    const u = window.BlockUtils;
+    const variables = Array.isArray(config.variables) ? config.variables : [];
+    let currentVars = {};
+    let renderedSvgHost = document.createElement('div');
+    ui.content.appendChild(renderedSvgHost);
 
-    // Replace each blank label's <text> with a foreignObject + <input>.
-    shapes.forEach((sh, idx) => {
-      if(sh.type !== 'label' || !sh.blank) return;
-      const textNode = svg.querySelector('text[data-shape-idx="' + idx + '"]');
-      if(!textNode) return;
-      const fs = sh.fontSize || 18;
-      const expected = String(sh.correctText || sh.text || '').trim();
-      // Input width derived from expected length.
-      const w = Math.max(80, expected.length * fs * 0.55 + 24);
-      const h = fs + 12;
-      // Position the foreignObject so the input baseline matches the text.
-      const fo = document.createElementNS(NS, 'foreignObject');
-      fo.setAttribute('x', sh.x - 2);
-      fo.setAttribute('y', sh.y - fs);
-      fo.setAttribute('width', w);
-      fo.setAttribute('height', h);
-      fo.setAttribute('data-shape-idx', String(idx));
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.className = 'comp-blank-input';
-      inp.style.cssText = 'width:100%; height:' + h + 'px; box-sizing:border-box; ' +
-        'font:' + (sh.fontWeight || 400) + ' ' + (fs - 2) + 'px Verdana,Arial,sans-serif; ' +
-        'padding:0 0.4rem; border:1px solid #84bf66; border-radius:4px; background:#fff; color:#003b5c;';
-      inp.placeholder = '…';
-      fo.appendChild(inp);
-      textNode.replaceWith(fo);
-      blanks.push({ idx, input: inp, correct: expected });
-    });
+    function genVars(){
+      const vars = {};
+      variables.forEach(v => {
+        if(!v || !v.name) return;
+        const lo = Number(v.min); const hi = Number(v.max);
+        const a = isNaN(lo) ? 1 : lo;
+        const b = isNaN(hi) ? 10 : hi;
+        let val = a + Math.random() * (b - a);
+        if(v.integer !== false) val = Math.round(val);
+        else val = Math.round(val * 100) / 100;
+        vars[v.name] = val;
+      });
+      return vars;
+    }
+    function fillTemplate(str, vars){
+      return String(str || '').replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
+        if(name in vars){
+          const v = vars[name];
+          return Number.isInteger(v) ? String(v) : String(Math.round(v * 1000) / 1000);
+        }
+        return m;
+      });
+    }
+    function evalFormula(expr, vars){
+      if(!expr) return null;
+      try {
+        const r = u.safeMathExpr(String(expr), vars);
+        if(typeof r === 'number' && Number.isFinite(r)) return r;
+      } catch(e){}
+      return null;
+    }
+    // Resolve a blank's expected answer: if `formula` is set, evaluate it
+    // with the current variables; otherwise use `correctText` (static fallback).
+    function expectedFor(sh, vars){
+      if(sh.formula && String(sh.formula).trim()){
+        const v = evalFormula(sh.formula, vars);
+        if(v != null) return { value: v, asString: Number.isInteger(v) ? String(v) : String(Math.round(v * 1000) / 1000) };
+      }
+      const txt = String(sh.correctText || sh.text || '').trim();
+      const filled = fillTemplate(txt, vars);
+      const asNum = u.parseNum(filled);
+      return { value: asNum, asString: filled };
+    }
+
+    function render(){
+      renderedSvgHost.innerHTML = '';
+      // Substitute variables into every label's text BEFORE rendering.
+      const shapes = (config.shapes || []).map(sh => {
+        if(sh.type !== 'label') return sh;
+        return Object.assign({}, sh, { text: fillTemplate(sh.text, currentVars) });
+      });
+      const renderConfig = Object.assign({}, config, { shapes });
+      const svg = appendSvg(renderedSvgHost, renderConfig, 'comp-blanks-' + (api?.blockId || ''));
+      const blanks = [];
+      shapes.forEach((sh, idx) => {
+        if(sh.type !== 'label' || !sh.blank) return;
+        const textNode = svg.querySelector('text[data-shape-idx="' + idx + '"]');
+        if(!textNode) return;
+        const fs = sh.fontSize || 18;
+        const exp = expectedFor(sh, currentVars);
+        const expectedStr = exp.asString || '';
+        const w = Math.max(80, expectedStr.length * fs * 0.55 + 24);
+        const h = fs + 12;
+        const fo = document.createElementNS(NS, 'foreignObject');
+        fo.setAttribute('x', sh.x - 2);
+        fo.setAttribute('y', sh.y - fs);
+        fo.setAttribute('width', w);
+        fo.setAttribute('height', h);
+        fo.setAttribute('data-shape-idx', String(idx));
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'comp-blank-input';
+        inp.style.cssText = 'width:100%; height:' + h + 'px; box-sizing:border-box; ' +
+          'font:' + (sh.fontWeight || 400) + ' ' + (fs - 2) + 'px Verdana,Arial,sans-serif; ' +
+          'padding:0 0.4rem; border:1px solid #84bf66; border-radius:4px; background:#fff; color:#003b5c;';
+        inp.placeholder = '...';
+        fo.appendChild(inp);
+        textNode.replaceWith(fo);
+        blanks.push({ idx, input: inp, expected: exp, formula: sh.formula, tolerance: Number(sh.tolerance) || 0.01 });
+      });
+      return blanks;
+    }
+
+    function regenerate(){
+      currentVars = genVars();
+      const blanks = render();
+      checkBtn.disabled = false;
+      checked = false;
+      currentBlanks = blanks;
+      u.renderMath(renderedSvgHost);
+      ui.fb.neutral('Neue Werte generiert.');
+    }
+
+    let currentBlanks = [];
+    let checked = false;
+    currentVars = genVars();
+    currentBlanks = render();
 
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'primary';
-    checkBtn.textContent = 'Prüfen';
-    let checked = false;
+    checkBtn.textContent = 'Pruefen';
     checkBtn.addEventListener('click', () => {
       if(checked) return;
+      if(currentBlanks.length === 0){ ui.fb.neutral('Keine Luecken definiert.'); api.reportScore(0); return; }
       checked = true;
       checkBtn.disabled = true;
-      if(blanks.length === 0){ ui.fb.neutral('Keine Lücken definiert.'); api.reportScore(0); return; }
       let correctCount = 0;
-      blanks.forEach(b => {
+      currentBlanks.forEach(b => {
         const given = String(b.input.value || '').trim();
-        const ok = given.toLowerCase() === b.correct.toLowerCase() && b.correct !== '';
+        let ok = false;
+        if(b.expected.value != null){
+          const gotNum = u.parseNum(given);
+          if(gotNum != null && u.nearlyEqual(gotNum, b.expected.value, b.tolerance)) ok = true;
+        } else {
+          ok = given.toLowerCase() === b.expected.asString.toLowerCase() && b.expected.asString !== '';
+        }
         b.input.disabled = true;
         b.input.classList.add(ok ? 'comp-blank-ok' : 'comp-blank-bad');
-        if(!ok && b.correct){
-          b.input.title = 'Lösung: ' + b.correct;
+        if(!ok && b.expected.asString){
+          b.input.title = 'Loesung: ' + b.expected.asString;
         }
         if(ok) correctCount++;
       });
-      const pts = Math.round((correctCount / blanks.length) * maxPoints * 100) / 100;
+      const pts = Math.round((correctCount / currentBlanks.length) * maxPoints * 100) / 100;
       api.reportScore(pts);
-      const msg = correctCount + ' / ' + blanks.length + ' Lücken korrekt → ' + pts + ' / ' + maxPoints + ' Punkte.';
-      if(correctCount === blanks.length) ui.fb.ok(msg);
-      else if(correctCount > 0)          ui.fb.neutral(msg);
-      else                               ui.fb.bad(msg);
+      const msg = correctCount + ' / ' + currentBlanks.length + ' Luecken korrekt -> ' + pts + ' / ' + maxPoints + ' Punkte.';
+      if(correctCount === currentBlanks.length) ui.fb.ok(msg);
+      else if(correctCount > 0)                 ui.fb.neutral(msg);
+      else                                      ui.fb.bad(msg);
     });
     ui.buttons.appendChild(checkBtn);
+
+    if(variables.length > 0){
+      const newBtn = document.createElement('button');
+      newBtn.type = 'button'; newBtn.className = 'secondary';
+      newBtn.textContent = 'Neu generieren';
+      newBtn.addEventListener('click', regenerate);
+      ui.buttons.appendChild(newBtn);
+    }
     return {};
   }
 
@@ -2046,6 +2139,9 @@
         prompt: '',
         // For 'click' mode: penalize wrong clicks?
         penalizeWrong: false,
+        // Variables for fillblanks: each label text + blank formula can reference
+        // {name} placeholders. Regenerated on each "Neu generieren" click.
+        variables: [],
         shapes: []
       };
     },
@@ -2086,6 +2182,18 @@
         { key:'penalizeWrong', label:'Falsche Klicks abziehen', type:'boolean',
           showIf: c => c.gradingMode === 'click',
           help:'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.' },
+        { type:'section', label:'Variablen', key:'_sec_vars',
+          showIf: c => c.gradingMode === 'fillblanks' },
+        { key:'variables', label:'Zufallsvariablen', type:'list', itemLabel:'Variable',
+          showIf: c => c.gradingMode === 'fillblanks',
+          help:'Variablen koennen in Label-Texten als {name} verwendet und in Luecken-Formeln referenziert werden. Bei jedem "Neu generieren" werden sie neu gezogen.',
+          itemSummary: item => (item.name || '?') + ' = [' + (item.min ?? '?') + '..' + (item.max ?? '?') + ']',
+          itemSchema: [
+            { key:'name',    label:'Name', type:'text', placeholder:'z. B. a' },
+            { key:'min',     label:'Min',  type:'number', step:1 },
+            { key:'max',     label:'Max',  type:'number', step:1 },
+            { key:'integer', label:'Ganzzahlig', type:'boolean', default:true }
+          ]},
         // Advanced manual editing; day-to-day work happens on the canvas.
         { type:'section', label:'Formen (erweitert)', key:'_sec_shapes' },
         { key:'shapes', label:'Formen', type:'list', itemLabel:'Form',

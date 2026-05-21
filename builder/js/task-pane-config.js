@@ -121,6 +121,16 @@ function renderSingleBlockPane(ctx, sel){
       pushHistoryDebounced();
       ctx.scheduleBlockPreviewRefresh(sel);
       renderConfigPane(ctx);
+      return;
+    }
+    // Block-defined custom action: def.applyAction(action, cfg) -> bool
+    if(typeof def.applyAction === 'function'){
+      const handled = def.applyAction(action, sel.config);
+      if(handled){
+        pushHistoryDebounced();
+        ctx.scheduleBlockPreviewRefresh(sel);
+        renderConfigPane(ctx);
+      }
     }
   };
   configHost._blockActionHandler = actionHandler;

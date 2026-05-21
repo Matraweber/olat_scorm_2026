@@ -247,10 +247,25 @@ export function renderField(spec, getObj, setObj){
     input.addEventListener('input', () => setObj(spec.key, input.value));
   } else if(spec.type === 'number'){
     input = el('input', {attrs:{type:'number', step: spec.step != null ? spec.step : 'any', placeholder: spec.placeholder || ''}});
+    input.dataset.fieldKey = spec.key;
     if(spec.min != null) input.min = spec.min;
     if(spec.max != null) input.max = spec.max;
     input.value = obj[spec.key] != null ? String(obj[spec.key]) : '';
-    input.addEventListener('input', () => setObj(spec.key, input.value === '' ? null : Number(input.value)));
+    input.addEventListener('input', () => {
+      const val = input.value === '' ? null : Number(input.value);
+      setObj(spec.key, val);
+      // Cross-field hook for things like min/max sync. setLive(k,v) updates
+      // both the state and the sibling DOM input that carries the field key.
+      if(typeof spec.onChange === 'function'){
+        const setLive = (k, v) => {
+          setObj(k, v);
+          const root = input.closest('.list-item, .field-row, fieldset, form, .block-config-pane') || document;
+          const sibling = root.querySelector('input[data-field-key="' + k + '"]');
+          if(sibling && sibling !== input) sibling.value = v == null ? '' : String(v);
+        };
+        spec.onChange(val, getObj() || {}, setLive);
+      }
+    });
   } else if(spec.type === 'boolean'){
     const cb = el('input', {attrs:{type:'checkbox'}});
     cb.checked = !!obj[spec.key];
@@ -614,7 +629,13 @@ function renderMathTextarea(spec, getObj, setObj, wrap){
     }
   }
 
-  ta.addEventListener('input', () => { setObj(spec.key, ta.value); updateMathPreview(); });
+  ta.addEventListener('input', () => {
+    setObj(spec.key, ta.value);
+    updateMathPreview();
+    if(typeof spec.onChange === 'function'){
+      spec.onChange(ta.value, getObj() || {}, (k, v) => setObj(k, v));
+    }
+  });
   updateMathPreview();
 
   mathWrap.appendChild(toolbar);
@@ -633,7 +654,15 @@ function renderFormulaText(spec, getObj, setObj, wrap){
   const formulaWrap = el('div', {className:'formula-field'});
   const fbar  = el('div', {className:'formula-toolbar'});
   const finp  = el('input', {attrs:{type:'text', placeholder: spec.placeholder || ''}});
+  finp.dataset.formulaFieldKey = spec.key;
   finp.value  = obj[spec.key] != null ? String(obj[spec.key]) : '';
+  // External updaters (z. B. Auto-Ableitung aus Frage-Vorlage) koennen
+  // dieses Event dispatchen, ohne die ganze Konfig-Pane neu zu rendern.
+  finp.addEventListener('formula-field-set', e => {
+    if(e.detail && e.detail.value != null && finp.value !== e.detail.value){
+      finp.value = e.detail.value;
+    }
+  });
 
   function insertFormulaPart(snippet, cursorPos){
     const s = finp.selectionStart, e = finp.selectionEnd, v = finp.value;

@@ -66,6 +66,10 @@
     'number-base':     svg('<text x="10" y="14.5" font-family="Verdana,Arial,sans-serif" font-size="11.5" font-weight="800" fill="currentColor" stroke="none" text-anchor="middle" letter-spacing="-0.4">0x</text>'),
     'unit-convert':    svg('<path d="M5 7 L13 7 M11 5 L13 7 L11 9"/><path d="M15 13 L7 13 M9 11 L7 13 L9 15"/>'),
     'truth-table':     svg('<rect x="3" y="4" width="14" height="12" rx="0.5"/><path d="M3 8 L17 8 M10 4 L10 16"/>'),
+    // Grid with header row + 3 data rows.
+    'table':           svg('<rect x="2" y="3" width="16" height="14" rx="1"/><path d="M2 7 L18 7 M10 3 L10 17 M2 11 L18 11 M2 14 L18 14"/>'),
+    // Curly brace + two equation lines for a linear system.
+    'equation-system': svg('<path d="M5 3 Q3 3 3 5 L3 9 Q3 10 2 10 Q3 10 3 11 L3 15 Q3 17 5 17"/><path d="M7 7 L17 7 M7 13 L17 13"/>'),
 
     // Visualisierung
     'function-sandbox': svg('<path d="M3 17 L3 3 M3 17 L17 17"/><path d="M3 13 C 7 13, 9 7, 13 7 S 17 11, 17 11"/><circle cx="13" cy="7" r="1.4" fill="currentColor" stroke="none"/>')

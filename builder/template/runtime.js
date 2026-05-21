@@ -102,12 +102,38 @@
     return { id: task.id, title: task.title, blocks };
   }
 
+  // Max points of a single task, derived from the block configs alone.
+  // Used so the score pill / progress bar can show the correct max even
+  // before the user has opened a task (mount() wasn't called yet).
+  function computeMaxPoints(task){
+    if(!task) return 0;
+    const blocks = getAllTaskBlocks(task);
+    let max = 0;
+    blocks.forEach(b => {
+      const def = window.Blocks && window.Blocks.get(b.type);
+      if(def && def.graded){
+        const mp = Number(b.config && b.config.maxPoints);
+        max += Math.max(1, isNaN(mp) ? 1 : mp);
+      }
+    });
+    return max;
+  }
   function totalScore(){
     let pts = 0, max = 0;
     perTask.forEach(t => {
       if(!t || !t.blockScores) return;
-      Object.values(t.blockScores).forEach(s => { pts += s.points; max += s.max; });
+      Object.values(t.blockScores).forEach(s => { pts += s.points; });
     });
+    courseConfig.tasks.forEach(task => { max += computeMaxPoints(task); });
+    return {pts, max};
+  }
+  function taskScore(idx){
+    let pts = 0;
+    const t = perTask[idx];
+    if(t && t.blockScores){
+      Object.values(t.blockScores).forEach(s => { pts += s.points; });
+    }
+    const max = computeMaxPoints(courseConfig.tasks[idx]);
     return {pts, max};
   }
 
@@ -130,19 +156,30 @@
   function updateScorePill(){
     const pill = document.getElementById('scorePill');
     if(!pill) return;
-    const {pts, max} = totalScore();
-    pill.textContent = 'Punkte: ' + (Math.round(pts*100)/100) + ' / ' + max;
+    const r = n => Math.round(n * 100) / 100;
+    const total = totalScore();
+    const task = taskScore(currentPageIdx);
+    // Per-Task only when the current task has graded blocks; otherwise just
+    // show the cumulative total to keep the header tidy.
+    if(task.max > 0){
+      pill.innerHTML = 'Aufgabe: <strong>' + r(task.pts) + ' / ' + task.max + '</strong>' +
+        '<span class="score-pill-sep"> · </span>' +
+        'Gesamt: <strong>' + r(total.pts) + ' / ' + total.max + '</strong>';
+    } else {
+      pill.innerHTML = 'Gesamt: <strong>' + r(total.pts) + ' / ' + total.max + '</strong>';
+    }
   }
 
   function isTaskDone(idx){
-    const t = perTask[idx];
-    if(!t || !t.blockScores) return false;
     const blocks = getAllTaskBlocks(courseConfig.tasks[idx]);
     const graded = blocks.filter(b => {
       const def = window.Blocks.get(b.type);
       return def && def.graded;
     });
-    if(graded.length === 0) return true; // content-only tasks count as done
+    // Content-only tasks count as done even before the user opens them.
+    if(graded.length === 0) return true;
+    const t = perTask[idx];
+    if(!t || !t.blockScores) return false;
     return graded.every(b => {
       const s = t.blockScores[b.id];
       return s && s.points >= s.max && s.max > 0;
@@ -364,6 +401,11 @@
       cfg.tasks.forEach(() => perTask.push({blockScores: {}, blockInstances: []}));
       buildNav();
       try { window.Scorm12 && Scorm12.init(); } catch(e) {}
+      // Show the cumulative max-points immediately, before any task is opened.
+      // computeMaxPoints reads each task's configs directly so the pill
+      // doesn't wait for mount() to populate blockScores.
+      updateScorePill();
+      updateNavStates();
       if(cfg.tasks.length > 0) showPage(0);
     }).catch(err => {
       document.getElementById('taskContainer').innerHTML = '<section class="hero-card"><div><h2>Konfiguration nicht ladbar</h2><pre>' + escapeHtml(String(err)) + '</pre></div></section>';

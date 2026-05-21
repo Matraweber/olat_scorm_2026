@@ -63,6 +63,13 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .text-input:focus { outline: 2px solid rgba(0,59,92,0.18); border-color: var(--primary); }
 .value-row { display: flex; justify-content: space-between; margin-top: 0.45rem; color: var(--muted); }
 .formula-text { font-family: "Courier New", Courier, monospace; color: #0f2d44; line-height: 1.45; }
+/* KaTeX in der Frage-Box braucht mehr Vertikal-Raum, damit Brueche nicht
+ * mit umgebendem Text kollidieren. Schriftgroesse + Strichdicke bleiben
+ * bei KaTeX-Default, damit der Bruchstrich richtig an die Breite der
+ * Zaehler/Nenner gebunden ist. */
+.formula-text { line-height: 2.2; font-size: 1.05rem; }
+.formula-text .katex { font-size: 1.25em; }
+.formula-text .katex-display { margin: 0.4em 0; }
 .input-stack { display: grid; gap: 0.2rem; }
 .button-row, .button-cluster { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 0.85rem; }
 .btn { appearance: none; border: none; border-radius: 999px; padding: 0.78rem 1.15rem; font: inherit; font-weight: 700; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease; }
@@ -82,6 +89,8 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .footer-link { display: block; max-width: 1200px; width: 100%; margin: 0 auto; padding: 0 1.2rem; color: var(--muted); text-decoration: none; font-size: 0.88rem; }
 .footer-link:hover { text-decoration: underline; }
 .score-pill { display: inline-block; padding: 0.3rem 0.8rem; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 999px; font-size: 0.85rem; margin-left: auto; color: #fff; }
+.score-pill strong { color: #fff; font-weight: 700; }
+.score-pill-sep { opacity: 0.55; padding: 0 0.15rem; }
 .tabs { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .tab-btn { background: rgba(0,59,92,0.06); color: var(--primary); border: 1px solid rgba(0,59,92,0.18); border-radius: 999px; padding: 0.45rem 0.9rem; font: inherit; font-weight: 700; cursor: pointer; font-size: 0.88rem; }
 .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -141,6 +150,45 @@ table.truth-table th { background: var(--panel-soft); color: var(--primary); }
 .match-content span { font-size: 0.9rem; text-align: center; line-height: 1.3; }
 .match-col-right.over { outline: 2px dashed var(--primary); border-radius: 12px; }
 .match-cell-left .match-slot[data-empty="false"] { cursor: grab; }
+
+/* Categorize block - n-to-1 drag/drop (left pool -> right zones). */
+.cat-wrap { margin-top: 0.7rem; display: grid; grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.8fr); gap: 0.9rem; align-items: start; }
+.cat-pool { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.9rem; background: var(--panel-soft); align-self: stretch; }
+.cat-pool-label { font-weight: 700; color: var(--primary); font-size: 0.8rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.cat-pool-list { display: flex; flex-direction: column; flex-wrap: wrap; gap: 0.4rem; min-height: 1.8rem; }
+.cat-drops { display: flex; flex-direction: column; gap: 0.7rem; }
+.cat-zone { border: 1.5px dashed var(--line); border-radius: 12px; padding: 0.7rem; background: #fff; min-height: 70px; transition: background 0.12s ease, border-color 0.12s ease; }
+@media (max-width: 720px) { .cat-wrap { grid-template-columns: 1fr; } }
+.cat-zone.is-drop-target { background: rgba(132,191,102,0.1); border-color: var(--accent-dark); }
+.cat-pool.is-drop-target { background: rgba(132,191,102,0.1); border-color: var(--accent-dark); }
+.cat-zone-label { font-weight: 700; color: var(--primary); font-size: 0.9rem; margin-bottom: 0.45rem; }
+.cat-zone-list { display: flex; flex-wrap: wrap; gap: 0.35rem; min-height: 1.8rem; }
+.cat-chip { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.7rem; font: inherit; font-weight: 600; color: var(--primary); cursor: grab; user-select: none; transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.12s ease; }
+.cat-chip:hover { background: var(--panel-soft); }
+.cat-chip.is-dragging { opacity: 0.5; cursor: grabbing; }
+.cat-chip-correct { background: rgba(132,191,102,0.18); border-color: var(--accent-dark); color: #2a4d18; }
+.cat-chip-wrong   { background: rgba(180,35,24,0.1);   border-color: var(--danger);      color: #6b0f0f; }
+
+/* Value-table block */
+.table-block-host { margin: 0.6rem 0; overflow-x: auto; }
+.table-block { border-collapse: collapse; width: auto; min-width: 50%; }
+.table-block th, .table-block td { border: 1px solid var(--line); padding: 0.5rem 0.8rem; text-align: center; font-family: "Courier New", monospace; }
+.table-block th { background: var(--panel-soft); color: var(--primary); font-weight: 700; font-family: inherit; }
+.table-block-input { width: 80px; padding: 0.3rem 0.4rem; border: 1px solid #c6d1d8; border-radius: 6px; background: #fffaf0; color: var(--primary); font: inherit; text-align: center; }
+.table-block-input:focus { background: #fff; outline: 2px solid rgba(0,59,92,0.18); border-color: var(--primary); }
+.table-cell-correct { background: rgba(132,191,102,0.2); border-color: var(--accent-dark); }
+.table-cell-wrong   { background: rgba(180,35,24,0.12); border-color: var(--danger); }
+.table-block-preview { font-size: 0.85rem; margin: 0.6rem 0; }
+
+/* Equation system block */
+.eqsys-system { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.8rem 1rem; background: var(--panel-soft); border-radius: 12px; border-left: 6px solid var(--accent); margin: 0.5rem 0 1rem; font-size: 1.05rem; }
+.eqsys-line { padding: 0.1rem 0; }
+.eqsys-inputs { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.5rem; }
+.eqsys-input-row { display: flex; align-items: center; gap: 0.6rem; }
+.eqsys-input-label { font-weight: 700; color: var(--primary); min-width: 2.5rem; }
+.eqsys-input { width: 140px; text-align: center; }
+.eqsys-correct { background: rgba(132,191,102,0.18); border-color: var(--accent-dark); }
+.eqsys-wrong   { background: rgba(180,35,24,0.1);   border-color: var(--danger); }
 
 /* Cloze inputs */
 .cloze-wrap input { background: #fffaf0; border-color: #d4a72a; }

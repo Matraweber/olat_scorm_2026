@@ -128,3 +128,101 @@ export function confirmDialog(opts){
   });
 }
 
+// Multi-field input dialog. Replaces stacked prompt() calls.
+// opts: {
+//   title, message?, fields: [{key, label, placeholder?, default?, type?, rows?}],
+//   confirmLabel = 'Speichern', cancelLabel = 'Abbrechen'
+// }
+// Returns Promise<{<key>: value, ...} | null>. Null = cancel.
+export function formDialog(opts){
+  const {
+    title = '',
+    message = '',
+    fields = [],
+    confirmLabel = 'Speichern',
+    cancelLabel = 'Abbrechen'
+  } = opts || {};
+  return new Promise(resolve => {
+    const prevFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal confirm-dialog form-dialog';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    const card = document.createElement('div');
+    card.className = 'modal-card confirm-dialog-card form-dialog-card';
+    overlay.appendChild(card);
+    if(title){
+      const h = document.createElement('h2');
+      h.className = 'confirm-dialog-title';
+      h.textContent = title;
+      card.appendChild(h);
+    }
+    if(message){
+      const p = document.createElement('p');
+      p.className = 'confirm-dialog-message';
+      p.textContent = message;
+      card.appendChild(p);
+    }
+    const inputs = {};
+    fields.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'form-dialog-row';
+      const lbl = document.createElement('label');
+      lbl.className = 'form-dialog-label';
+      lbl.textContent = f.label || f.key;
+      row.appendChild(lbl);
+      const input = f.type === 'textarea'
+        ? document.createElement('textarea')
+        : document.createElement('input');
+      if(f.type !== 'textarea') input.type = 'text';
+      input.className = 'form-dialog-input';
+      if(f.placeholder) input.placeholder = f.placeholder;
+      if(f.default != null) input.value = f.default;
+      if(f.rows && f.type === 'textarea') input.rows = f.rows;
+      row.appendChild(input);
+      card.appendChild(row);
+      inputs[f.key] = input;
+    });
+    const actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    actions.innerHTML =
+      '<button class="btn btn-secondary confirm-dialog-cancel" type="button">' + escapeHtml(cancelLabel) + '</button>' +
+      '<button class="btn btn-primary confirm-dialog-ok" type="button">' + escapeHtml(confirmLabel) + '</button>';
+    card.appendChild(actions);
+    document.body.appendChild(overlay);
+    const okBtn = overlay.querySelector('.confirm-dialog-ok');
+    const cancelBtn = overlay.querySelector('.confirm-dialog-cancel');
+    function cleanup(result){
+      document.removeEventListener('keydown', onKey, true);
+      overlay.removeEventListener('mousedown', onBackdrop);
+      overlay.remove();
+      if(prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus({ preventScroll: true });
+      resolve(result);
+    }
+    function collect(){
+      const out = {};
+      Object.keys(inputs).forEach(k => { out[k] = inputs[k].value; });
+      return out;
+    }
+    function onKey(e){
+      if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); cleanup(null); }
+      // Enter submits only when not in a textarea.
+      else if(e.key === 'Enter' && e.target.tagName !== 'TEXTAREA'){
+        e.preventDefault();
+        cleanup(collect());
+      }
+    }
+    function onBackdrop(e){
+      if(e.target === overlay) cleanup(null);
+    }
+    okBtn.addEventListener('click', () => cleanup(collect()));
+    cancelBtn.addEventListener('click', () => cleanup(null));
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', onBackdrop);
+    setTimeout(() => {
+      const first = fields[0] && inputs[fields[0].key];
+      if(first) first.focus({ preventScroll: true });
+    }, 0);
+  });
+}
+

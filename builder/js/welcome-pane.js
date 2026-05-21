@@ -408,6 +408,11 @@ function openBlockDetailModal(id, def){
     } else {
       previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'(Keine Vorschau verfügbar)'}));
     }
+    // Run KaTeX over the rendered preview so math notation in question
+    // templates / formulas (\(...\), $...$) gets typeset.
+    if(window.BlockUtils && window.BlockUtils.renderMath){
+      window.BlockUtils.renderMath(previewHost);
+    }
   } catch(err){
     previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'Vorschau konnte nicht gerendert werden.'}));
   }

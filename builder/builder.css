@@ -309,6 +309,20 @@ textarea:focus-visible,
   font-size: 0.94rem;
   line-height: 1.45;
 }
+.form-dialog-card { min-width: 360px; }
+.form-dialog-row { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.8rem; }
+.form-dialog-label { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
+.form-dialog-input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+  color: var(--text);
+  box-sizing: border-box;
+}
+.form-dialog-input:focus { outline: 2px solid rgba(0,59,92,0.18); border-color: var(--primary); }
 .confirm-dialog .modal-actions {
   display: flex;
   justify-content: flex-end;

@@ -38,6 +38,26 @@
     parseNum(value){
       const s = String(value == null ? '' : value).trim().replace(',', '.');
       if(!s) return null;
+      // Bruch-Eingabe: "a/b", "-3/4", "12/25", auch mit Whitespace.
+      const frac = s.match(/^(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)$/);
+      if(frac){
+        const num = Number(frac[1]);
+        const den = Number(frac[2]);
+        if(Number.isFinite(num) && Number.isFinite(den) && den !== 0) return num / den;
+        return null;
+      }
+      // Gemischte Zahl: "1 3/4" -> 1.75
+      const mixed = s.match(/^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+      if(mixed){
+        const sign = mixed[1] === '-' ? -1 : 1;
+        const whole = Number(mixed[2]);
+        const num = Number(mixed[3]);
+        const den = Number(mixed[4]);
+        if(Number.isFinite(whole) && Number.isFinite(num) && Number.isFinite(den) && den !== 0){
+          return sign * (whole + num / den);
+        }
+        return null;
+      }
       const n = Number(s);
       return Number.isFinite(n) ? n : null;
     },
@@ -57,6 +77,48 @@
       } catch(e) { return null; }
     },
     nearlyEqual(a, b, tol){ return Math.abs(a - b) <= (tol == null ? 0.05 : tol); },
+    // Try to render a number as a reduced fraction a/b. Returns null if the
+    // value isn't a "nice" rational (e.g. irrational like pi or huge denom).
+    // maxDenom limits how big the denominator may become before bailing out.
+    gcd(a, b){
+      a = Math.abs(Math.round(a)); b = Math.abs(Math.round(b));
+      while(b){ const t = b; b = a % b; a = t; }
+      return a || 1;
+    },
+    asFraction(value, maxDenom){
+      if(!Number.isFinite(value)) return null;
+      const limit = maxDenom || 999;
+      const sign = value < 0 ? -1 : 1;
+      const x = Math.abs(value);
+      if(Math.abs(x - Math.round(x)) < 1e-9) return null;
+      for(let den = 2; den <= limit; den++){
+        const num = x * den;
+        if(Math.abs(num - Math.round(num)) < 1e-9){
+          const n = Math.round(num);
+          const g = utils.gcd(n, den);
+          return { num: sign * (n / g), den: den / g };
+        }
+      }
+      return null;
+    },
+    formatNum(value){
+      if(!Number.isFinite(value)) return String(value);
+      if(Number.isInteger(value)) return String(value);
+      const rounded = Math.round(value * 1000) / 1000;
+      return String(rounded);
+    },
+    // Pretty solution text: "15/4 (= 3.75)" for non-integer rationals,
+    // plain decimal otherwise.
+    formatSolution(value){
+      if(!Number.isFinite(value)) return String(value);
+      if(Number.isInteger(value)) return String(value);
+      const frac = utils.asFraction(value);
+      const dec = Math.round(value * 1000) / 1000;
+      if(frac && Math.abs(frac.den) > 1){
+        return frac.num + '/' + frac.den + ' (= ' + dec + ')';
+      }
+      return String(dec);
+    },
     normalizeAngle(phi){
       let x = phi;
       while(x <= -Math.PI) x += 2 * Math.PI;
@@ -78,16 +140,36 @@
     },
     safeMathExpr(expr, vars){
       const allowedFns = ['sin','cos','tan','asin','acos','atan','atan2','sinh','cosh','tanh','exp','log','log2','log10','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
-      let s = String(expr || '').replace(/\s+/g, '').replace(/,/g, '.');
-      if(!s) return null;
+      let s = String(expr || '').replace(/,/g, '.');
+      if(!s.trim()) return null;
+      // Implicit multiplication: "2 pi r", "2pi", ")(": insert "*" between
+      // tokens where multiplication is meant. Skip cases where the right side
+      // starts an allowed function call - "2sin(x)" should become "2*sin(x)"
+      // but "sin(x)" must stay intact.
+      const fnRe = new RegExp('^(?:' + allowedFns.join('|') + ')\\b');
+      function isFunctionStart(rest){ return fnRe.test(rest); }
+      // Implicit multiplication. Iterate until stable: each replace may
+      // create new neighbouring patterns ("2 pi r" -> "2*pi r" -> "2*pi*r").
+      let prev;
+      do {
+        prev = s;
+        s = s.replace(/([A-Za-z0-9_)])\s+(?=[A-Za-z_(])/g, '$1*');
+        s = s.replace(/(\d)([A-Za-z_])/g, '$1*$2');
+        s = s.replace(/\)([A-Za-z0-9_(])/g, ')*$1');
+      } while(s !== prev);
+      s = s.replace(/\s+/g, '');
       s = utils.normalizePowerSyntax(s);
       const varNames = Object.keys(vars || {});
       const tokens = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
       for(const t of tokens){
         if(!(allowedFns.includes(t) || varNames.includes(t) || t === 'pi' || t === 'e' || t === 'PI' || t === 'E')) return null;
       }
-      let body = s.replace(/\bpi\b/g, '(Math.PI)').replace(/\bPI\b/g, '(Math.PI)')
-                  .replace(/\be\b/g, '(Math.E)').replace(/\bE\b/g, '(Math.E)');
+      // Constants: replace via placeholders so the second pass doesn't
+      // re-match the "PI" inside "(Math.PI)" we just inserted.
+      let body = s.replace(/\b(?:pi|PI)\b/g, '__PI__')
+                  .replace(/\b(?:e|E)\b/g, '__E__')
+                  .replace(/__PI__/g, '(Math.PI)')
+                  .replace(/__E__/g, '(Math.E)');
       allowedFns.forEach(fn => { body = body.replace(new RegExp('\\b' + fn + '\\b', 'g'), 'Math.' + fn); });
       try {
         const fn = new Function(...varNames, '"use strict"; return (' + body + ');');

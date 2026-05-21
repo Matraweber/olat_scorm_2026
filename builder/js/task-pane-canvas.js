@@ -1,6 +1,6 @@
 // task-pane-canvas.js: Canvas render + direct-manipulation handlers
 // (drag-to-move, drag-to-resize) with snap guides and history snapshots.
-import { el, uid, cssEscape, toast, confirmDialog } from './util.js';
+import { el, uid, cssEscape, toast, confirmDialog, formDialog } from './util.js';
 import { state, pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
 import { captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
 import {
@@ -54,15 +54,21 @@ export function renderCanvas(ctx){
       selectedBlockIds.clear(); selectedBlockIds.add(copy.id); ctx.persistSelection();
       renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
     });
-    tplBtn.addEventListener('click', e => {
+    tplBtn.addEventListener('click', async e => {
       e.stopPropagation();
       const defaultName = (def && def.label) || block.type;
-      const name = prompt('Name der Block-Vorlage:', defaultName);
-      if(name === null) return;
-      const trimmed = String(name).trim();
+      const result = await formDialog({
+        title: 'Block als Vorlage speichern',
+        fields: [
+          { key:'name',        label:'Name',                 default: defaultName, placeholder:'z. B. Multiple Choice mit 4 Optionen' },
+          { key:'description', label:'Beschreibung (optional)', type:'textarea', rows:2, placeholder:'Was zeichnet diese Vorlage aus?' }
+        ],
+        confirmLabel: 'Speichern'
+      });
+      if(!result) return;
+      const trimmed = String(result.name || '').trim();
       if(!trimmed){ toast('Vorlage wurde nicht gespeichert (kein Name angegeben).', 'error'); return; }
-      const description = prompt('Beschreibung (optional):', '') || '';
-      const tpl = captureBlockAsTemplate(block, trimmed, description);
+      const tpl = captureBlockAsTemplate(block, trimmed, String(result.description || '').trim());
       state.userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
       state.userBlockTemplates.unshift(tpl);
       saveUserBlockTemplates();

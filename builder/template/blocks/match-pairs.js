@@ -9,14 +9,30 @@
     defaultConfig(){
       return {
         blockTitle: '', preset: 'custom',
+        mode: 'pairs',
         question: '', pairs: [],
+        categories: [], items: [],
         imgHeight: 70, shuffle: true, maxPoints: 1
       };
     },
-    summary(cfg){ return ((cfg.pairs || []).length) + ' Paare'; },
+    summary(cfg){
+      if(cfg.mode === 'categorize'){
+        return ((cfg.categories || []).length) + ' Kategorien, ' + ((cfg.items || []).length) + ' Begriffe';
+      }
+      return ((cfg.pairs || []).length) + ' Paare';
+    },
     validate(cfg){
       if(cfg.preset && cfg.preset !== 'custom') return [];
       const w = [];
+      if(cfg.mode === 'categorize'){
+        const cats = cfg.categories || [];
+        const items = cfg.items || [];
+        if(cats.length < 2) w.push('Mindestens zwei Kategorien erforderlich.');
+        if(items.length < 2) w.push('Mindestens zwei Begriffe erforderlich.');
+        const ids = new Set(cats.map(c => c.id));
+        if(items.some(i => !ids.has(i.categoryId))) w.push('Mindestens ein Begriff hat keine gueltige Kategorie.');
+        return w;
+      }
       if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) w.push('Mindestens zwei Paare erforderlich.');
       else if(cfg.pairs.some(p => !p.left || !p.right)) w.push('Mindestens ein Paar hat eine leere Seite.');
       return w;
@@ -35,6 +51,8 @@
     },
     builderSchema(){
       const isCustom = c => (c.preset || 'custom') === 'custom';
+      const isPairs  = c => isCustom(c) && (c.mode || 'pairs') === 'pairs';
+      const isCat    = c => isCustom(c) && c.mode === 'categorize';
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Zuordnung' },
         { key:'preset', label:'Vorlage', type:'select', options:[
@@ -42,16 +60,26 @@
           {value:'chemistry',     label:'Beispiel: Chemie, Elemente & Symbole'},
           {value:'units',         label:'Beispiel: Physik, Einheiten zuordnen'},
           {value:'number-bases',  label:'Beispiel: Informatik, Zahlensysteme'},
-          {value:'math-symbols',  label:'Beispiel: Mathematik, Symbole & Bedeutungen'}
-        ], help:'Beispiele zeigen typische Zuordnungsaufgaben. Bei „Manuell" eigene Paare eingeben.' },
+          {value:'math-symbols',  label:'Beispiel: Mathematik, Symbole & Bedeutungen'},
+          {value:'animals',       label:'Beispiel: Biologie, Tiere nach Klasse (Kategorisierung)'},
+          {value:'states',        label:'Beispiel: Chemie, Aggregatzustaende (Kategorisierung)'}
+        ], help:'Beispiele zeigen typische Zuordnungsaufgaben. Bei „Manuell" eigene Daten eingeben.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
+
+        { type:'section', label:'Modus', key:'_sec_mode', showIf: isCustom },
+        { key:'mode', label:'Zuordnungs-Modus', type:'select', showIf: isCustom, options:[
+          {value:'pairs',      label:'1 zu 1 (jeder Begriff hat genau einen Partner)'},
+          {value:'categorize', label:'Kategorisierung (mehrere Begriffe pro Kategorie)'}
+        ]},
+
         // Frage
         { type:'section', label:'Frage', key:'_sec_q', showIf: isCustom },
         { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom },
-        // Paare
-        { type:'section', label:'Paare  (links ↔ rechts)', key:'_sec_pairs', showIf: isCustom },
+
+        // Paare (1:1-Modus)
+        { type:'section', label:'Paare  (links ↔ rechts)', key:'_sec_pairs', showIf: isPairs },
         { key:'pairs', label:'Paare', type:'list', itemLabel:'Paar',
-          showIf: isCustom,
+          showIf: isPairs,
           itemSummary: item => {
             const l = (item.left  || (item.leftImg  ? '(Bild)' : '')).slice(0, 35) || '…';
             const r = (item.right || (item.rightImg ? '(Bild)' : '')).slice(0, 35) || '…';
@@ -65,11 +93,32 @@
             { key:'right',    label:'Text',  type:'text',  fullWidth:true },
             { key:'rightImg', label:'Bild',  type:'image', fullWidth:true }
           ]},
+
+        // Kategorisierung (n:1-Modus)
+        { type:'section', label:'Kategorien', key:'_sec_cats', showIf: isCat },
+        { key:'categories', label:'Kategorien', type:'list', itemLabel:'Kategorie',
+          showIf: isCat,
+          itemSummary: item => (item.label || '...'),
+          itemSchema:[
+            { key:'id',    label:'Interne ID', type:'text', placeholder:'c1' },
+            { key:'label', label:'Anzeige-Name', type:'text', placeholder:'z. B. Saeugetiere' },
+            { key:'image', label:'Bild (optional)', type:'image', fullWidth:true }
+          ]},
+        { type:'section', label:'Begriffe', key:'_sec_items', showIf: isCat },
+        { key:'items', label:'Begriffe', type:'list', itemLabel:'Begriff',
+          showIf: isCat,
+          itemSummary: item => (item.text || (item.image ? '(Bild)' : '...')) + '  ->  ' + (item.categoryId || '?'),
+          itemSchema:[
+            { key:'text',       label:'Text', type:'text', placeholder:'z. B. Hund' },
+            { key:'image',      label:'Bild (optional)', type:'image', fullWidth:true },
+            { key:'categoryId', label:'Zugehoerige Kategorie-ID', type:'text', placeholder:'c1' }
+          ]},
+
         // Einstellungen
         { type:'section', label:'Einstellungen', key:'_sec_opts' },
         { key:'imgHeight', label:'Bild-Höhe in px', type:'number', step:10, min:20, max:400,
-          help:'Maximale Höhe für alle Bilder in den Paaren.' },
-        { key:'shuffle',   label:'Rechte Seite mischen', type:'boolean' },
+          help:'Maximale Höhe für alle Bilder.' },
+        { key:'shuffle',   label:'Reihenfolge mischen', type:'boolean' },
         // Bewertung
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 }
@@ -77,6 +126,9 @@
     },
     mount(host, config, api){
       const activeConfig = matchPresetConfig(config);
+      if(activeConfig.mode === 'categorize'){
+        return mountCategorize(host, activeConfig, api);
+      }
       const imgH = Number(activeConfig.imgHeight) || 70;
 
       const card = document.createElement('section');
@@ -358,8 +410,202 @@
           { left:'≈', right:'ungefähr gleich' },
           { left:'∞', right:'unendlich' }
         ]
+      },
+      animals: {
+        mode: 'categorize',
+        question: 'Ordnen Sie die Tiere ihren Klassen zu.',
+        categories: [
+          { id:'mammals', label:'Saeugetiere' },
+          { id:'birds',   label:'Voegel' },
+          { id:'fish',    label:'Fische' }
+        ],
+        items: [
+          { text:'Hund',  categoryId:'mammals' },
+          { text:'Katze', categoryId:'mammals' },
+          { text:'Adler', categoryId:'birds' },
+          { text:'Spatz', categoryId:'birds' },
+          { text:'Hai',   categoryId:'fish' },
+          { text:'Lachs', categoryId:'fish' }
+        ],
+        maxPoints: 6
+      },
+      states: {
+        mode: 'categorize',
+        question: 'Ordnen Sie die Stoffe ihrem Aggregatzustand zu.',
+        categories: [
+          { id:'solid',  label:'Fest' },
+          { id:'liquid', label:'Fluessig' },
+          { id:'gas',    label:'Gasfoermig' }
+        ],
+        items: [
+          { text:'Eisen',       categoryId:'solid'  },
+          { text:'Granit',      categoryId:'solid'  },
+          { text:'Wasser',      categoryId:'liquid' },
+          { text:'Quecksilber', categoryId:'liquid' },
+          { text:'Sauerstoff',  categoryId:'gas'    },
+          { text:'Helium',      categoryId:'gas'    }
+        ],
+        maxPoints: 6
       }
     }[config.preset];
     return pairs ? Object.assign(base, pairs) : config;
+  }
+  // Mount fuer Kategorisierungs-Modus (n-zu-1 Drag&Drop).
+  function mountCategorize(host, cfg, api){
+    const imgH = Number(cfg.imgHeight) || 70;
+    const card = document.createElement('section');
+    card.className = 'section-card block-question';
+    const h = document.createElement('h3'); h.textContent = cfg.blockTitle || 'Kategorisierung'; card.appendChild(h);
+    if(cfg.question && String(cfg.question).trim() !== ''){
+      const qBox = document.createElement('div'); qBox.className = 'formula-box'; qBox.style.marginBottom = '1rem';
+      const qBoxTitle = document.createElement('div'); qBoxTitle.className = 'formula-title'; qBoxTitle.textContent = 'Frage';
+      qBox.appendChild(qBoxTitle);
+      const qText = document.createElement('div'); qText.className = 'formula-text'; qText.textContent = cfg.question;
+      qBox.appendChild(qText);
+      card.appendChild(qBox);
+    }
+    const cats  = (cfg.categories || []).filter(c => c && c.id);
+    const items = (cfg.items || []).filter(it => it && (it.text || it.image));
+    if(cats.length === 0 || items.length === 0){
+      const ph = document.createElement('div');
+      ph.style.cssText = 'color:var(--muted, #6a7986); font-style:italic;';
+      ph.textContent = '(Keine Kategorien oder Begriffe definiert.)';
+      card.appendChild(ph);
+      host.appendChild(card);
+      api.initScore(Number(cfg.maxPoints) || 1);
+      return {};
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cat-wrap';
+    card.appendChild(wrap);
+
+    const pool = document.createElement('div');
+    pool.className = 'cat-pool';
+    const poolLabel = document.createElement('div');
+    poolLabel.className = 'cat-pool-label';
+    poolLabel.textContent = 'Begriffe';
+    pool.appendChild(poolLabel);
+    const poolList = document.createElement('div');
+    poolList.className = 'cat-pool-list';
+    pool.appendChild(poolList);
+    wrap.appendChild(pool);
+
+    const dropArea = document.createElement('div');
+    dropArea.className = 'cat-drops';
+    wrap.appendChild(dropArea);
+
+    const dropZones = {};
+    cats.forEach(c => {
+      const zone = document.createElement('div');
+      zone.className = 'cat-zone';
+      zone.dataset.categoryId = c.id;
+      const lbl = document.createElement('div');
+      lbl.className = 'cat-zone-label';
+      if(c.image){
+        const img = document.createElement('img');
+        img.src = c.image; img.alt = c.label || c.id;
+        img.style.cssText = 'max-height:' + Math.round(imgH*0.6) + 'px; vertical-align:middle; margin-right:0.4rem;';
+        lbl.appendChild(img);
+      }
+      const txt = document.createElement('span');
+      txt.textContent = c.label || c.id;
+      lbl.appendChild(txt);
+      zone.appendChild(lbl);
+      const list = document.createElement('div');
+      list.className = 'cat-zone-list';
+      zone.appendChild(list);
+      dropArea.appendChild(zone);
+      dropZones[c.id] = { zone, list };
+    });
+
+    const assigned = items.map(() => null);
+    const itemOrder = items.map((_, i) => i);
+    if(cfg.shuffle !== false) window.BlockUtils.shuffle(itemOrder);
+
+    const chips = items.map((it, idx) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'cat-chip';
+      chip.draggable = true;
+      chip.dataset.itemIdx = String(idx);
+      if(it.image){
+        const img = document.createElement('img');
+        img.src = it.image; img.alt = it.text || '';
+        img.style.cssText = 'max-height:' + imgH + 'px; vertical-align:middle; margin-right:0.4rem;';
+        chip.appendChild(img);
+      }
+      if(it.text){
+        const txt = document.createElement('span');
+        txt.textContent = it.text;
+        chip.appendChild(txt);
+      }
+      chip.addEventListener('dragstart', e => {
+        chip.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(idx)); } catch(_){}
+      });
+      chip.addEventListener('dragend', () => chip.classList.remove('is-dragging'));
+      chip.addEventListener('click', () => {
+        if(assigned[idx] != null){
+          assigned[idx] = null;
+          poolList.appendChild(chip);
+        }
+      });
+      return chip;
+    });
+    itemOrder.forEach(i => poolList.appendChild(chips[i]));
+
+    function attachDrop(target, categoryId){
+      target.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        target.classList.add('is-drop-target');
+      });
+      target.addEventListener('dragleave', () => target.classList.remove('is-drop-target'));
+      target.addEventListener('drop', e => {
+        e.preventDefault();
+        target.classList.remove('is-drop-target');
+        const itemIdx = Number(e.dataTransfer.getData('text/plain'));
+        if(Number.isNaN(itemIdx) || !chips[itemIdx]) return;
+        assigned[itemIdx] = categoryId;
+        if(categoryId == null) poolList.appendChild(chips[itemIdx]);
+        else dropZones[categoryId].list.appendChild(chips[itemIdx]);
+      });
+    }
+    cats.forEach(c => attachDrop(dropZones[c.id].zone, c.id));
+    attachDrop(pool, null);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'button-cluster';
+    const checkBtn = document.createElement('button');
+    checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
+    checkBtn.textContent = 'Korrektur';
+    btnRow.appendChild(checkBtn);
+    card.appendChild(btnRow);
+    const fb = api.utils.feedbackBox(card);
+    host.appendChild(card);
+
+    checkBtn.addEventListener('click', () => {
+      let correct = 0;
+      chips.forEach((chip, idx) => {
+        const expected = items[idx].categoryId;
+        const actual   = assigned[idx];
+        chip.classList.remove('cat-chip-correct', 'cat-chip-wrong');
+        if(actual === expected){ chip.classList.add('cat-chip-correct'); correct++; }
+        else                    { chip.classList.add('cat-chip-wrong'); }
+      });
+      const maxPoints = Number(cfg.maxPoints) || items.length;
+      const pts = Math.round((correct / items.length) * maxPoints * 100) / 100;
+      if(correct === items.length){
+        fb.ok('Alle ' + items.length + ' Begriffe richtig zugeordnet. ' + maxPoints + ' / ' + maxPoints + ' Punkte.');
+      } else {
+        fb.bad(correct + ' von ' + items.length + ' richtig. ' + pts + ' / ' + maxPoints + ' Punkte.');
+      }
+      api.reportScore(pts);
+    });
+
+    api.initScore(Number(cfg.maxPoints) || 1);
+    return {};
   }
 })();

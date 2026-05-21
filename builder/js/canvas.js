@@ -29,6 +29,8 @@ export const BLOCK_FILES = {
   'number-base':       'number-base.js',
   'unit-convert':      'unit-convert.js',
   'truth-table':       'truth-table.js',
+  'table':             'table.js',
+  'equation-system':   'equation-system.js',
   'function-sandbox':  'function-sandbox.js',
   'composition':       'composition.js'
 };
@@ -58,6 +60,8 @@ const BLOCK_DEFAULT_SIZES = {
   'text-input':        {w: 600, h: 340},
   'cloze':             {w: 900, h: 320},
   'match-pairs':       {w: 900, h: 540},
+  'table':             {w: 700, h: 460},
+  'equation-system':   {w: 600, h: 460},
   'sort-list':         {w: 700, h: 420},
   'complex-question':  {w: 1080, h: 720},
   'function-question': {w: 1080, h: 640},
