@@ -49,7 +49,11 @@ textarea:focus-visible,
 }
 .builder-shell { display: flex; flex-direction: column; min-height: 100vh; }
 .builder-header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: #fff; padding: 0.6rem 1.2rem; display:flex; justify-content:space-between; align-items: center; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-.builder-brand { display: flex; align-items: center; gap: 0.7rem; }
+.builder-brand { display: flex; align-items: center; gap: 0.4rem; }
+.builder-brand-home,
+.builder-brand-title { background: transparent; border: none; padding: 0.2rem 0.4rem; margin: 0; cursor: pointer; color: inherit; font: inherit; text-align: left; border-radius: 8px; transition: background 0.12s ease; }
+.builder-brand-home:hover,
+.builder-brand-title:hover { background: rgba(255,255,255,0.08); }
 .builder-brand h1 { margin: 0; font-size: 1.05rem; font-weight: 700; }
 .builder-kicker { display: inline-block; background: rgba(161, 216, 132, 0.18); color: #e9f8df; border: 1px solid rgba(161, 216, 132, 0.4); border-radius: 999px; padding: 0.2rem 0.6rem; font-size: 0.74rem; }
 .builder-subtitle { display: none; }
@@ -755,6 +759,32 @@ html.welcome-active {
 .welcome-chapter-body { font-size: 0.98rem; line-height: 1.6; color: #1f3247; }
 .welcome-chapter-body p { margin: 0 0 1rem; }
 .welcome-chapter-body .welcome-lead { color: var(--muted); font-size: 1rem; margin-bottom: 1.2rem; }
+.welcome-optional-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.6rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.88rem;
+}
+.welcome-optional-label { color: var(--muted); font-weight: 600; }
+.welcome-optional-btn {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.86rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.welcome-optional-btn:hover { background: var(--accent); border-color: var(--accent-dark); }
 
 /* Hero chapter (no number, larger type, no border) */
 .welcome-chapter-hero { padding: 3rem 0 3.4rem; border-top: none; }
@@ -784,6 +814,12 @@ html.welcome-active {
   color: #2a4053 !important;
   max-width: 56ch;
   margin: 0 0 1.8rem !important;
+}
+.welcome-lede-sub {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 .welcome-cta-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 

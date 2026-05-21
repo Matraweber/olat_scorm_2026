@@ -53,7 +53,10 @@ function renderWelcomePane(host){
   heroBody.insertAdjacentHTML('afterbegin',
     '<span class="welcome-kicker">SCORM Builder · Umwelt-Campus Birkenfeld</span>'
   );
-  heroBody.appendChild(el('p', {className:'welcome-lede', text:'OLAT-Lerneinheiten direkt im Browser bauen. Ohne Installation, ohne Konto.'}));
+  heroBody.appendChild(el('p', {
+    className: 'welcome-lede',
+    html: 'OLAT-Lerneinheiten direkt im Browser bauen.<br><span class="welcome-lede-sub">Ohne Installation, ohne Konto.</span>'
+  }));
   const heroCta = el('div', {className:'welcome-cta-row'});
   const newTaskBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
   newTaskBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
@@ -65,6 +68,18 @@ function renderWelcomePane(host){
   // 01 Quickstart: 5 Schritte
   const quick = chapter('In 5 Schritten zum SCORM-Paket');
   quick.appendChild(el('p', {className:'welcome-lead', text:'Vom leeren Builder bis zur fertigen ZIP-Datei.'}));
+  const optionalRow = el('div', {className: 'welcome-optional-row'});
+  optionalRow.innerHTML =
+    '<span class="welcome-optional-label">Optional vorher:</span> ' +
+    '<button type="button" class="welcome-optional-btn" data-target="course">Kopfdaten</button>' +
+    '<button type="button" class="welcome-optional-btn" data-target="theme">Branding / Theme</button>';
+  optionalRow.querySelectorAll('.welcome-optional-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.selected = { kind: btn.dataset.target };
+      renderActivePane();
+    });
+  });
+  quick.appendChild(optionalRow);
 
   const steps = el('div', {className:'welcome-steps'});
   const stepDefs = [

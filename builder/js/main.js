@@ -73,6 +73,23 @@ function init(){
 
   setupCheatsheet();
 
+  // Header brand: SCORM-Builder badge -> welcome, course title -> Kopfdaten.
+  document.getElementById('btnHomeBrand')?.addEventListener('click', () => {
+    state.selected = { kind: 'welcome' };
+    render();
+  });
+  document.getElementById('btnCourseHead')?.addEventListener('click', () => {
+    state.selected = { kind: 'course' };
+    render();
+  });
+  // Keep the header title in sync with state.course.courseTitle.
+  function syncHeaderTitle(){
+    const t = document.getElementById('courseTitleDisplay');
+    if(t) t.textContent = state.course.courseTitle || 'Neue Lerneinheit';
+  }
+  syncHeaderTitle();
+  window.scormBuilderSyncHeaderTitle = syncHeaderTitle;
+
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     const ae = document.activeElement;

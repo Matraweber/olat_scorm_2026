@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCORM Builder - Umwelt-Campus Birkenfeld</title>
-  <link rel="stylesheet" href="builder.css?v=112" />
+  <link rel="stylesheet" href="builder.css?v=114" />
   <link rel="stylesheet" href="lib/katex/katex.min.css" />
   <script defer src="lib/katex/katex.min.js"></script>
   <script defer src="lib/katex/contrib/auto-render.min.js"></script>
@@ -18,8 +18,12 @@
         </svg>
       </button>
       <div class="builder-brand">
-        <span class="builder-kicker">SCORM Builder</span>
-        <h1>OLAT-Lerneinheiten erstellen</h1>
+        <button id="btnHomeBrand" class="builder-brand-home" type="button" aria-label="Zur Willkommen-Seite">
+          <span class="builder-kicker">SCORM Builder</span>
+        </button>
+        <button id="btnCourseHead" class="builder-brand-title" type="button" aria-label="Kopfdaten bearbeiten">
+          <h1 id="courseTitleDisplay">OLAT-Lerneinheiten erstellen</h1>
+        </button>
       </div>
       <div class="builder-actions">
         <!-- Datei dropdown groups all secondary file ops in one place. -->

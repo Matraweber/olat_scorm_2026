@@ -186,7 +186,13 @@ function renderCoursePane(host){
   host.appendChild(el('p', {className:'hint', text:'Diese Angaben erscheinen im SCORM-Header und im OLAT-Lernpfad.'}));
   const c = state.course;
   const get = () => c;
-  const set = (k, v) => { c[k] = v; if(k === 'courseTitle') renderTaskList(); };
+  const set = (k, v) => {
+    c[k] = v;
+    if(k === 'courseTitle'){
+      renderTaskList();
+      if(typeof window.scormBuilderSyncHeaderTitle === 'function') window.scormBuilderSyncHeaderTitle();
+    }
+  };
   [
     { key:'courseTitle', label:'Kurstitel', type:'text', placeholder:'z. B. Maschinendynamik: Komplexe Zahlen' },
     { key:'courseSubtitle', label:'Untertitel', type:'text' },
