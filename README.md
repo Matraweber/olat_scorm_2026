@@ -1,93 +1,341 @@
-# Olat_Scorm_2026
+# SCORM Builder für OLAT
 
+Browser-basiertes Werkzeug zum Erstellen von SCORM-1.2-Lerneinheiten für die OLAT-Lernplattform. Komplett ohne Installation, ohne Backend, ohne Konto. Der Builder läuft als statische HTML/JS-App lokal im Browser. Das fertige SCORM-ZIP wird im Builder erzeugt und heruntergeladen.
 
+Entwickelt am Umwelt-Campus Birkenfeld, Hochschule Trier.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Inhalt
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- [Schnellstart](#schnellstart)
+- [Projektstruktur](#projektstruktur)
+- [Builder-Workflow](#builder-workflow)
+- [Block-Kategorien](#block-kategorien)
+- [Persistenz: Autosave, JSON, SCORM-ZIP](#persistenz-autosave-json-scorm-zip)
+- [Tastaturkürzel](#tastaturkürzel)
+- [Cache-Buster bumpen](#cache-buster-bumpen)
+- [Eigene Block-Typen entwickeln](#eigene-block-typen-entwickeln)
+- [Branding / Theme](#branding--theme)
+- [Browser-Anforderungen](#browser-anforderungen)
 
-## Add your files
+---
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Schnellstart
+
+Der Builder ist eine statische Webseite, er braucht nur einen lokalen HTTP-Server (kein Node.js, kein npm-Build).
+
+### macOS / Linux
+
+```bash
+./start.sh
+```
+
+### Windows
+
+```cmd
+start.bat
+```
+
+Beide Scripts:
+- starten einen lokalen Python-HTTP-Server auf Port `8765`
+- öffnen automatisch `http://localhost:8765/builder/` im Browser
+- beenden via `Strg + C`
+
+### Voraussetzung
+
+Python 3 muss installiert sein. Auf macOS bereits enthalten, unter Windows ggf. von [python.org](https://www.python.org/downloads/) installieren. Der Builder selbst nutzt kein Python, der Server liefert nur die statischen Dateien aus.
+
+### Manuell starten
+
+```bash
+python3 -m http.server 8765 --bind 127.0.0.1
+# danach im Browser: http://localhost:8765/builder/
+```
+
+---
+
+## Projektstruktur
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.rlp.net/mcwb2026910007/olat_scorm_2026.git
-git branch -M main
-git push -uf origin main
+olat_scorm_2026/
+├── README.md                 Dieses Dokument
+├── start.sh / start.bat      Lokalen Server starten
+├── bump-version.sh / .bat    Cache-Buster in builder/index.html erhöhen
+└── builder/                  Builder-Applikation
+    ├── index.html
+    ├── builder.css
+    ├── js/                   Builder-Logik (ES-Module)
+    ├── template/             Block-Definitionen + SCORM-Runtime
+    │   ├── blocks/           Eine Datei pro Block-Typ
+    │   ├── block-icons.js    SVG-Icons aller Blöcke
+    │   ├── runtime.js        Wird in jedes SCORM-ZIP eingebettet
+    │   ├── styles.css        Runtime-Styles im SCORM-Paket
+    │   ├── imsmanifest.xml   SCORM-1.2-Manifest-Template
+    │   ├── scorm12.js        SCORM-API-Wrapper für die Lernplattform
+    │   └── utils.js          Shared BlockUtils für Block-Runtimes
+    ├── templates.js          Vordefinierte Aufgaben-Vorlagen
+    └── lib/                  Externe Libs (KaTeX)
 ```
 
-## Integrate with your tools
+### Builder-JS-Module
 
-* [Set up project integrations](https://gitlab.rlp.net/mcwb2026910007/olat_scorm_2026/-/settings/integrations)
+| Datei | Verantwortung |
+|---|---|
+| `main.js` | Bootstrap, globale Keyboard-Shortcuts, Autosave-Listener |
+| `state.js` | Zentraler State, Autosave, Theme |
+| `panes.js` | Welcome-Page, Sidebar, Kopfdaten-Pane, Theme-Pane |
+| `task-pane.js` | Canvas-Editor-Container, Toolbar, Tabs |
+| `task-pane-canvas.js` | Drag/Resize/Snap auf der Canvas |
+| `task-pane-config.js` | Rechte Konfig-Pane, Multi-Select-Toolbar |
+| `task-pane-bulk.js` | Bulk-Operationen (align, distribute, duplicate, delete) |
+| `modals.js` | Block-Picker, Task-Create-Modal |
+| `form.js` | Schema-getriebener Form-Renderer |
+| `preview.js` | Block-Vorschau im Canvas + Welcome-Detail |
+| `io.js` | JSON-Im/Export, SCORM-ZIP-Generierung, Preview-Iframe |
+| `canvas.js` | Snap-Algorithmus, Block-Summary, Auto-Fit-Höhen |
+| `tasks.js` | Task-Validierung, Block-Usage-Tracking, User-Templates |
+| `util.js` | DOM-Helper, Escape-Funktionen, Toast, ConfirmDialog |
 
-## Collaborate with your team
+---
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## Builder-Workflow
 
-## Test and Deploy
+Vom leeren Builder bis zum SCORM-Paket:
 
-Use the built-in continuous integration in GitLab.
+1. **Aufgabe anlegen** - in der Sidebar auf `+ Aufgabe`. Wählbar: leere Aufgabe oder eine Vorlage.
+2. **Blöcke hinzufügen** - innerhalb der Aufgabe auf `+ Block`. Ein Menü zeigt alle Block-Typen, gruppiert nach Kategorie.
+3. **Block befüllen** - jeder Frage-Block startet mit einer Vorlage: „Manuell (leer)" für eigene Inhalte oder „Beispiel" mit fertigem Inhalt.
+4. **Vorschau ansehen** - Button `Vorschau` oben rechts zeigt die Lerneinheit aus Studierenden-Sicht. Antworten lassen sich direkt ausprobieren.
+5. **SCORM-ZIP erzeugen** - `SCORM-ZIP erzeugen` lädt ein vollständiges SCORM-1.2-Paket herunter. Diese ZIP-Datei wird in OLAT als Lerneinheit hochgeladen.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### Canvas-Bedienung
 
-***
+- Blöcke werden frei auf einer Canvas platziert (kein starres Raster)
+- **Drag** zum Verschieben, **Resize-Handle** unten rechts zum Skalieren
+- **Snap-Lines** erscheinen während des Drags, wenn Kanten oder Mitten mit anderen Blöcken übereinstimmen
+- **Shift + Klick** für Mehrfachauswahl
+- **Strg/Cmd + Mausrad** zum Zoomen
+- **Bild per Drag & Drop** auf die Canvas erzeugt automatisch einen Image-Block am Drop-Punkt
 
-# Editing this README
+---
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Block-Kategorien
 
-## Suggestions for a good README
+26 Block-Typen in 4 Kategorien:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+| Kategorie | Anzahl | Beispiele |
+|---|---|---|
+| **Medien & Inhalt** | 11 | Audio, Bild, Video, Datei-Download, Fließtext, Überschrift, Trennlinie, Hinweisbox, Zusammenfassung, Code-Block, Umfrage |
+| **Frage** | 7 | Multiple Choice, Lückentext, Text-Eingabe, Numerische Eingabe, Zuordnung (Drag & Drop), Sortierliste, Hotzone |
+| **MINT** | 6 | Einheitenumrechnung, Funktion ablesen, Komplexe Zahl ablesen, Vektor 2D ablesen, Wahrheitstabelle, Zahlensysteme |
+| **Visualisierung** | 2 | Komposition (Vektor-Editor), Funktionsplot-Sandbox |
 
-## Name
-Choose a self-explaining name for your project.
+Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. Meistgenutzte zuerst. Die Häufigkeiten werden lokal in `localStorage` mitgezählt.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+---
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## Persistenz: Autosave, JSON, SCORM-ZIP
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Autosave (lokal)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+- Jede Änderung am Kurs wird mit 800 ms Debounce in `localStorage` gespeichert
+- Bei Reload bietet der Builder an, den letzten Stand wiederherzustellen
+- `Strg + S` löst ein sofortiges Speichern aus
+- Der Status oben im Header zeigt „Gespeichert" / „Wird gespeichert..." / „Nicht gespeichert"
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+`localStorage` ist auf ca. 5-10 MB beschränkt. Bei sehr großen eingebetteten Medien (Videos > 10 MB) kann das Autosave fehlschlagen. Der SCORM-Export funktioniert trotzdem.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### JSON-Im/Export
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- `Datei -> Als JSON exportieren` speichert das gesamte Paket als `.json`-Datei
+- `Datei -> JSON laden …` lädt eine zuvor exportierte JSON-Datei
+- `Datei -> SCORM-ZIP laden …` ermöglicht Re-Import eines früher generierten SCORM-Pakets
+- Im **JSON-Editor**-Modus (Toggle in der Sidebar) kann der gesamte Kurs direkt als JSON editiert werden
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### SCORM-ZIP
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+- Erzeugt ein SCORM-1.2-konformes ZIP mit `imsmanifest.xml`, allen Blocks und Runtime-Files
+- Eingebettete Medien (Bilder, Audio) werden als Data-URLs im ZIP transportiert
+- YouTube/Vimeo-Videos bleiben als Embed-Links erhalten
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Datei-Upload-Limits
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+| Typ | Hard-Cap | Warn-Schwelle |
+|---|---|---|
+| Bild | 50 MB | 2 MB |
+| Audio | 200 MB | 5 MB |
+| Video | 500 MB | 10 MB |
+| Sonstige Dateien | 500 MB | 10 MB |
 
-## License
-For open source projects, say how it is licensed.
+Bei großen Videos einen YouTube/Vimeo-Link einbetten (unbegrenzte Größe).
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+---
+
+## Tastaturkürzel
+
+`?` öffnet jederzeit die vollständige Übersicht im Builder. Wichtigste:
+
+| Shortcut | Aktion |
+|---|---|
+| `?` | Tastaturkürzel-Übersicht ein-/ausblenden |
+| `Strg/Cmd + S` | Sofort speichern |
+| `Strg/Cmd + Shift + S` | SCORM-ZIP exportieren |
+| `Strg/Cmd + Z` / `Y` | Rückgängig / Wiederherstellen |
+| `Strg/Cmd + A` | Alle Blöcke der Aufgabe markieren |
+| `Strg/Cmd + C` / `V` / `D` | Blöcke kopieren / einfügen / duplizieren |
+| `Entf` / `Backspace` | Markierte Blöcke löschen |
+| `Pfeiltasten` | Markierte Blöcke 1 px verschieben (`Shift` = 10 px) |
+| `Esc` | Auswahl aufheben / Modal schließen |
+
+Innerhalb des Komposition-Editors gibt es zusätzliche Shortcuts (`V` = Verschieben, `S` = Auswahl, etc.).
+
+---
+
+## Cache-Buster bumpen
+
+`builder/index.html` lädt das CSS mit einem Query-Parameter (`?v=N`). Nach Änderungen an `builder.css` muss `N` erhöht werden, damit Nutzer-Browser nicht die alte Version cachen.
+
+### macOS / Linux
+
+```bash
+./bump-version.sh           # bumped um +1
+./bump-version.sh 200       # setzt auf 200
+```
+
+### Windows
+
+```cmd
+bump-version.bat
+bump-version.bat 200
+```
+
+Beide Scripts:
+- suchen das aktuelle `?v=N` in `builder/index.html`
+- ersetzen es durch `N+1` (oder den übergebenen Wert)
+- bestätigen das Ergebnis (`Bumped cache-buster: v=110 -> v=111`)
+
+Nach jeder produktiven Änderung an `builder.css` bumpen. Bei reinen JS-Änderungen weniger kritisch.
+
+---
+
+## Eigene Block-Typen entwickeln
+
+Block-Typen sind selbst-registrierende Module unter `builder/template/blocks/`. Eine Datei pro Block.
+
+### Skelett
+
+```javascript
+(function(){
+  'use strict';
+  Blocks.register('my-block', {
+    label: 'Mein Block',
+    description: 'Was dieser Block tut.',
+    category: 'Medien & Inhalt',   // 'Frage', 'MINT', 'Visualisierung'
+    icon: '*',
+    graded: false,                  // true -> Block wird bewertet
+
+    defaultConfig(){
+      return { title: '', body: '' };
+    },
+
+    // Optional: Beispiel-Config für die Welcome-Page-Vorschau
+    previewConfig(){
+      return { title: 'Beispiel', body: 'Inhalt...' };
+    },
+
+    // Optional: Ein-Zeilen-Zusammenfassung für die Task-Liste
+    summary(cfg){ return cfg.title || '(leer)'; },
+
+    // Optional: Validation für den Pre-Export-Check
+    validate(cfg){
+      const warnings = [];
+      if(!cfg.title) warnings.push('Titel fehlt.');
+      return warnings;
+    },
+
+    // Schema-getriebenes Konfig-Formular (rechte Pane)
+    builderSchema(){
+      return [
+        { key: 'title', label: 'Titel', type: 'text' },
+        { key: 'body',  label: 'Inhalt', type: 'textarea', rows: 4 }
+      ];
+    },
+
+    // Render im echten Lerneinheit-Output (SCORM-Runtime)
+    mount(host, config, api){
+      const div = document.createElement('div');
+      div.textContent = config.title + ': ' + config.body;
+      host.appendChild(div);
+    },
+
+    // Render in der Welcome-Page-Live-Vorschau (Builder-Seite)
+    preview(host, config){
+      const div = document.createElement('div');
+      div.textContent = config.title + ': ' + config.body;
+      host.appendChild(div);
+    }
+  });
+})();
+```
+
+### Block einbinden
+
+Nach dem Erstellen der Datei muss sie in `builder/index.html` registriert werden:
+
+```html
+<script src="template/blocks/my-block.js?v=N" defer></script>
+```
+
+Anschließend `./bump-version.sh` ausführen.
+
+### Verfügbare Schema-Field-Typen
+
+| Type | Renderer |
+|---|---|
+| `text`, `textarea`, `number`, `select`, `checkbox` | Standard-Inputs |
+| `color` | Farb-Picker |
+| `image`, `audio`, `video`, `file` | Datei-Upload mit MIME-Validierung |
+| `math-textarea` | Mathe-Toolbar (LaTeX-Eingabe mit Live-KaTeX-Preview) |
+| `list` | Wiederholbare Sub-Schema-Liste mit add/remove |
+| `section`, `action` | Layout-Helfer |
+
+### Block-API-Lifecycle
+
+| Methode | Pflicht | Aufruf |
+|---|---|---|
+| `defaultConfig()` | ja | beim Erstellen eines neuen Blocks |
+| `previewConfig()` | optional | für Welcome-Modal-Vorschau (sonst `defaultConfig`) |
+| `summary(cfg)` | optional | Task-Liste, Block-Karten-Header |
+| `validate(cfg)` | optional | Pre-Export-Check (Warnungen) |
+| `builderSchema()` | ja | rechte Konfig-Pane |
+| `mount(host, cfg, api)` | ja | SCORM-Runtime und Vorschau-Modal |
+| `preview(host, cfg)` | optional | Builder-Canvas-Vorschau (sonst `mount`) |
+
+---
+
+## Branding / Theme
+
+Unter **Allgemein -> Branding / Theme** anpassbar:
+
+- Primärfarbe, Akzentfarbe (jeweils Standard + Hell-Variante)
+- Schriftart (CSS `font-family`)
+- Kicker-Text (Badge oben links)
+- Footer-Text und -Link
+- Logo (Upload als Data-URL oder Pfad zu einer Datei in `template/`)
+
+Theme-Änderungen sind live im Builder sichtbar und werden ins SCORM-ZIP übernommen. Das Standard-Branding ist UCB / Hochschule Trier.
+
+---
+
+## Browser-Anforderungen
+
+- Chromium-basierter Browser (Chrome, Edge, Brave, Arc, Opera) oder Firefox
+- Aktuelle Version (ES-Modules, async/await, IntersectionObserver)
+- JavaScript aktiviert
+- `localStorage` aktiviert (für Autosave und Block-Usage-Tracking)
+- Touch-Bedienung wird unterstützt, Desktop empfohlen
+
+Das im SCORM-ZIP erzeugte Paket läuft in jedem SCORM-1.2-kompatiblen LMS. Getestet mit Open-OLAT.
+
+
