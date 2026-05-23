@@ -1,13 +1,12 @@
-// video.js: Video block. Embeds a file via <video controls> or detects
-// YouTube/Vimeo URLs and renders an embed iframe. Optional poster, 16:9.
+// video.js: <video> tag for files, embed iframe for YouTube/Vimeo. Optional poster, 16:9.
 (function(){
   'use strict';
 
-  // Returns { kind:'youtube'|'vimeo', id } / { kind:'file', url } / null.
+  // Returns { kind, id|url } or null. kind: 'youtube' | 'vimeo' | 'file'.
   function detectVideoSource(src){
     if(!src || typeof src !== 'string') return null;
     if(src.startsWith('data:')) return { kind:'file', url: src };
-    // YouTube: watch?v=, youtu.be/, /embed/, /shorts/, with extra params.
+    // YouTube: watch?v= / youtu.be/ / /embed/ / /shorts/ / /v/, with extra params.
     const yt = src.match(/(?:youtube\.com\/(?:watch\?(?:[^&]*&)*v=|embed\/|shorts\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
     if(yt) return { kind:'youtube', id: yt[1] };
     const vm = src.match(/vimeo\.com\/(?:video\/|channels\/[^\/]+\/|groups\/[^\/]+\/videos\/)?([0-9]+)/);
@@ -23,7 +22,7 @@
     iframe.setAttribute('loading', 'lazy');
     iframe.title = (opts && opts.title) || 'Eingebettetes Video';
     if(srcInfo.kind === 'youtube'){
-      // youtube-nocookie + rel=0 (no suggested-video grid).
+      // nocookie + rel=0: no related-videos grid at the end.
       iframe.src = 'https://www.youtube-nocookie.com/embed/' + srcInfo.id + '?rel=0';
     } else if(srcInfo.kind === 'vimeo'){
       iframe.src = 'https://player.vimeo.com/video/' + srcInfo.id + '?dnt=1';
@@ -32,7 +31,7 @@
     return iframe;
   }
 
-  // Expose detectVideoSource so the builder form can reuse it.
+  // Exposed for the builder form (form.js renderVideoField).
   Blocks.register('video', {
     label: 'Video',
     description: 'Videodatei oder YouTube-/Vimeo-URL einbetten. Datei-Upload oder Link.',
@@ -75,8 +74,7 @@
         host.appendChild(wrap);
         return {};
       }
-      // Brand-gradient background shows when no poster is set, instead of
-      // the browser's default dark "no content" overlay.
+      // Brand-gradient background replaces the browser's dark "no content" overlay.
       const frame = document.createElement('div');
       frame.style.cssText = 'position:relative; width:100%; aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:' + (config.poster ? '#000' : 'linear-gradient(135deg, #0f567d 0%, #003b5c 60%, #08293d 100%)') + ';';
       const srcInfo = detectVideoSource(config.src);
@@ -111,7 +109,7 @@
         wrap.appendChild(t);
       }
       if(config._demo){
-        // 16:9 frame with play-button overlay for the welcome modal.
+        // 16:9 mock frame with play-button overlay for the welcome modal.
         const demo = document.createElement('div');
         demo.style.cssText = 'position:relative; width:100%; aspect-ratio:16/9; border-radius:8px; background:linear-gradient(135deg, #0f567d 0%, #003b5c 60%, #08293d 100%); overflow:hidden; display:flex; align-items:center; justify-content:center;';
         // Faux film grain
@@ -139,7 +137,7 @@
         ph.textContent = '(noch keine Videodatei)';
         wrap.appendChild(ph);
       } else {
-        // Same gradient-background wrapper as mount().
+        // Same gradient wrapper as mount().
         const frame = document.createElement('div');
         frame.style.cssText = 'position:relative; flex:1; min-height:0; width:100%; border-radius:4px; overflow:hidden; background:' + (config.poster ? '#000' : 'linear-gradient(135deg, #0f567d 0%, #003b5c 60%, #08293d 100%)') + ';';
         const srcInfo = detectVideoSource(config.src);

@@ -48,8 +48,7 @@ export function clearPersistentTheme(){
   catch(e){}
 }
 
-// Push theme colors onto the document root so the builder UI live-previews
-// changes (the SCORM output already uses these vars natively).
+// Push theme colors onto :root so the builder UI updates live.
 export function applyThemeToBuilder(theme){
   const t = mergeTheme(theme);
   const r = document.documentElement;
@@ -60,8 +59,7 @@ export function applyThemeToBuilder(theme){
   if(t.accentDarkColor)  r.style.setProperty('--accent-dark',  t.accentDarkColor);
 }
 
-// Autosave: mirror state.course to localStorage. On next load main.js
-// offers to restore the saved course.
+// Autosave to localStorage. main.js offers restore on next load.
 let _autosaveTimer = null;
 let _onAutosave = null;
 let _onAutosavePending = null;
@@ -127,8 +125,7 @@ export function clearAutosave(){
   try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_META_KEY); } catch(e){}
 }
 
-// Debounced for hot paths (typing, dragging): 800 ms idle = one write.
-// main.js also registers a flush on unload for the last edit.
+// Debounced: 800 ms idle = one write. Main.js flushes on unload.
 export function scheduleAutosave(){
   if(!_autosaveTimer && _onAutosavePending){
     try { _onAutosavePending(); } catch(e){}
@@ -150,7 +147,7 @@ export const state = {
   userTemplates: []
 };
 
-// Stubs so modules can call render() at import time before main.js sets them.
+// Stubs until main.js wires the real render functions.
 let _render = () => {};
 let _renderActivePane = () => {};
 export function setRenderer(renderFn, renderActivePaneFn){

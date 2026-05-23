@@ -1,6 +1,5 @@
 // panes.js: Sidebar task list + course/theme settings panes.
-// renderActivePaneImpl dispatches to course/theme/task-pane. The task editor
-// lives in task-pane.js + sibling modules.
+// renderActivePaneImpl dispatches to course/theme/task panes; task editor in task-pane.js.
 import { el, toast, confirmDialog } from './util.js';
 import { state, pushHistory, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder } from './state.js';
 import { renderField } from './form.js';
@@ -10,8 +9,7 @@ import { renderWelcomePane } from './welcome-pane.js';
 export function renderTaskList(){
   const list = document.getElementById('taskList');
   list.innerHTML = '';
-  // Hide the header "+ Aufgabe" when the empty-state card already shows its
-  // own CTA, otherwise we'd render three "Aufgabe erstellen" buttons at once.
+  // Hide header "+ Aufgabe" in empty-state so we don't render three CTAs at once.
   const headerAddBtn = document.getElementById('btnAddTask');
   if(headerAddBtn) headerAddBtn.hidden = state.course.tasks.length === 0;
   if(state.course.tasks.length === 0){
@@ -85,8 +83,7 @@ export function renderTaskList(){
   });
 }
 
-// Drag-and-drop reorder for the sidebar task list (in addition to the
-// up/down arrow buttons).
+// Drag-and-drop reorder for the sidebar task list.
 function installTaskDnD(list){
   let fromIdx = null;
   function clearMarkers(){
@@ -95,7 +92,7 @@ function installTaskDnD(list){
     );
   }
   list.querySelectorAll('li').forEach(li => {
-    // Don't hijack the up/down/delete icon buttons.
+    // Skip the up/down/delete icon buttons.
     li.addEventListener('mousedown', (e) => {
       const onBtn = e.target.closest('.task-controls');
       li.draggable = !onBtn;
@@ -103,7 +100,7 @@ function installTaskDnD(list){
     li.addEventListener('dragstart', (e) => {
       fromIdx = parseInt(li.dataset.taskIdx, 10);
       e.dataTransfer.effectAllowed = 'move';
-      // Some browsers refuse to start a drag without setData.
+      // Some browsers won't start a drag without setData.
       try { e.dataTransfer.setData('text/plain', String(fromIdx)); } catch(_){}
       li.classList.add('dragging');
     });
@@ -146,15 +143,14 @@ function swapTasks(a, b){
   render();
 }
 
-// Move `from` to position `to` (post-move index): dropping after item 3
-// means land at index 4.
+// Move `from` to post-removal index `to`. Dropping after item 3 -> to=4.
 function moveTask(from, to){
   const tasks = state.course.tasks;
   if(from < 0 || from >= tasks.length) return;
   if(to === from || to === from + 1) return;
   pushHistory();
   const [moved] = tasks.splice(from, 1);
-  // After removal, indices above `from` shift down by 1.
+  // After splice, indices above `from` shift down by 1.
   const adjusted = to > from ? to - 1 : to;
   tasks.splice(adjusted, 0, moved);
   if(state.selected.kind === 'task'){
@@ -225,7 +221,7 @@ function renderThemePane(host){
   const persistTheme = () => {
     if(!savePersistentTheme(state.theme)) toast('Branding konnte nicht dauerhaft gespeichert werden.', 'error');
   };
-  // Pushing the new theme onto the document root live-previews brand changes.
+  // Apply to :root for live theme preview.
   const get = () => t;
   const set = (k, v) => { t[k] = v; persistTheme(); applyThemeToBuilder(state.theme); };
   [

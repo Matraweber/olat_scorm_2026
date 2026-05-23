@@ -1,7 +1,6 @@
 // utils.js: Helpers passed into every block's mount() as `api.utils`.
-// DOM/SVG builders, number/angle parsing, safe math-expression evaluator,
-// questionCard / simpleQuestionCard layouts, renderPlane, feedbackBox,
-// and the KaTeX auto-render bootstrap (renderMath).
+// DOM/SVG builders, number/angle parsing, safe expression evaluator,
+// question-card layouts, renderPlane, feedbackBox, KaTeX renderMath.
 (function(){
   'use strict';
   if(window.BlockUtils) return;
@@ -38,7 +37,7 @@
     parseNum(value){
       const s = String(value == null ? '' : value).trim().replace(',', '.');
       if(!s) return null;
-      // Bruch-Eingabe: "a/b", "-3/4", "12/25", auch mit Whitespace.
+      // Fraction: "a/b", whitespace allowed.
       const frac = s.match(/^(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)$/);
       if(frac){
         const num = Number(frac[1]);
@@ -46,7 +45,7 @@
         if(Number.isFinite(num) && Number.isFinite(den) && den !== 0) return num / den;
         return null;
       }
-      // Gemischte Zahl: "1 3/4" -> 1.75
+      // Mixed: "1 3/4" -> 1.75
       const mixed = s.match(/^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
       if(mixed){
         const sign = mixed[1] === '-' ? -1 : 1;
@@ -77,9 +76,7 @@
       } catch(e) { return null; }
     },
     nearlyEqual(a, b, tol){ return Math.abs(a - b) <= (tol == null ? 0.05 : tol); },
-    // Try to render a number as a reduced fraction a/b. Returns null if the
-    // value isn't a "nice" rational (e.g. irrational like pi or huge denom).
-    // maxDenom limits how big the denominator may become before bailing out.
+    // Reduced fraction a/b, or null if not a rational within maxDenom.
     gcd(a, b){
       a = Math.abs(Math.round(a)); b = Math.abs(Math.round(b));
       while(b){ const t = b; b = a % b; a = t; }
@@ -107,8 +104,7 @@
       const rounded = Math.round(value * 1000) / 1000;
       return String(rounded);
     },
-    // Pretty solution text: "15/4 (= 3.75)" for non-integer rationals,
-    // plain decimal otherwise.
+    // "15/4 (= 3.75)" for non-integer rationals, plain decimal otherwise.
     formatSolution(value){
       if(!Number.isFinite(value)) return String(value);
       if(Number.isInteger(value)) return String(value);
@@ -142,14 +138,10 @@
       const allowedFns = ['sin','cos','tan','asin','acos','atan','atan2','sinh','cosh','tanh','exp','log','log2','log10','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
       let s = String(expr || '').replace(/,/g, '.');
       if(!s.trim()) return null;
-      // Implicit multiplication: "2 pi r", "2pi", ")(": insert "*" between
-      // tokens where multiplication is meant. Skip cases where the right side
-      // starts an allowed function call - "2sin(x)" should become "2*sin(x)"
-      // but "sin(x)" must stay intact.
+      // Implicit "*": "2pi" -> "2*pi", but leave "sin(x)" alone.
       const fnRe = new RegExp('^(?:' + allowedFns.join('|') + ')\\b');
       function isFunctionStart(rest){ return fnRe.test(rest); }
-      // Implicit multiplication. Iterate until stable: each replace may
-      // create new neighbouring patterns ("2 pi r" -> "2*pi r" -> "2*pi*r").
+      // Iterate until stable so neighbouring patterns chain ("2 pi r" -> "2*pi*r").
       let prev;
       do {
         prev = s;
@@ -164,8 +156,7 @@
       for(const t of tokens){
         if(!(allowedFns.includes(t) || varNames.includes(t) || t === 'pi' || t === 'e' || t === 'PI' || t === 'E')) return null;
       }
-      // Constants: replace via placeholders so the second pass doesn't
-      // re-match the "PI" inside "(Math.PI)" we just inserted.
+      // Constants via placeholders so we don't re-match "PI" inside "(Math.PI)".
       let body = s.replace(/\b(?:pi|PI)\b/g, '__PI__')
                   .replace(/\b(?:e|E)\b/g, '__E__')
                   .replace(/__PI__/g, '(Math.PI)')
@@ -189,10 +180,7 @@
         neutral(msg){ box.classList.remove('feedback-good','feedback-bad'); text.textContent = msg; }
       };
     },
-    // Standard question card: heading, question box, single text input,
-    // Korrektur + Neu generieren buttons, feedback box.
-    // opts: { h3?, qBoxTitle?, inputLabel?, inputPlaceholder? }
-    // Returns: { card, qText, inp, checkBtn, newBtn, fb }
+    // Standard card: text input + check/regenerate. Returns { card, qText, inp, checkBtn, newBtn, fb }.
     questionCard(host, opts){
       opts = opts || {};
       const card = document.createElement('section');
@@ -243,9 +231,7 @@
 
       return { card, qText, inp, checkBtn, newBtn, fb };
     },
-    // Question card variant for blocks with custom answer UIs (MC, sort-list,
-    // text-input, hotzone). opts: { title?, qBoxTitle?, question? | questionHtml? }
-    // Returns: { card, qText, content, buttons, fb }
+    // Card for blocks with custom answer UIs. Returns { card, qText, content, buttons, fb }.
     simpleQuestionCard(host, opts){
       opts = opts || {};
       const card = document.createElement('section');
@@ -280,8 +266,7 @@
       host.appendChild(card);
       return { card, qText, content, buttons, fb };
     },
-    // Builder-canvas preview wrapper: padded div with an optional green
-    // icon+label tag at the top. opts: { icon?, label?, fillHeight? }.
+    // Padded preview wrapper with optional icon+label tag. opts: { icon?, label?, fillHeight? }.
     tagPreview(host, opts){
       opts = opts || {};
       const wrap = document.createElement('div');
@@ -385,8 +370,7 @@
     host.appendChild(svg);
   };
 
-  // Auto-render LaTeX via KaTeX. Delimiters: $...$, $$...$$, \(...\), \[...\].
-  // If KaTeX isn't loaded yet, queue and retry every 100 ms.
+  // Auto-render LaTeX via KaTeX; queue and retry every 100 ms until KaTeX loads.
   const _mathRetryQueue = [];
   let _katexWatcher = null;
   function _runMathRenderOn(root){
@@ -419,7 +403,7 @@
     }, 100);
   };
 
-  // Fisher-Yates in-place shuffle. Returns the same array for chaining.
+  // Fisher-Yates in-place shuffle, returns same array.
   utils.shuffle = function(arr){
     if(!Array.isArray(arr)) return arr;
     for(let i = arr.length - 1; i > 0; i--){

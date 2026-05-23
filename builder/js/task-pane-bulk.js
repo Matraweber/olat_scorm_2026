@@ -1,6 +1,4 @@
-// task-pane-bulk.js: Bulk ops on multi-selected canvas blocks: alignment,
-// distribution, duplicate, delete. Functions take the ctx built in
-// task-pane.js.
+// task-pane-bulk.js: Bulk ops on multi-selected canvas blocks. Take ctx from task-pane.js.
 import { uid, confirmDialog } from './util.js';
 import { renderTaskList } from './panes.js';
 
@@ -74,7 +72,7 @@ export async function bulkDelete(ctx){
   });
   if(!ok) return;
   const ids = sel.map(b => b.id);
-  // In-place splice keeps the task.blocks / task.tabs[i].blocks alias intact.
+  // In-place splice preserves the task.blocks alias when tabs are on.
   for(let bi = ctx.task.blocks.length - 1; bi >= 0; bi--){
     if(ids.includes(ctx.task.blocks[bi].id)) ctx.task.blocks.splice(bi, 1);
   }

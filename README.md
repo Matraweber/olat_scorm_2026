@@ -103,11 +103,11 @@ olat_scorm_2026/
 
 Vom leeren Builder bis zum SCORM-Paket:
 
-1. **Aufgabe anlegen** - in der Sidebar auf `+ Aufgabe`. Wählbar: leere Aufgabe oder eine Vorlage.
-2. **Blöcke hinzufügen** - innerhalb der Aufgabe auf `+ Block`. Ein Menü zeigt alle Block-Typen, gruppiert nach Kategorie.
-3. **Block befüllen** - jeder Frage-Block startet mit einer Vorlage: „Manuell (leer)" für eigene Inhalte oder „Beispiel" mit fertigem Inhalt.
-4. **Vorschau ansehen** - Button `Vorschau` oben rechts zeigt die Lerneinheit aus Studierenden-Sicht. Antworten lassen sich direkt ausprobieren.
-5. **SCORM-ZIP erzeugen** - `SCORM-ZIP erzeugen` lädt ein vollständiges SCORM-1.2-Paket herunter. Diese ZIP-Datei wird in OLAT als Lerneinheit hochgeladen.
+1. **Aufgabe anlegen**: in der Sidebar auf `+ Aufgabe`. Wählbar: leere Aufgabe oder eine Vorlage.
+2. **Blöcke hinzufügen**: innerhalb der Aufgabe auf `+ Block`. Ein Menü zeigt alle Block-Typen, gruppiert nach Kategorie.
+3. **Block befüllen**: jeder Frage-Block startet mit einer Vorlage: „Manuell (leer)" für eigene Inhalte oder „Beispiel" mit fertigem Inhalt.
+4. **Vorschau ansehen**: Button `Vorschau` oben rechts zeigt die Lerneinheit aus Studierenden-Sicht. Antworten lassen sich direkt ausprobieren.
+5. **SCORM-ZIP erzeugen**: `SCORM-ZIP erzeugen` lädt ein vollständiges SCORM-1.2-Paket herunter. Diese ZIP-Datei wird in OLAT als Lerneinheit hochgeladen.
 
 ### Canvas-Bedienung
 
@@ -152,6 +152,18 @@ Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. 
 - `Datei -> JSON laden …` lädt eine zuvor exportierte JSON-Datei
 - `Datei -> SCORM-ZIP laden …` ermöglicht Re-Import eines früher generierten SCORM-Pakets
 - Im **JSON-Editor**-Modus (Toggle in der Sidebar) kann der gesamte Kurs direkt als JSON editiert werden
+
+### Ordner-Browser
+
+- Header-Button `Ordner` öffnet beim ersten Klick einen Dateipicker für ein Verzeichnis mit SCORM-ZIPs
+- Danach erscheint ein **Dropdown unterhalb der Schaltfläche** mit dem Ordnerbaum
+- Themen sind als Accordion organisiert nur ein Theme ist gleichzeitig aufgeklappt, hält das Dropdown kompakt
+- Klick auf eine `.zip` lädt sie in den Builder; das Dropdown bleibt offen, damit man direkt die nächste Datei wählen kann
+- Aktive Datei ist im Tree hervorgehoben schneller Wechsel zwischen mehreren Lerneinheiten
+- Klick außerhalb des Dropdowns oder `ESC` schließt es; der Ordner bleibt im Hintergrund aktiv
+- `×` im Dropdown vergisst den Ordner ganz (entfernt den persistierten Handle)
+- **Persistierung über Reload:** der gewählte Ordner wird in IndexedDB gespeichert. Beim nächsten Builder-Start ist er noch verfügbar, solange der Browser die Berechtigung beibehält kein erneutes Auswählen nötig
+- Funktioniert mit File System Access API in Chromium-Browsern (Chrome, Edge, Brave), Fallback via `webkitdirectory` in anderen Browsern (read-only, keine Persistierung)
 
 ### SCORM-ZIP
 

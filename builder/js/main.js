@@ -19,13 +19,12 @@ function render(){
 }
 setRenderer(render, renderActivePaneImpl);
 
-// Exposed for devtools inspection and tests. The app itself
-// never reads window.state.
+// Exposed for devtools and tests. The app reads `state` from the module.
 window.state = state;
 window.scormBuilderRender = render;
 
 function init(){
-  // Apply persisted theme on frame 1 so the builder UI never flashes default.
+  // Apply persisted theme synchronously to avoid a flash of default styles.
   applyThemeToBuilder(state.theme);
   document.getElementById('btnNew').addEventListener('click', async () => {
     if(!await confirmDialog({
@@ -42,6 +41,16 @@ function init(){
   });
   document.getElementById('btnAddTask').addEventListener('click', openTaskCreateModal);
   document.getElementById('btnDownload').addEventListener('click', downloadZip);
+  // Optional folder browser as a header dropdown. Restored from IndexedDB.
+  import('./folder-browser.js').then(mod => {
+    document.getElementById('btnOpenFolder')?.addEventListener('click', e => {
+      e.stopPropagation();
+      mod.toggleDropdown();
+    });
+    if(typeof mod.tryRestoreFolder === 'function'){
+      mod.tryRestoreFolder().catch(() => {});
+    }
+  });
   document.getElementById('btnPreview').addEventListener('click', showPreview);
   document.getElementById('btnExportJson').addEventListener('click', exportJson);
   document.getElementById('fileLoadZip').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if(f) loadZipFile(f); e.target.value = ''; });
@@ -73,7 +82,7 @@ function init(){
 
   setupCheatsheet();
 
-  // Header brand: SCORM-Builder badge -> welcome, course title -> Kopfdaten.
+  // Header brand: badge -> welcome page, title -> course meta editor.
   document.getElementById('btnHomeBrand')?.addEventListener('click', () => {
     state.selected = { kind: 'welcome' };
     render();
@@ -112,7 +121,7 @@ function init(){
       downloadZip();
       return;
     }
-    // Cmd/Ctrl + S: flush autosave + toast. Muscle memory for every user.
+    // Cmd/Ctrl + S: flush autosave + toast.
     if(mod && !e.shiftKey && (key === 's' || key === 'S')){
       if(inField) return;
       e.preventDefault();
@@ -189,8 +198,7 @@ function init(){
   render();
 }
 
-// Cheatsheet overlay: opens via the "?" header button or "?" key, closes on
-// Escape / X / backdrop click. Restores focus to the previous element.
+// Cheatsheet overlay. Toggled by "?" button/key. Esc/X/backdrop close it.
 let _cheatsheetPrevFocus = null;
 function toggleCheatsheet(){
   const m = document.getElementById('cheatsheetModal');
@@ -224,8 +232,8 @@ function setupCheatsheet(){
   });
 }
 
-// Datei dropdown: opens on click, closes on outside-click, Escape, or any
-// item activation.
+// File menu dropdown: opens on click, closes on outside-click, Escape, or
+// any item activation.
 function setupFileMenu(){
   const wrap   = document.getElementById('fileMenu');
   const trig   = document.getElementById('btnFileMenu');
@@ -247,8 +255,7 @@ function setupFileMenu(){
   document.addEventListener('keydown', e => {
     if(e.key === 'Escape' && !pop.hidden){ setOpen(false); trig.focus(); }
   });
-  // <label>s for file inputs trigger a click on the hidden <input>; both
-  // flows close the popover.
+  // File <label>s trigger their hidden <input> on click; close popover then.
   pop.querySelectorAll('.header-menu-item').forEach(el => {
     el.addEventListener('click', () => setOpen(false));
     if(el.tagName === 'LABEL'){
@@ -259,8 +266,7 @@ function setupFileMenu(){
   });
 }
 
-// Autosave status pill in the header. States: idle / saving / saved.
-// On a successful save, .just-saved triggers a ~700 ms ring pulse.
+// Autosave status pill: idle / saving / saved. .just-saved pulses briefly.
 function setupAutosaveIndicator(){
   const actions = document.querySelector('.builder-actions');
   if(!actions) return;
@@ -305,9 +311,7 @@ function setupAutosaveIndicator(){
   if(meta && meta.ts){ lastTs = meta.ts; update(); }
 }
 
-// Recovery dialog: offered when localStorage has a non-trivial course from
-// a previous session. "Wiederherstellen" replaces state.course, "Verwerfen"
-// clears the autosave.
+// Recovery dialog when localStorage has a course from a previous session.
 function maybeOfferRecovery(){
   if(!isAutosaveAvailable()) return;
   const saved = loadAutosave();

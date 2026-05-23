@@ -1,4 +1,4 @@
-// welcome-pane.js: Welcome / Hilfe page. Hero, 5-Schritte-Quickstart, layout
+// welcome-pane.js: Welcome / help page. Hero, 5-step quickstart, layout
 // legend, block-type grid with live preview modal, tips, shortcuts, scrollspy.
 import { el, escapeHtml } from './util.js';
 import { state, renderActivePane } from './state.js';
@@ -28,8 +28,7 @@ function renderWelcomePane(host){
 
   const chapters = [];
 
-  // Create a numbered chapter. Returns the body element. opts.hero hides the
-  // rail entry (title page).
+  // Create a numbered chapter. opts.hero hides it from the rail.
   function chapter(title, opts){
     opts = opts || {};
     const idx = chapters.length;
@@ -65,7 +64,7 @@ function renderWelcomePane(host){
   heroCta.appendChild(newTaskBtn); heroCta.appendChild(goCourseBtn);
   heroBody.appendChild(heroCta);
 
-  // 01 Quickstart: 5 Schritte
+  // 01 Quickstart: 5 steps
   const quick = chapter('In 5 Schritten zum SCORM-Paket');
   quick.appendChild(el('p', {className:'welcome-lead', text:'Vom leeren Builder bis zur fertigen ZIP-Datei.'}));
   const optionalRow = el('div', {className: 'welcome-optional-row'});
@@ -121,7 +120,7 @@ function renderWelcomePane(host){
   });
   quick.appendChild(steps);
 
-  // 02 Die Oberfläche (annotated mockup)
+  // 02 The interface (annotated mockup)
   const oberflaeche = chapter('Die Oberfläche im Überblick');
   oberflaeche.appendChild(el('p', {className:'welcome-lead', text:'Der Builder besteht aus drei Bereichen.'}));
   oberflaeche.appendChild(mockBuilderLayout());
@@ -175,7 +174,7 @@ function renderWelcomePane(host){
   });
   types.appendChild(blocksGrid);
 
-  // 04 Mit dem Canvas arbeiten
+  // 04 Working with the canvas
   const tips = chapter('Mit dem Canvas arbeiten');
   const tipsGrid = el('div', {className:'welcome-tips-grid'});
   [
@@ -219,7 +218,7 @@ function renderWelcomePane(host){
   });
   tips.appendChild(tipsGrid);
 
-  // 05 Tastaturkürzel
+  // 05 Keyboard shortcuts
   const shortcuts = chapter('Tastaturkürzel');
   shortcuts.appendChild(el('p', {className:'welcome-lead', text:'Auf der Canvas verfügbar:'}));
   const kbdTable = el('table', {className:'welcome-kbd-table'});
@@ -271,8 +270,7 @@ function renderWelcomePane(host){
   setupRevealAnimations(host);
 }
 
-// Scroll-spy: highlights the rail item for the chapter nearest the top, and
-// updates the reading-progress bar. One rAF-throttled listener handles both.
+// Scroll-spy: highlights the current chapter + updates the progress bar.
 function setupWelcomeScrollSpy(chapters, railList){
   if(typeof window._welcomeScrollCleanup === 'function'){
     window._welcomeScrollCleanup();
@@ -330,8 +328,7 @@ function setupWelcomeScrollSpy(chapters, railList){
   };
 }
 
-// Detail modal opened from a welcome-page block card. Shows label/category/
-// description plus a live preview via the block's preview() or mount().
+// Detail modal for a welcome-page block card. Shows meta + live preview.
 function openBlockDetailModal(id, def){
   document.querySelectorAll('.welcome-block-modal').forEach(m => m.remove());
 
@@ -377,7 +374,7 @@ function openBlockDetailModal(id, def){
       const schema = def.builderSchema();
       const optionCount = Array.isArray(schema) ? schema.filter(s => s && s.key).length : 0;
       if(optionCount) facts.push({ k:'Konfigurations-Optionen', v: String(optionCount) });
-    } catch(e){ /* ignore - schema may require runtime context */ }
+    } catch(e){ /* ignore: schema may require runtime context */ }
   }
   const factList = el('dl', {className:'welcome-block-modal-facts'});
   facts.forEach(f => {
@@ -386,8 +383,7 @@ function openBlockDetailModal(id, def){
   });
   left.appendChild(factList);
 
-  // Live preview from def.previewConfig() or def.defaultConfig() - same path
-  // the builder canvas uses, so we don't maintain separate screenshots.
+  // Live preview via def.preview() / mount() - same rendering as the canvas.
   const right = el('div', {className:'welcome-block-modal-preview'});
   right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text:'Live-Vorschau'}));
   const previewHost = el('div', {className:'welcome-block-modal-preview-host'});
@@ -408,8 +404,7 @@ function openBlockDetailModal(id, def){
     } else {
       previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'(Keine Vorschau verfügbar)'}));
     }
-    // Run KaTeX over the rendered preview so math notation in question
-    // templates / formulas (\(...\), $...$) gets typeset.
+    // Render KaTeX over the preview so $...$ and \(...\) get typeset.
     if(window.BlockUtils && window.BlockUtils.renderMath){
       window.BlockUtils.renderMath(previewHost);
     }
@@ -442,8 +437,7 @@ function openBlockDetailModal(id, def){
   requestAnimationFrame(() => modal.classList.add('is-open'));
 }
 
-// Below-the-fold reading elements fade in on first viewport entry.
-// Above-the-fold renders visible immediately. Respects prefers-reduced-motion.
+// Fade-in for below-the-fold reading elements (respects prefers-reduced-motion).
 function setupRevealAnimations(host){
   if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -474,8 +468,7 @@ function setupRevealAnimations(host){
   }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
   hidden.forEach(el => observer.observe(el));
 
-  // Safety net: force-reveal in-viewport elements that didn't get an initial
-  // intersection callback.
+  // Force-reveal in-viewport elements that missed the initial intersection.
   setTimeout(() => {
     hidden.forEach(el => {
       if(el.classList.contains('reveal-visible')) return;

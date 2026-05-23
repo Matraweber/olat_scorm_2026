@@ -1,5 +1,4 @@
-// task-pane-config.js: Right-hand block-configuration pane. Three states:
-// empty selection, multi-select (bulk actions), single-block (schema form).
+// task-pane-config.js: Right-hand config pane: empty | multi-select | single-block form.
 import { el } from './util.js';
 import { pushHistoryDebounced } from './state.js';
 import { renderField } from './form.js';
@@ -97,10 +96,9 @@ function renderSingleBlockPane(ctx, sel){
 
   if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
 
-  // Actions dispatched by `type:'action'` buttons in builderSchema():
-  //   reset             - restore defaultConfig()
-  //   add-shape:<type>  - push a fresh shape onto sel.config.shapes
-  //                       (requires def.newShape(type))
+  // Actions from `type:'action'` buttons in builderSchema():
+  //   reset             : restore defaultConfig()
+  //   add-shape:<type>  : push def.newShape(type) into sel.config.shapes
   const prevHandler = configHost._blockActionHandler;
   if(prevHandler) configHost.removeEventListener('block-field-action', prevHandler);
   const actionHandler = e => {
@@ -123,7 +121,7 @@ function renderSingleBlockPane(ctx, sel){
       renderConfigPane(ctx);
       return;
     }
-    // Block-defined custom action: def.applyAction(action, cfg) -> bool
+    // Block-defined custom action; def.applyAction(action, cfg) -> bool.
     if(typeof def.applyAction === 'function'){
       const handled = def.applyAction(action, sel.config);
       if(handled){

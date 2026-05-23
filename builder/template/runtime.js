@@ -1,7 +1,6 @@
-// runtime.js: SCORM-1.2 player. Loads tasks.json + theme.json, builds the
-// top nav, renders blocks on an absolute-positioned canvas, tracks scores,
-// pushes aggregate to the LMS via scorm12.js. Default sizes are duplicated
-// from canvas.js because the runtime ships standalone in the SCORM ZIP.
+// runtime.js: SCORM-1.2 player. Loads tasks.json + theme.json, builds the nav,
+// renders blocks on an absolute-positioned canvas, and pushes scores to the LMS.
+// Default sizes duplicate canvas.js because the runtime ships standalone.
 (function(){
   'use strict';
 
@@ -81,7 +80,7 @@
       ensurePositions(task.blocks);
       return task;
     }
-    // Old monolithic task types map onto a single block.
+    // Legacy monolithic task types collapse onto a single block.
     const legacyMap = {
       'complex-numbers': 'complex-question',
       'function-plot':   'function-question',
@@ -102,9 +101,7 @@
     return { id: task.id, title: task.title, blocks };
   }
 
-  // Max points of a single task, derived from the block configs alone.
-  // Used so the score pill / progress bar can show the correct max even
-  // before the user has opened a task (mount() wasn't called yet).
+  // Max points from block configs alone, so the score pill is correct before mount().
   function computeMaxPoints(task){
     if(!task) return 0;
     const blocks = getAllTaskBlocks(task);
@@ -159,8 +156,7 @@
     const r = n => Math.round(n * 100) / 100;
     const total = totalScore();
     const task = taskScore(currentPageIdx);
-    // Per-Task only when the current task has graded blocks; otherwise just
-    // show the cumulative total to keep the header tidy.
+    // Per-task only when the current task has graded blocks.
     if(task.max > 0){
       pill.innerHTML = 'Aufgabe: <strong>' + r(task.pts) + ' / ' + task.max + '</strong>' +
         '<span class="score-pill-sep"> · </span>' +
@@ -176,7 +172,7 @@
       const def = window.Blocks.get(b.type);
       return def && def.graded;
     });
-    // Content-only tasks count as done even before the user opens them.
+    // Content-only tasks count as done immediately.
     if(graded.length === 0) return true;
     const t = perTask[idx];
     if(!t || !t.blockScores) return false;
@@ -401,9 +397,7 @@
       cfg.tasks.forEach(() => perTask.push({blockScores: {}, blockInstances: []}));
       buildNav();
       try { window.Scorm12 && Scorm12.init(); } catch(e) {}
-      // Show the cumulative max-points immediately, before any task is opened.
-      // computeMaxPoints reads each task's configs directly so the pill
-      // doesn't wait for mount() to populate blockScores.
+      // Show cumulative max-points immediately, without waiting for mount().
       updateScorePill();
       updateNavStates();
       if(cfg.tasks.length > 0) showPage(0);

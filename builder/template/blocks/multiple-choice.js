@@ -179,10 +179,6 @@
       btn.className = 'bp-btn';
       btnRow.appendChild(btn);
       card.appendChild(btnRow);
-      const fb = document.createElement('div');
-      fb.className = 'bp-hint';
-      fb.innerHTML = '<div class="bp-hint-title">Rückmeldung</div><div class="bp-hint-body">Noch keine Korrektur durchgeführt.</div>';
-      card.appendChild(fb);
       host.appendChild(card);
     }
   });

@@ -142,7 +142,7 @@
     preview(host, config){
       const activeConfig = clozePresetConfig(config);
       const u = window.BlockUtils;
-      const wrap = u.tagPreview(host, { icon:'___', label:'Lückentext' });
+      const wrap = u.tagPreview(host, { icon:'▭', label:'Lückentext' });
       wrap.style.lineHeight = '1.7';
       wrap.style.fontSize = '0.88rem';
       let html = String(activeConfig.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).replace(/\n/g, '<br>');

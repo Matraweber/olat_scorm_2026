@@ -1,5 +1,4 @@
-// task-pane-canvas.js: Canvas render + direct-manipulation handlers
-// (drag-to-move, drag-to-resize) with snap guides and history snapshots.
+// task-pane-canvas.js: Canvas render + drag-to-move / drag-to-resize with snap guides.
 import { el, uid, cssEscape, toast, confirmDialog, formDialog } from './util.js';
 import { state, pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
 import { captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
@@ -21,8 +20,7 @@ export function renderCanvas(ctx){
     const def = window.Blocks.get(block.type);
     const card = el('div', {className:'canvas-block-card', attrs:{'data-block-id': block.id}});
     if(selectedBlockIds.has(block.id)) card.classList.add('selected');
-    // First render of this block id: tag .is-new so the fade-in animation
-    // fires once. Existing blocks stay still on subsequent re-renders.
+    // Tag .is-new only on first render so fade-in fires once per block.
     if(seenBlockIds && !seenBlockIds.has(block.id)){
       card.classList.add('is-new');
       seenBlockIds.add(block.id);
@@ -39,8 +37,7 @@ export function renderCanvas(ctx){
     const ctrls = el('div', {className:'canvas-block-controls'});
     const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Höhe an Inhalt anpassen'}, text:'↕'});
     const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Duplizieren'}, text:'⧉'});
-    // Save as Block-Vorlage: prepends a deep-cloned snapshot to
-    // state.userBlockTemplates so it shows in the picker's "Eigene Vorlagen".
+    // Block-template button: deep-clones into state.userBlockTemplates.
     const tplBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Als Block-Vorlage speichern'}, text:'★'});
     const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
     fitBtn.addEventListener('click', e => { e.stopPropagation(); autoFitBlock(block); });
@@ -88,7 +85,7 @@ export function renderCanvas(ctx){
       const animate = !window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const doRemove = () => {
         if(i >= 0) task.blocks.splice(i, 1);
-        // Drop from seen-set so undo re-triggers the fade-in animation.
+        // Drop from seen-set so undo re-triggers fade-in.
         if(ctx.seenBlockIds) ctx.seenBlockIds.delete(block.id);
         selectedBlockIds.delete(block.id); ctx.persistSelection();
         renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight(); renderTaskList();
@@ -117,7 +114,7 @@ export function renderCanvas(ctx){
     canvas.appendChild(card);
   });
   if(task.blocks.length === 0){
-    // Empty state: illustration + headline + CTA that opens the block picker.
+    // Empty state: illustration + headline + picker CTA.
     const empty = el('div', { className:'canvas-block-empty' });
     const svg = '<svg class="canvas-empty-art" viewBox="0 0 120 64" width="96" height="51" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<rect x="10"  y="10" width="58" height="18" rx="3" opacity="0.55"/>' +
@@ -148,9 +145,8 @@ export function renderCanvas(ctx){
 
 export function installDragHandlers(ctx, card, block){
   const { task, canvas, configHost, selectedBlockIds } = ctx;
-  // Two entry points: mousedown for real mouse + dispatched MouseEvents
-  // in tests, pointerdown (non-mouse) for touch/pen. setPointerCapture on
-  // pointerdown keeps events flowing during fast drags.
+  // mousedown for mouse + test events; pointerdown (non-mouse) for touch/pen.
+  // setPointerCapture keeps events flowing on fast drags.
   function startDrag(e, isPointer){
     if(e.target.closest('.canvas-block-resize') || e.target.closest('.canvas-block-controls')) return;
     if(!isPointer && e.button !== 0) return;
@@ -316,13 +312,12 @@ export function installResizeHandler(ctx, handle, card, block){
   });
 }
 
-// Autofit pass for fresh template blocks. Template defaults rarely match
-// the real rendered height; measure, update pos.h, re-pack the column.
+// Autofit pass for fresh template blocks: measure, set pos.h, re-pack column.
 function scheduleTemplateAutofitPass(ctx){
   const { task, canvas } = ctx;
   const flagged = (task.blocks || []).filter(b => b && b._needsAutofit);
   if(flagged.length === 0) return;
-  // Two rAFs: render the cards, then wait for shadow-DOM mounts.
+  // 2 rAFs: 1 for card render, 1 for shadow-DOM mount.
   requestAnimationFrame(() => requestAnimationFrame(() => {
     let changed = false;
     flagged.forEach(block => {

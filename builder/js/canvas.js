@@ -32,7 +32,8 @@ export const BLOCK_FILES = {
   'table':             'table.js',
   'equation-system':   'equation-system.js',
   'function-sandbox':  'function-sandbox.js',
-  'composition':       'composition.js'
+  'composition':       'composition.js',
+  'complex-input':     'complex-input.js'
 };
 
 export function usedBlockTypes(){
@@ -69,7 +70,8 @@ const BLOCK_DEFAULT_SIZES = {
   'number-base':       {w: 700, h: 360},
   'truth-table':       {w: 700, h: 520},
   'function-sandbox':  {w: 1080, h: 580},
-  'composition':       {w: 700, h: 460}
+  'composition':       {w: 700, h: 460},
+  'complex-input':     {w: 600, h: 380}
 };
 export function defaultSizeFor(type){ return BLOCK_DEFAULT_SIZES[type] || {w: 500, h: 200}; }
 
@@ -196,9 +198,8 @@ export function blockSummary(block){
   return (def && def.label) || block.type;
 }
 
-// Content-fit height. Centralised so autoFitBlock + the autofit passes
-// agree on how to read a height inside a shadow-DOM. Returns 0 when nothing
-// has rendered yet.
+// Natural content height. Relaxes overflow:hidden on card/body and any SVG
+// max-height (capViewport) so scrollHeight reports the true height.
 export function measureCardContent(card){
   if(!card) return 0;
   const body = card.querySelector('.canvas-block-body');
@@ -208,7 +209,33 @@ export function measureCardContent(card){
     const wrap = shadowHost.shadowRoot.querySelector('.canvas-mount-wrap');
     if(wrap) return wrap.scrollHeight;
   }
-  return body.scrollHeight;
+  const cardStyle = { overflow: card.style.overflow, height: card.style.height };
+  const bodyStyle = { overflow: body.style.overflow, height: body.style.height, minHeight: body.style.minHeight, flex: body.style.flex };
+  // Also release SVGs whose max-height was set by capViewport.
+  const svgs = Array.from(body.querySelectorAll('svg'));
+  const svgStyles = svgs.map(s => ({ maxHeight: s.style.maxHeight, height: s.style.height, aspectRatio: s.style.aspectRatio }));
+  try {
+    card.style.height = 'auto';
+    card.style.overflow = 'visible';
+    body.style.height = 'auto';
+    body.style.overflow = 'visible';
+    body.style.minHeight = '';
+    body.style.flex = 'initial';
+    svgs.forEach(s => { s.style.maxHeight = 'none'; });
+    return body.scrollHeight;
+  } finally {
+    card.style.overflow = cardStyle.overflow;
+    card.style.height = cardStyle.height;
+    body.style.overflow = bodyStyle.overflow;
+    body.style.height = bodyStyle.height;
+    body.style.minHeight = bodyStyle.minHeight;
+    body.style.flex = bodyStyle.flex;
+    svgs.forEach((s, i) => {
+      s.style.maxHeight = svgStyles[i].maxHeight;
+      s.style.height = svgStyles[i].height;
+      s.style.aspectRatio = svgStyles[i].aspectRatio;
+    });
+  }
 }
 
 // Card height = head + content + 8 px padding. Returns null when nothing

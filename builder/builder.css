@@ -17,12 +17,7 @@
 html, body { margin: 0; padding: 0; height: 100%; }
 body { font-family: Verdana, Arial, sans-serif; color: var(--text); background: linear-gradient(180deg, #eef5f8 0%, #f8fbfc 100%); }
 
-/* Global keyboard focus ring
- * Browsers fire :focus-visible only when the focus came from keyboard
- * navigation (Tab) or programmatic focus(), NOT mouse clicks. So this
- * rule polishes accessibility without making mouse interactions noisier.
- * The 3 px outer ring uses a brand-colour at 35 % opacity so it shows
- * over any background. Specific elements can still override below. */
+/* Keyboard focus ring (Tab navigation only; ignored on mouse clicks). */
 :focus-visible {
   outline: 2px solid rgba(0, 59, 92, 0.55);
   outline-offset: 2px;
@@ -60,14 +55,97 @@ textarea:focus-visible,
 .builder-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .builder-actions .btn { padding: 0.42rem 0.85rem; font-size: 0.84rem; }
 .builder-main { display: grid; grid-template-columns: 220px 1fr; gap: 0.9rem; padding: 0.9rem; flex: 1; max-width: 100%; width: 100%; margin: 0 auto; }
-@media (min-width: 1500px) { .builder-main { max-width: 1800px; margin: 0 auto; } }
+@media (min-width: 1500px) {
+  .builder-main { max-width: 1800px; margin: 0 auto; }
+}
+
+/* Folder browser: dropdown anchored to the "Ordner" header button. */
+.folder-dropdown {
+  position: fixed;
+  width: 380px;
+  max-width: calc(100vw - 16px);
+  max-height: 65vh;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 32px rgba(0, 28, 47, 0.20), 0 0 0 1px rgba(0, 59, 92, 0.06);
+  display: flex;
+  flex-direction: column;
+  z-index: 130;
+  overflow: hidden;
+}
+.folder-dropdown-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+.folder-dropdown-title {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-weight: 700; color: var(--primary); font-size: 0.86rem;
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-dropdown-close { width: 22px; height: 22px; font-size: 0.95rem; }
+.folder-dropdown-hint {
+  padding: 0.45rem 0.7rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+.folder-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.folder-tree-sub { list-style: none; margin: 0; padding: 0; }
+.folder-tree-row {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--text);
+  border-radius: 7px;
+  margin: 0.05rem 0.35rem;
+  transition: background 0.1s ease;
+  user-select: none;
+}
+.folder-tree-row:hover { background: var(--panel-soft); }
+.folder-tree-item-dir > .folder-tree-row { font-weight: 600; color: var(--primary); }
+.folder-tree-item-file.is-active > .folder-tree-row {
+  background: var(--primary);
+  color: #fff;
+}
+.folder-tree-item-file.is-active > .folder-tree-row .folder-tree-icon { color: #fff; }
+.folder-tree-caret {
+  display: inline-block; width: 0.9rem; flex-shrink: 0;
+  color: var(--muted); font-size: 0.7rem; text-align: center;
+}
+.folder-tree-caret-placeholder { visibility: hidden; }
+.folder-tree-icon { display: inline-flex; color: var(--accent-dark); flex-shrink: 0; }
+.folder-tree-icon-file { color: var(--muted); }
+.folder-tree-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-tree-meta {
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: var(--panel-soft);
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.folder-tree-item-file.is-active > .folder-tree-row .folder-tree-meta { background: rgba(255,255,255,0.2); color: #fff; }
 .builder-sidebar {
   display: flex; flex-direction: column; gap: 1rem;
-  /* Sticky positioning so the task list + Allgemein-links + Modus toggle stay
-   * reachable while scrolling through the welcome page or a long task. The
-   * top offset accounts for the sticky header height (≈ 60 px) + the main
-   * grid's 0.9 rem padding. align-self:start prevents the grid from
-   * stretching the sidebar to full row height, which would break sticky. */
+  /* Sticky sidebar. Top offset = header height + grid padding. */
   position: sticky;
   top: 75px;
   align-self: start;
@@ -76,10 +154,7 @@ textarea:focus-visible,
   /* Keep the scrollbar from sitting flush against the card edges. */
   padding-right: 0.2rem;
 }
-/* Sidebar sections use a subtle container - flat panel + hairline border, no
- * floating shadow. This matches Notion/Linear/Figma sidebar conventions:
- * containers exist as boundaries, not as visually competing cards. The
- * Section-Header is small Caps so it reads as a label, not as a heading. */
+/* Sidebar section container: flat panel + hairline border, small-caps header. */
 .sidebar-section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.9rem 1rem; }
 .sidebar-section h2 { color: var(--muted); margin: 0 0 0.6rem; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .section-head { display:flex; flex-direction:column; align-items:flex-start; margin-bottom: 0.6rem; gap: 0.45rem; }
@@ -92,7 +167,7 @@ textarea:focus-visible,
 .task-list li[draggable="true"] .task-btn { cursor: grab; }
 .task-list li.dragging { opacity: 0.5; }
 .task-list li.dragging .task-btn { cursor: grabbing; }
-/* Drop-position indicator - a 2 px accent line above or below the target. */
+/* Drop-position indicator: a 2 px accent line above or below the target. */
 .task-list li.drop-before::before,
 .task-list li.drop-after::after {
   content: '';
@@ -111,9 +186,7 @@ textarea:focus-visible,
 .task-list .task-btn .task-meta { display:block; font-size: 0.75rem; color: var(--muted); font-weight: normal; margin-top: 0.15rem; }
 .task-list .task-btn.active .task-meta { color: rgba(255,255,255,0.85); }
 .task-list .task-controls { display: flex; flex-direction: column; gap: 0.15rem; }
-/* Empty-state shown when state.course.tasks is empty (e.g. fresh course or
- * after deleting the last task). A muted SVG hint + one-tap CTA so the
- * sidebar never looks abandoned. */
+/* Sidebar empty-state shown when state.course.tasks is empty. */
 .task-list .task-empty {
   display: flex;
   flex-direction: column;
@@ -234,7 +307,7 @@ textarea:focus-visible,
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(0,59,92,0.10);
 }
-/* When a search is active the category nav fades - it's not actionable
+/* When a search is active the category nav fades it's not actionable
    in a flat-match view (matches come from multiple categories). */
 .block-cat-nav.search-active .block-cat-btn { opacity: 0.45; }
 .block-cat-nav.search-active .block-cat-btn:hover { opacity: 1; }
@@ -349,7 +422,7 @@ textarea:focus-visible,
 .color-row input[type="color"] { width: 44px; height: 30px; padding: 0; border: 1px solid #c6d1d8; border-radius: 8px; background: #fff; }
 .hidden { display: none !important; }
 
-/* Aufgaben-Editor: kompakter Header oben + Canvas/Config nebeneinander */
+/* Task editor: compact header on top + canvas/config side-by-side */
 .task-edit-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .task-edit-head .task-num { color: var(--primary); font-weight: 700; font-size: 1rem; white-space: nowrap; padding: 0.4rem 0.6rem; background: var(--panel-soft); border-radius: 8px; border: 1px solid var(--line); }
 .task-edit-head .task-title-input { flex: 1; min-width: 220px; padding: 0.5rem 0.75rem; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--primary); border: 1px solid var(--line); border-radius: 10px; background: #fff; }
@@ -391,7 +464,7 @@ textarea:focus-visible,
   cursor: grab;
   user-select: none;
   /* Block touch-scroll / pinch on the card so pointer-drag works on
-   * touch devices - the canvas itself still scrolls/pinches normally. */
+   * touch devices the canvas itself still scrolls/pinches normally. */
   touch-action: none;
   display: flex;
   flex-direction: column;
@@ -412,10 +485,7 @@ textarea:focus-visible,
   z-index: 5;
 }
 .canvas-block-card.dragging * { cursor: grabbing !important; }
-/* Fade-in + small bounce when a brand-new block is first rendered. The
- * `.is-new` class is added by task-pane-canvas.js on first sight of a
- * block id; it sticks for the lifetime of the card but the animation
- * only runs once. */
+/* Fade-in for newly-added blocks. .is-new is set on first render in task-pane-canvas.js. */
 .canvas-block-card.is-new {
   animation: blockAppear 320ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }
@@ -425,7 +495,7 @@ textarea:focus-visible,
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 /* Exit animation when the user removes a block. JS adds `.is-removing`
- * 180 ms before splicing - the card briefly fades + shrinks. */
+ * 180 ms before splicing; the card briefly fades + shrinks. */
 .canvas-block-card.is-removing {
   animation: blockRemove 180ms ease-in forwards;
   pointer-events: none;
@@ -660,19 +730,13 @@ textarea:focus-visible,
 .formula-fn-btn:hover { background:var(--primary-light); border-color:var(--primary); }
 
 /*
-   Welcome / Onboarding  ·  Editorial Academic design direction.
-   Two-column layout (content + sticky chapter rail), numbered chapters.
-   Only two elements stick during scroll: the global builder-header (top)
-   and the chapter rail (right). Chapter heads scroll with their content
-   so reading transitions stay clean (no stacked sticky headings).
+   Welcome / onboarding. Two-column layout (content + sticky chapter rail).
+   Header (top) and rail (right) stick during scroll; chapter heads scroll
+   with their content.
 */
 
-/* Scope scroll-related behaviour to the welcome pane only (the class is
-   added to <html> while the welcome pane is mounted; removed by the
-   scroll-spy cleanup). scroll-padding-top reserves room for the sticky
-   builder-header so chapter anchors don't land hidden behind it.
-   scroll-snap-type is intentionally NOT set: Chrome's proximity snap
-   fights free scroll and made the page feel jumpy. */
+/* Welcome-only scroll behaviour. .welcome-active is set on <html> while the
+   welcome pane is mounted. scroll-padding-top clears the sticky header. */
 html.welcome-active {
   scroll-padding-top: 80px;
   scroll-behavior: smooth;
@@ -735,8 +799,7 @@ html.welcome-active {
 .welcome-rail-link.is-active .welcome-rail-num { color: var(--accent-dark); opacity: 1; }
 
 /* Chapters
-   Anchor targets for rail clicks. scroll-margin-top reserves room for the
-   sticky builder-header so clicked chapters land flush below it. */
+   Anchor targets for rail clicks. scroll-margin-top clears the sticky header. */
 .welcome-chapter {
   scroll-margin-top: 80px;
   padding: 1.8rem 0 2.8rem;
@@ -837,7 +900,7 @@ html.welcome-active {
 }
 .welcome-cta-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
-/* 5-Schritte cards */
+/* 5-step quickstart cards */
 .welcome-steps { display: grid; gap: 0.85rem; }
 .welcome-step {
   display: grid;
@@ -887,14 +950,8 @@ html.welcome-active {
   border-bottom: 1px solid var(--line);
 }
 .welcome-blocks-cat:first-child { margin-top: 0; }
-/* Real <button> cards. Grid: icon top-left spanning both text rows so the
- * title + description stack TIGHTLY to its right and start at the same y
- * as the icon. Result: zero wasted vertical space at the top, and the
- * description sits indented under the title (not under the icon).
- *
- * `minmax(0, 1fr)` is critical: a plain `1fr` lets long unbreakable words
- * (e.g. "Einheitenumrechnung") blow the column wider than its share of the
- * card, which would push text out of the card on the right. */
+/* Block cards: icon column + title/description column. minmax(0, 1fr) on
+ * the second column so long compound words wrap instead of overflowing. */
 .welcome-block-card {
   background: #fff; border: 1px solid var(--line);
   border-radius: 8px;
@@ -921,26 +978,20 @@ html.welcome-active {
 }
 .welcome-block-card:focus-visible { box-shadow: 0 0 0 2px rgba(0,59,92,0.18), 0 6px 18px rgba(0,59,92,0.08); }
 .welcome-block-card:active { transform: translateY(0); }
-/* The .reveal-target rule (further down) sets a 540 ms transition for the
- * initial scroll-fade. That's elegant for entrance, but makes hover feel
- * sluggish. Override with higher specificity so hover stays at 200 ms while
- * opacity keeps its slower elegant fade-in. */
+/* Hover overrides the slow .reveal-target transition so hover stays snappy. */
 .welcome-block-card.reveal-target {
   transition: opacity 540ms cubic-bezier(0.22, 0.61, 0.36, 1),
               transform 200ms ease,
               border-color 200ms ease,
               box-shadow 200ms ease;
 }
-/* Graded cards: green accent stripe on the left edge AND inline "bewertet"
- * pill in the title row. The stripe gives a strong, scannable signal at the
- * row level; the pill provides the explicit label inline with the title.
- * padding-left compensates so the icon and text don't visually jump. */
+/* Graded cards: green left-edge stripe + inline "bewertet" pill in the title. */
 .welcome-block-card.graded {
   border-left: 3px solid var(--accent-dark);
   padding-left: calc(0.8rem - 2px);
 }
 /* Icon spans both rows so the text block to its right can sit tight at
- * the top - no extra row-height padded by the 30 px icon chip. */
+ * the top, no extra row-height padded by the 30 px icon chip. */
 .welcome-block-icon {
   font-family: "Courier New", monospace; font-weight: 800; font-size: 1rem;
   color: var(--primary);
@@ -955,11 +1006,7 @@ html.welcome-active {
   grid-row: 1; grid-column: 2;
   align-self: start;
   min-width: 0; line-height: 1.3;
-  /* `break-word` only breaks long unbreakable strings; word boundaries
-   * are still respected. Hyphenation kicks in for ≥8-char German compound
-   * words (with at least 4 chars on each side of the break), so
-   * "Einheitenumrechnung" splits at a real syllable boundary instead of
-   * mid-word. The 4/4 limits avoid earlier ugliness like "Ein-gabe". */
+  /* break-word + hyphenation so long German compound words wrap cleanly. */
   overflow-wrap: break-word;
   hyphens: auto;
   -webkit-hyphens: auto;
@@ -979,10 +1026,7 @@ html.welcome-active {
   -webkit-hyphenate-limit-after:  4;
   hyphenate-limit-chars: 8 4 4;
 }
-/* Inline pill following the title text. Kept very compact so it almost
- * always fits on the same line as the title, even on the narrowest cards.
- * The green left stripe on .graded cards is the primary signal - the pill
- * is the accessible label for screen readers + a confirming visual cue. */
+/* Inline "bewertet" pill after the title. Compact so it stays on one line. */
 .welcome-block-graded {
   display: inline-block;
   position: static;
@@ -1010,10 +1054,8 @@ html.welcome-active {
   column-gap: 0.6rem;
   row-gap: 0.35rem;
   align-items: center;
-  /* CRITICAL: pin rows to the top, otherwise the outer tips-grid stretches
-   * cards in the same row to the tallest one and the inner grid distributes
-   * the extra height across rows - which makes the title drift below the
-   * icon's center on shorter-body cards. */
+  /* Pin rows to the top so the outer grid doesn't stretch them and push
+   * titles below the icon center on shorter cards. */
   align-content: start;
 }
 .welcome-tip-icon {
@@ -1102,7 +1144,7 @@ html.welcome-active {
   opacity: 1;
   transform: translateY(0);
 }
-/* Accessibility: respect reduced-motion preference - no animations at all. */
+/* Accessibility: respect reduced-motion preference. No animations at all. */
 @media (prefers-reduced-motion: reduce) {
   .reveal-target { opacity: 1 !important; transform: none !important; transition: none !important; }
   html.welcome-active { scroll-behavior: auto; }
@@ -1181,10 +1223,7 @@ html.welcome-active {
   font-family: "Courier New", monospace; text-transform: uppercase;
 }
 
-/*
-   Komposition block · in-canvas editor (Photoshop-style toolbar above
-   the drawing area, direct-manipulation handles on the SVG).
-*/
+/* Composition block: in-canvas editor (toolbar + SVG handles) */
 .comp-editor {
   display: flex; flex-direction: column;
   background: var(--panel);
@@ -1293,6 +1332,316 @@ html.welcome-active {
 }
 .comp-tool-btn-text:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 
+/* Composition template picker: popover triggered from the "Vorlage" button. */
+.comp-tool-template {
+  background: linear-gradient(180deg, var(--accent-light, #eef9e2) 0%, #fff 100%);
+  border-color: var(--accent, #a1d884);
+  display: inline-flex; align-items: center;
+}
+.comp-tool-template:hover { background: var(--accent, #84bf66); color: var(--primary); border-color: var(--primary); }
+.comp-tpl-popover {
+  position: fixed;
+  z-index: 110;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 28, 47, 0.18), 0 0 0 1px rgba(0, 59, 92, 0.06);
+  padding: 0.9rem;
+  min-width: 540px;
+}
+.comp-tpl-popover-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem;
+  margin-bottom: 0.7rem;
+  color: var(--primary);
+}
+.comp-tpl-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem;
+}
+.comp-tpl-card {
+  appearance: none;
+  display: flex; flex-direction: column; gap: 0.4rem;
+  padding: 0.55rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.comp-tpl-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 59, 92, 0.12);
+  transform: translateY(-1px);
+}
+.comp-tpl-cap-name {
+  font-weight: 700; color: var(--primary); font-size: 0.9rem;
+}
+.comp-tpl-cap-desc {
+  font-size: 0.78rem; color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+/* Empty-state hint shown inside the composition canvas when shapes.length === 0. */
+.comp-empty-hint {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none;
+  color: var(--muted);
+  text-align: center;
+  padding: 1rem;
+  gap: 0.5rem;
+}
+.comp-empty-hint-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); }
+.comp-empty-hint-body  { font-size: 0.82rem; line-height: 1.45; max-width: 420px; }
+.comp-empty-hint-arrow {
+  font-size: 1.4rem; line-height: 1; color: var(--accent-dark, #84bf66);
+  animation: comp-empty-bounce 1.6s ease-in-out infinite;
+}
+@keyframes comp-empty-bounce {
+  0%, 100% { transform: translateY(-3px); }
+  50%      { transform: translateY(3px); }
+}
+
+/* Variable-Picker dropdown next to the label-text field in the bottom toolbar. */
+.comp-var-picker {
+  appearance: none;
+  height: 28px; padding: 0 0.4rem;
+  border: 1px solid var(--line); background: #fff; color: var(--primary);
+  border-radius: 5px; cursor: pointer;
+  font: inherit; font-size: 0.8rem; font-weight: 600;
+}
+.comp-var-picker:hover { border-color: var(--primary); }
+
+/* Mode badge + dice button in the composition toolbar. */
+.comp-mode-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+.comp-mode-chip {
+  display: inline-flex; align-items: center;
+  height: 26px; padding: 0 0.55rem;
+  background: var(--panel-soft, #eef5f8);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  font-size: 0.78rem; font-weight: 600; color: var(--primary);
+  white-space: nowrap;
+}
+.comp-mode-chip-button { cursor: pointer; transition: background 120ms ease, border-color 120ms ease; }
+.comp-mode-chip-button:hover { background: #fff; border-color: var(--primary); }
+.comp-mode-chip-caret { margin-left: 0.3rem; opacity: 0.7; font-size: 0.7em; }
+
+.comp-mode-menu {
+  position: fixed; z-index: 130;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0,28,47,0.18);
+  padding: 0.3rem; min-width: 180px;
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+.comp-mode-menu-item {
+  appearance: none;
+  text-align: left; padding: 0.45rem 0.6rem;
+  background: transparent; border: 0; border-radius: 5px;
+  font: inherit; font-size: 0.85rem; color: var(--text);
+  cursor: pointer;
+}
+.comp-mode-menu-item:hover { background: var(--panel-soft, #eef5f8); }
+.comp-mode-menu-item.is-active { background: var(--primary); color: #fff; font-weight: 600; }
+
+/* Inline hint chip shown when a label is selected but mode != fillblanks. */
+.comp-hint-chip {
+  appearance: none;
+  margin-left: 0.4rem;
+  display: inline-flex; align-items: center;
+  height: 26px; padding: 0 0.55rem;
+  background: linear-gradient(180deg, #fff8db 0%, #fff3a8 100%);
+  border: 1px dashed #d4b430;
+  border-radius: 13px;
+  font-size: 0.78rem; font-weight: 600; color: #6e5810;
+  white-space: nowrap; cursor: pointer;
+}
+.comp-hint-chip:hover { background: #fff3a8; border-style: solid; }
+
+/* Variable Quick-Add dialog: floating mini-form. */
+.comp-var-dialog {
+  position: fixed; z-index: 120;
+  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0,28,47,0.18);
+  padding: 0.8rem;
+  width: 280px;
+}
+.comp-var-dialog-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  color: var(--primary);
+}
+.comp-var-dialog-row {
+  display: grid; grid-template-columns: 60px 1fr; gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+.comp-var-dialog-row label { font-size: 0.82rem; color: var(--text); }
+.comp-var-dialog-row input[type="text"],
+.comp-var-dialog-row input[type="number"] {
+  width: 100%; padding: 0.32rem 0.45rem;
+  border: 1px solid var(--line); border-radius: 5px;
+  font: inherit; font-size: 0.85rem;
+}
+.comp-var-dialog-check { display: flex; align-items: center; gap: 0.4rem; }
+.comp-var-dialog-actions {
+  display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.5rem;
+}
+
+/* Replace / Append / Cancel chooser shown after picking a template
+   when the composition already has shapes. */
+.comp-tpl-choose-actions {
+  display: flex; gap: 0.4rem; justify-content: flex-end;
+}
+
+/* Polygon-Picker popover: looks like template picker but tighter. */
+.comp-poly-popover {
+  position: fixed; z-index: 110;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 28, 47, 0.18), 0 0 0 1px rgba(0, 59, 92, 0.06);
+  padding: 0.8rem;
+  min-width: 480px;
+}
+.comp-poly-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;
+}
+.comp-poly-card {
+  appearance: none;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  padding: 0.55rem 0.4rem;
+  background: #fff;
+  border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer; font: inherit;
+  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+.comp-poly-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,59,92,0.10);
+}
+.comp-poly-card-icon { color: var(--primary); }
+.comp-poly-card-label { font-weight: 600; font-size: 0.84rem; color: var(--primary); }
+.comp-poly-card-hint  { font-size: 0.72rem; color: var(--muted); text-align: center; }
+
+/* Formula field with helper buttons (√, π, x², Variable-Picker). */
+.comp-formula-wrap {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  flex-wrap: nowrap;
+}
+.comp-formula-input {
+  min-width: 200px;
+}
+.comp-formula-btn {
+  appearance: none;
+  height: 28px; min-width: 28px; padding: 0 0.4rem;
+  background: #fff; border: 1px solid var(--line); border-radius: 5px;
+  font: inherit; font-size: 0.85rem; font-weight: 600;
+  color: var(--primary); cursor: pointer;
+}
+.comp-formula-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+select.comp-formula-btn { font-size: 0.78rem; }
+
+/* Insert popover: combined Variable + Symbol picker for the label-text. */
+.comp-insert-popover {
+  position: fixed; z-index: 130;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0,28,47,0.18);
+  padding: 0.6rem;
+  max-width: 340px;
+}
+.comp-insert-head {
+  font-size: 0.74rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  margin: 0.1rem 0.1rem 0.3rem;
+}
+.comp-insert-head:not(:first-child) { margin-top: 0.6rem; }
+.comp-insert-row {
+  display: flex; flex-wrap: wrap; gap: 0.25rem;
+}
+.comp-insert-row-sym {
+  display: grid; grid-template-columns: repeat(9, 32px); gap: 0.2rem;
+}
+.comp-insert-cell {
+  appearance: none;
+  min-width: 32px; height: 32px; padding: 0 0.4rem;
+  border: 1px solid var(--line); background: #fff;
+  border-radius: 5px;
+  font: inherit; font-size: 0.95rem; line-height: 1;
+  cursor: pointer;
+  color: var(--primary);
+  transition: background 100ms ease, border-color 100ms ease;
+}
+.comp-insert-cell-var { font-weight: 600; font-size: 0.85rem; padding: 0 0.55rem; }
+.comp-insert-cell:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* Scoring popover: blank toggle + solution + formula + helper buttons. */
+.comp-bew-popover {
+  position: fixed; z-index: 130;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0,28,47,0.18);
+  padding: 0.7rem;
+  width: 360px;
+  max-width: calc(100vw - 16px);
+}
+.comp-bew-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.86rem; color: var(--text);
+  padding: 0.2rem 0;
+}
+.comp-bew-body {
+  border-top: 1px solid var(--line);
+  margin-top: 0.55rem; padding-top: 0.55rem;
+  display: flex; flex-direction: column; gap: 0.55rem;
+}
+.comp-bew-body:empty { display: none; border: 0; margin: 0; padding: 0; }
+.comp-bew-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.comp-bew-field > label {
+  font-size: 0.74rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.comp-bew-field > input {
+  width: 100%; padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line); border-radius: 5px;
+  font: inherit; font-size: 0.86rem;
+}
+.comp-bew-helprow {
+  display: flex; gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+/* Variables table: mass editor for the variables-list. */
+.comp-var-table { width: 420px; }
+.comp-var-tbl {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.comp-var-tbl th {
+  text-align: left; padding: 0.3rem 0.4rem;
+  font-size: 0.74rem; color: var(--muted); font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.comp-var-tbl td {
+  padding: 0.25rem 0.3rem;
+  border-bottom: 1px solid var(--panel-soft);
+}
+.comp-var-tbl td input[type="text"],
+.comp-var-tbl td input[type="number"] {
+  width: 100%; padding: 0.25rem 0.4rem;
+  border: 1px solid var(--line); border-radius: 4px;
+  font: inherit; font-size: 0.82rem;
+}
+.comp-var-tbl td .icon-btn {
+  background: transparent; border: 0;
+  color: var(--muted); cursor: pointer; padding: 0;
+  width: 24px; height: 24px; line-height: 1;
+}
+.comp-var-tbl td .icon-btn.danger:hover { color: #c0392b; }
+
 /* Welcome: Block-detail modal */
 .welcome-hint {
   font-size: 0.78rem; color: var(--muted);
@@ -1321,8 +1670,8 @@ html.welcome-active {
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 24px 60px rgba(0, 28, 47, 0.22);
-  width: min(820px, calc(100vw - 2rem));
-  max-height: min(620px, calc(100vh - 2rem));
+  width: min(980px, calc(100vw - 2rem));
+  max-height: min(680px, calc(100vh - 2rem));
   display: flex; flex-direction: column;
   transform: translateY(8px) scale(0.985);
   transition: transform 200ms ease;
@@ -1385,7 +1734,7 @@ html.welcome-active {
 }
 
 .welcome-block-modal-body {
-  display: grid; grid-template-columns: 1fr 1.1fr;
+  display: grid; grid-template-columns: minmax(260px, 0.85fr) minmax(420px, 1.5fr);
   gap: 1.2rem;
   padding: 1.1rem 1.3rem 1.3rem;
   overflow: auto;
@@ -1437,10 +1786,7 @@ html.welcome-active {
   color: var(--muted); font-size: 0.85rem; padding: 1rem; text-align: center;
 }
 
-/* Shared block-preview building blocks. Used by individual block files
- * (image.js, multiple-choice.js, ...) so the welcome-modal previews stay
- * visually consistent without each block re-declaring the same inline
- * styles. */
+/* Shared block-preview primitives used by per-block preview() functions. */
 .bp-card {
   background: #fff;
   border: 1px solid var(--line);
@@ -1586,10 +1932,7 @@ html.welcome-active {
 }
 
 /* Responsive: tablet + mobile */
-/* The desktop layout uses a fixed 220 px sidebar + flexible main pane and a
- * top-bar with seven action buttons. Below ~1100 px the side-by-side starts
- * to feel cramped; below ~720 px the action row needs to wrap, and modals
- * should claim more of the viewport so they stay readable. */
+/* Responsive: <1100 px stacks the sidebar; <720 px wraps the action row. */
 
 @media (max-width: 1100px) {
   .builder-main { grid-template-columns: 200px 1fr; gap: 0.7rem; padding: 0.7rem; }
@@ -1597,7 +1940,7 @@ html.welcome-active {
 }
 
 @media (max-width: 900px) {
-  /* Stack sidebar above main pane - override the 200 px column from the
+  /* Stack sidebar above main pane: override the 200 px column from the
    * 1100 px breakpoint earlier in this stylesheet. */
   .builder-main { grid-template-columns: 1fr !important; }
   .builder-header { padding: 0.5rem 0.8rem; gap: 0.6rem; }
@@ -1610,9 +1953,7 @@ html.welcome-active {
 }
 
 @media (max-width: 720px) {
-  /* Action row wraps to two lines; primary export button stays on the right.
-   * Hide "Vorschau" + "JSON exportieren" - they're secondary actions, the
-   * essentials are New / Load / Export-ZIP. */
+  /* Action row wraps; hide secondary actions to keep New/Load/Export-ZIP. */
   #btnPreview, #btnExportJson, #btnSidebarToggle {
     display: none;
   }
@@ -1620,7 +1961,7 @@ html.welcome-active {
   .builder-brand { justify-content: center; }
   .builder-actions { justify-content: stretch; }
   .builder-actions .btn { flex: 1 1 auto; min-width: 0; text-align: center; }
-  /* Sidebar slides on top of canvas at <720 px - full-width sections. */
+  /* Sidebar slides on top of canvas at <720 px: full-width sections. */
   .builder-main { gap: 0.5rem; padding: 0.5rem; }
   .builder-pane { padding: 0.7rem 0.8rem; }
   /* Welcome page: tighter chapter padding */
@@ -1647,9 +1988,7 @@ html.welcome-active {
   .welcome-block-modal-titles { flex: 1; min-width: 0; }
 }
 
-/* SVG icons inside the icon chips scale to fill their container while
- * keeping a small inner padding. Uses `stroke: currentColor` so the icon
- * follows the chip's color (primary on the cards, white on hover). */
+/* SVG icons in chips: scale to container, stroke follows chip color. */
 .welcome-block-icon  svg { width: 18px; height: 18px; display: block; }
 .welcome-tip-icon    svg { width: 18px; height: 18px; display: block; }
 .welcome-block-modal-icon { padding: 0.45rem; }
@@ -1666,9 +2005,7 @@ html.welcome-active {
 .builder-header .builder-brand { flex: 1; min-width: 0; }
 .builder-header .builder-brand h1 { font-size: 1.02rem; }
 
-/* Compact 32 px icon-only button for the sidebar toggle. The chevron
- * rotates 180 ° when the sidebar is collapsed so it visually flips from
- * "hide" to "show". */
+/* Sidebar toggle: 32 px icon button; chevron flips 180 ° when collapsed. */
 .header-icon-btn {
   appearance: none;
   width: 32px; height: 32px; padding: 0;
@@ -1688,7 +2025,7 @@ html.welcome-active {
 .header-icon-btn svg { transition: transform 200ms cubic-bezier(0.4, 0.2, 0.2, 1); }
 .builder-shell.sidebar-collapsed .header-icon-btn svg { transform: rotate(180deg); }
 
-/* Datei dropdown */
+/* File menu dropdown */
 .header-menu { position: relative; }
 .header-menu-trigger {
   display: inline-flex; align-items: center; gap: 0.35rem;
@@ -1708,9 +2045,7 @@ html.welcome-active {
   display: flex; flex-direction: column;
 }
 .header-menu-popover[hidden] { display: none; }
-/* Section grouping inside the file menu - a tiny uppercase label plus
-   the items belonging to that group. Sections are separated by a 1 px
-   divider rule. */
+/* Section grouping in the file menu: uppercase label + group items. */
 .header-menu-section { display: flex; flex-direction: column; gap: 0.1rem; }
 .header-menu-section-label {
   font-size: 0.66rem;
@@ -1804,7 +2139,7 @@ html.welcome-active {
 /* Subtle separator before primary actions to give them visual weight */
 .builder-actions { gap: 0.45rem; }
 
-/* Mobile: hide hints inside the Datei menu so the popover stays compact. */
+/* Mobile: hide hints inside the file menu so the popover stays compact. */
 @media (max-width: 560px) {
   .header-menu-hint { display: none; }
   .header-menu-item { gap: 0; }

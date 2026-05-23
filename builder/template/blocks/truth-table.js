@@ -43,7 +43,7 @@
         { key:'variableCount', label:'Variablenzahl', type:'number', step:1, min:2, max:3,
           help:'2 Variablen = 4 Zeilen, 3 Variablen = 8 Zeilen.',
           showIf: c => (c.expressionPreset || 'custom') !== 'custom' },
-        // Ausdrücke
+        // Expressions
         { type:'section', label:'Boolesche Ausdrücke', key:'_sec_expr', showIf: isCustom },
         { key:'expressions', label:'Ausdrücke', type:'list', itemLabel:'Ausdruck',
           showIf: isCustom,
@@ -53,7 +53,7 @@
               help:'Operatoren: && (AND), || (OR), ! (NOT), xor (XOR)' },
             { key:'vars', label:'Variablen (kommasepariert)', type:'text', placeholder:'a,b,c', transform:'csv' }
           ]},
-        // Einstellungen & Bewertung
+        // Settings & scoring
         { type:'section', label:'Einstellungen & Bewertung', key:'_sec_score' },
         { key:'randomize', label:'Ausdruck zufällig wählen', type:'boolean' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
@@ -193,7 +193,7 @@
           td.style.cssText = 'padding:0.18rem 0.45rem; border:1px solid #d8e0e6; text-align:center; background:#fff;';
           tr.appendChild(td);
         }
-        const t2 = document.createElement('td'); t2.textContent = '_'; t2.style.cssText = 'padding:0.18rem 0.45rem; border:1px dashed #d4a72a; background:#fff8e6; text-align:center; color:#888;';
+        const t2 = document.createElement('td'); t2.textContent = '?'; t2.style.cssText = 'padding:0.18rem 0.45rem; border:1px solid #d8e0e6; background:#f5f8fa; text-align:center; color:#5d6872; font-weight:600;';
         tr.appendChild(t2); tbl.appendChild(tr);
       }
       wrap.appendChild(tbl);

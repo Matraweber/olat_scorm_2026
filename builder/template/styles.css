@@ -63,10 +63,10 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .text-input:focus { outline: 2px solid rgba(0,59,92,0.18); border-color: var(--primary); }
 .value-row { display: flex; justify-content: space-between; margin-top: 0.45rem; color: var(--muted); }
 .formula-text { font-family: "Courier New", Courier, monospace; color: #0f2d44; line-height: 1.45; }
-/* KaTeX in der Frage-Box braucht mehr Vertikal-Raum, damit Brueche nicht
- * mit umgebendem Text kollidieren. Schriftgroesse + Strichdicke bleiben
- * bei KaTeX-Default, damit der Bruchstrich richtig an die Breite der
- * Zaehler/Nenner gebunden ist. */
+/* KaTeX inside the question box needs more vertical room so fractions
+ * don't collide with surrounding text. Font size + bar thickness stay
+ * at KaTeX defaults so the fraction bar binds correctly to the width
+ * of numerator/denominator. */
 .formula-text { line-height: 2.2; font-size: 1.05rem; }
 .formula-text .katex { font-size: 1.25em; }
 .formula-text .katex-display { margin: 0.4em 0; }
@@ -151,7 +151,7 @@ table.truth-table th { background: var(--panel-soft); color: var(--primary); }
 .match-col-right.over { outline: 2px dashed var(--primary); border-radius: 12px; }
 .match-cell-left .match-slot[data-empty="false"] { cursor: grab; }
 
-/* Categorize block - n-to-1 drag/drop (left pool -> right zones). */
+/* Categorize block: n-to-1 drag/drop (left pool -> right zones). */
 .cat-wrap { margin-top: 0.7rem; display: grid; grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.8fr); gap: 0.9rem; align-items: start; }
 .cat-pool { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.9rem; background: var(--panel-soft); align-self: stretch; }
 .cat-pool-label { font-weight: 700; color: var(--primary); font-size: 0.8rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -194,7 +194,7 @@ table.truth-table th { background: var(--panel-soft); color: var(--primary); }
 .cloze-wrap input { background: #fffaf0; border-color: #d4a72a; }
 .cloze-wrap input:focus { background: #fff; }
 
-/* Composition block - runtime grading visuals */
+/* Composition block: runtime grading visuals */
 /* Correct / wrong feedback on shapes (click + hotspot modes) */
 .comp-graded-correct { stroke: #2e8540 !important; fill: rgba(46,133,64,0.18) !important; }
 .comp-graded-wrong   { stroke: #b42318 !important; fill: rgba(180,35,24,0.15) !important; }

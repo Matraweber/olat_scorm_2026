@@ -32,6 +32,30 @@
       const w = [];
       if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push('Frage-Vorlage fehlt.');
       if(!cfg.formula || !String(cfg.formula).trim()) w.push('Lösungsformel fehlt.');
+      // Monte Carlo check: catches 0 under a fraction bar, sqrt(-x), log(0) before export.
+      if(cfg.formula && (cfg.variables || []).length > 0 && window.BlockUtils){
+        const SAMPLES = 200;
+        let invalid = 0;
+        for(let i = 0; i < SAMPLES; i++){
+          const vars = {};
+          (cfg.variables || []).forEach(v => {
+            const min = Number(v.min), max = Number(v.max);
+            if(!isFinite(min) || !isFinite(max)) return;
+            let val = min + Math.random() * (max - min);
+            if(v.integer) val = Math.round(val);
+            else val = Math.round(val * 100) / 100;
+            vars[v.name] = val;
+          });
+          const r = window.BlockUtils.safeMathExpr(cfg.formula, vars);
+          if(typeof r !== 'number' || !Number.isFinite(r)) invalid++;
+        }
+        const ratio = invalid / SAMPLES;
+        if(ratio === 1){
+          w.push('Formel ergibt mit den aktuellen Variablenbereichen IMMER ein ungültiges Ergebnis (z. B. Division durch 0, Wurzel aus Negativem). Formel oder Bereiche anpassen.');
+        } else if(ratio >= 0.2){
+          w.push('Formel scheitert in ' + Math.round(ratio * 100) + '% der Stichproben (z. B. Division durch 0). Variablenbereich enger fassen oder Formel anpassen.');
+        }
+      }
       return w;
     },
     previewConfig(){
@@ -52,27 +76,24 @@
         { key:'preset', label:'Vorlage', type:'select', options: PRESET_OPTIONS,
           help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        // Frage
+        // Question
         { type:'section', label:'Frage', key:'_sec_q' },
         { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {name})', type:'math-textarea', rows:2, showIf: isCustom,
           help:'Beispiel: „Berechnen Sie {a} + {b}." Variablen werden beim Start zufällig belegt. Die Lösungs-Formel wird automatisch abgeleitet.',
           onChange: (val, cfg, set) => {
-            // Auto-derive the formula whenever the question changes, unless
-            // the user has explicitly customised it (signaled by storing the
-            // last auto-derived value in cfg._derivedFormula).
+            // Auto-derive the formula unless the user has edited it.
             const derived = deriveFormula(val);
             const previous = cfg._derivedFormula || '';
             const userTouched = cfg.formula && cfg.formula !== previous;
             if(!userTouched){
               set('formula', derived);
               set('_derivedFormula', derived);
-              // Push the new value into the open formula input without
-              // re-rendering the entire config pane (preserves focus).
+              // Push value into the open formula input without re-render (keeps focus).
               const fld = document.querySelector('[data-formula-field-key="formula"]');
               if(fld) fld.dispatchEvent(new CustomEvent('formula-field-set', { detail: { value: derived } }));
             }
           } },
-        // Variablen
+        // Variables
         { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
         { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
           showIf: isCustom,
@@ -85,25 +106,25 @@
             { key:'name',    label:'Name',           type:'text',    placeholder:'z. B. a' },
             { key:'min',     label:'von',             type:'number',  step:'any',
               onChange:(val, item, set) => {
-                // Untere Grenze ueber obere -> obere mit-anheben.
+                // Lower bound exceeds upper: raise upper alongside.
                 if(val != null && item.max != null && val > item.max) set('max', val);
               }},
             { key:'max',     label:'bis',             type:'number',  step:'any',
               onChange:(val, item, set) => {
-                // Obere unter untere -> untere mit-absenken.
+                // Upper bound below lower: lower the lower bound alongside.
                 if(val != null && item.min != null && val < item.min) set('min', val);
               }},
             { key:'integer', label:'Nur Ganzzahlen',  type:'boolean' }
           ]},
-        // Lösung
+        // Solution
         { type:'section', label:'Lösung', key:'_sec_formula' },
         { key:'formula', label:'Lösungs-Formel', type:'formula-text', placeholder:'sqrt(a^2 + b^2)', showIf: isCustom,
           help:'Wird automatisch aus der Frage abgeleitet. Bei Bedarf manuell überschreiben.' },
         { key:'tolerance', label:'Toleranz  (±)', type:'number', step:'any',
           help:'Abweichung, die noch als korrekt gilt. 0 = exakt.' },
         { key:'unit', label:'Antwort-Einheit (optional)', type:'text', placeholder:'z. B. m/s oder kg',
-          help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehoert in den Fragetext.' },
-        // Bewertung
+          help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehört in den Fragetext.' },
+        // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];
@@ -136,12 +157,9 @@
         function formatValue(v){
           return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
         }
-        // Within $...$ blocks (KaTeX) the braces around {a} are LaTeX
-        // argument groups - keep them so constructs like \frac{a}{b} stay
-        // valid after substitution. Outside math, drop the braces.
+        // Inside $...$ (KaTeX), keep {} as argument groups; outside, strip them.
         return String(tpl || '').replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName) => {
           if(match.startsWith('$')){
-            // Math context: replace {name} but keep wrapping braces.
             return match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
               if(name in vars) return '{' + formatValue(vars[name]) + '}';
               return m;
@@ -154,14 +172,33 @@
       function sameInstance(a, b){
         return !!a && !!b && JSON.stringify(a.vars || {}) === JSON.stringify(b.vars || {}) && a.expected === b.expected;
       }
+      // Valid = finite real number (no NaN/Infinity).
+      function isValidExpected(e){
+        return typeof e === 'number' && Number.isFinite(e);
+      }
       function chooseNew(showMsg){
-        let vars = genVars();
-        let expected = u.safeMathExpr(activeConfig.formula || '0', vars);
-        let next = { vars, expected };
-        for(let i = 0; current && sameInstance(next, current) && i < 30; i++){
+        const MAX_TRIES = 200;
+        let vars = null, expected = null;
+        // First find any combination that evaluates to a finite number.
+        let attempts = 0;
+        while(attempts < MAX_TRIES){
           vars = genVars();
           expected = u.safeMathExpr(activeConfig.formula || '0', vars);
-          next = { vars, expected };
+          if(isValidExpected(expected)) break;
+          attempts++;
+        }
+        if(!isValidExpected(expected)){
+          // Formula always fails (e.g. 1/0). Feedback and bail out.
+          fb.bad('Aufgabe nicht generierbar: Formel führt mit den aktuellen Variablenbereichen immer zu einem ungültigen Ergebnis (z. B. Division durch 0). Variablenbereiche oder Formel anpassen.');
+          return;
+        }
+        // Prefer a different instance than before, but never sacrifice validity.
+        let next = { vars, expected };
+        for(let i = 0; current && sameInstance(next, current) && i < 30; i++){
+          const tryVars = genVars();
+          const tryExp = u.safeMathExpr(activeConfig.formula || '0', tryVars);
+          if(!isValidExpected(tryExp)) continue;
+          vars = tryVars; expected = tryExp; next = { vars, expected };
         }
         current = next;
         inp.value = '';
@@ -174,7 +211,7 @@
         const got = u.parseNum(inp.value);
         if(got == null){ fb.bad('Bitte eine gültige Zahl oder Bruch (z. B. 3/4) eingeben.'); return; }
         if(u.nearlyEqual(got, current.expected, Number(activeConfig.tolerance) || 0.01)){
-          fb.ok('Korrekt. (Loesung: ' + u.formatSolution(current.expected) + (activeConfig.unit ? ' ' + activeConfig.unit : '') + ')');
+          fb.ok('Korrekt. (Lösung: ' + u.formatSolution(current.expected) + (activeConfig.unit ? ' ' + activeConfig.unit : '') + ')');
           api.reportScore(activeConfig.maxPoints || 1);
         } else {
           fb.bad('Nicht korrekt.');
@@ -194,7 +231,7 @@
       const sample = { a: 7, b: 3, p: 20, g: 150, x: 4, y: 3 };
       const questionText = (activeConfig.questionTemplate || '(Aufgabe)')
         .replace(/\{(\w+)\}/g, (_, name) => (sample[name] != null ? sample[name] : '?'));
-      // Evaluate with the same sample so the Lösung-Hint shows a number.
+      // Evaluate with the same sample so the solution hint shows a number.
       let solution = null;
       if(activeConfig.formula){
         try {
@@ -250,27 +287,18 @@
     }
   });
 
-  // Best-effort: turn "Berechnen Sie {a} + {b}." into "a + b". Walks the
-  // template, drops natural-language tokens, normalizes operator symbols.
-  // Try to extract a JavaScript-evaluable formula from a question template.
-  // Strategy: prefer math inside $...$ delimiters (KaTeX), then convert LaTeX
-  // constructs to ASCII, then strip natural-language fluff.
+  // Question template -> JS formula. Prefers $...$, translates LaTeX constructs to ASCII.
   function deriveFormula(template){
     if(!template) return '';
     let s = String(template);
-    // 1. Prefer the contents inside $...$ if present (KaTeX block).
+    // Prefer the contents between $...$.
     const dollarMatch = s.match(/\$([^$]+)\$/);
     if(dollarMatch) s = dollarMatch[1];
-    // 2. Convert LaTeX constructs to ASCII expressions BEFORE the brace strip.
-    //    \frac{X}{Y} -> (X)/(Y)
-    //    \sqrt{X}    -> sqrt(X)
-    //    \cdot       -> *
-    //    {X}^{Y}     -> (X)^(Y)
+    // LaTeX -> ASCII: \frac{X}{Y}->(X)/(Y), \sqrt{X}->sqrt(X), \cdot->*, {X}^{Y}->(X)^(Y).
     function unwrapBraces(str){
-      // {a+b}^{2} pattern: braces denote LaTeX argument groups (single token).
       return str.replace(/\{([^{}]*)\}/g, '($1)');
     }
-    // First handle \frac, \sqrt etc. with their {...}-args.
+    // First handle \frac, \sqrt etc. with their {...} args.
     s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)');
     s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
     s = s.replace(/\\cdot/g, '*');

@@ -58,7 +58,7 @@
             { key:'xMax', label:'x bis', type:'number', step:'any' },
             { key:'yMin', label:'y von', type:'number', step:'any' },
             { key:'yMax', label:'y bis', type:'number', step:'any' },
-            // Abfrage
+            // Query options
             { type:'section', label:'Abfrage', key:'_sec_query' },
             { key:'questionMode', label:'Was wird gefragt?', type:'select',
               options: QUESTION_MODE_OPTIONS, default:'value-at-x', fullWidth:true },

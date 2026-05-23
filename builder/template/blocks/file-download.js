@@ -40,7 +40,7 @@
         _demo: true,
         filename: 'skript-woche-3.pdf',
         title: 'Vorlesungs-Skript Woche 3',
-        description: 'PDF, 12 Seiten · Kapitel 4 (Lineare Algebra)'
+        description: 'PDF, 12 Seiten, Kapitel 4 (Lineare Algebra)'
       };
     },
     builderSchema(){

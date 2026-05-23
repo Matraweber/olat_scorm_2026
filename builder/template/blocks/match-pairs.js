@@ -30,7 +30,7 @@
         if(cats.length < 2) w.push('Mindestens zwei Kategorien erforderlich.');
         if(items.length < 2) w.push('Mindestens zwei Begriffe erforderlich.');
         const ids = new Set(cats.map(c => c.id));
-        if(items.some(i => !ids.has(i.categoryId))) w.push('Mindestens ein Begriff hat keine gueltige Kategorie.');
+        if(items.some(i => !ids.has(i.categoryId))) w.push('Mindestens ein Begriff hat keine gültige Kategorie.');
         return w;
       }
       if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) w.push('Mindestens zwei Paare erforderlich.');
@@ -72,11 +72,11 @@
           {value:'categorize', label:'Kategorisierung (mehrere Begriffe pro Kategorie)'}
         ]},
 
-        // Frage
+        // Question
         { type:'section', label:'Frage', key:'_sec_q', showIf: isCustom },
         { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom },
 
-        // Paare (1:1-Modus)
+        // Pairs (1:1 mode)
         { type:'section', label:'Paare  (links ↔ rechts)', key:'_sec_pairs', showIf: isPairs },
         { key:'pairs', label:'Paare', type:'list', itemLabel:'Paar',
           showIf: isPairs,
@@ -94,14 +94,14 @@
             { key:'rightImg', label:'Bild',  type:'image', fullWidth:true }
           ]},
 
-        // Kategorisierung (n:1-Modus)
+        // Categorization (n:1 mode)
         { type:'section', label:'Kategorien', key:'_sec_cats', showIf: isCat },
         { key:'categories', label:'Kategorien', type:'list', itemLabel:'Kategorie',
           showIf: isCat,
           itemSummary: item => (item.label || '...'),
           itemSchema:[
             { key:'id',    label:'Interne ID', type:'text', placeholder:'c1' },
-            { key:'label', label:'Anzeige-Name', type:'text', placeholder:'z. B. Saeugetiere' },
+            { key:'label', label:'Anzeige-Name', type:'text', placeholder:'z. B. Säugetiere' },
             { key:'image', label:'Bild (optional)', type:'image', fullWidth:true }
           ]},
         { type:'section', label:'Begriffe', key:'_sec_items', showIf: isCat },
@@ -111,15 +111,15 @@
           itemSchema:[
             { key:'text',       label:'Text', type:'text', placeholder:'z. B. Hund' },
             { key:'image',      label:'Bild (optional)', type:'image', fullWidth:true },
-            { key:'categoryId', label:'Zugehoerige Kategorie-ID', type:'text', placeholder:'c1' }
+            { key:'categoryId', label:'Zugehörige Kategorie-ID', type:'text', placeholder:'c1' }
           ]},
 
-        // Einstellungen
+        // Settings
         { type:'section', label:'Einstellungen', key:'_sec_opts' },
         { key:'imgHeight', label:'Bild-Höhe in px', type:'number', step:10, min:20, max:400,
           help:'Maximale Höhe für alle Bilder.' },
         { key:'shuffle',   label:'Reihenfolge mischen', type:'boolean' },
-        // Bewertung
+        // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 }
       ];
@@ -415,8 +415,8 @@
         mode: 'categorize',
         question: 'Ordnen Sie die Tiere ihren Klassen zu.',
         categories: [
-          { id:'mammals', label:'Saeugetiere' },
-          { id:'birds',   label:'Voegel' },
+          { id:'mammals', label:'Säugetiere' },
+          { id:'birds',   label:'Vögel' },
           { id:'fish',    label:'Fische' }
         ],
         items: [
@@ -450,7 +450,7 @@
     }[config.preset];
     return pairs ? Object.assign(base, pairs) : config;
   }
-  // Mount fuer Kategorisierungs-Modus (n-zu-1 Drag&Drop).
+  // Mount for categorization mode (n-to-1 drag&drop).
   function mountCategorize(host, cfg, api){
     const imgH = Number(cfg.imgHeight) || 70;
     const card = document.createElement('section');

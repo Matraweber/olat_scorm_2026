@@ -44,7 +44,7 @@
           {value:'example-regex',   label:'Beispiel: Regex, Muster (3-stellige Zahl)'}
         ], help:'„Manuell" ist für eigene Fragen. Beispiele zeigen alle Auswertungsarten.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        // Frage
+        // Question
         { type:'section', label:'Frage', key:'_sec_q', showIf: isCustom },
         { key:'question', label:'Fragetext', type:'math-textarea', rows:2, showIf: isCustom },
         // Antworten
@@ -71,7 +71,7 @@
               {value:'regex',  label:'Regulärer Ausdruck'}
             ]}
           ]},
-        // Bewertung
+        // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
         { key:'partialKeywords', label:'Teilpunkte aktivieren', type:'boolean',
@@ -157,7 +157,7 @@
       }
       const inp = document.createElement('div');
       inp.style.cssText = 'border:1px solid #c6d1d8; border-radius:6px; padding:0.4rem 0.6rem; background:#f5f8fa; color:#888;';
-      inp.textContent = '⏤ Antwort eingeben';
+      inp.textContent = 'Antwort eingeben…';
       wrap.appendChild(inp);
     }
   });

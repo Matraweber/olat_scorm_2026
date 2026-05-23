@@ -38,7 +38,7 @@
     builderSchema(){
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Komplexe Zahlen' },
-        // Aufgaben-Pool
+        // Question pool
         { key:'pool', label:'Aufgaben-Pool  (z = a + bi)', type:'list', itemLabel:'Punkt',
           itemSummary: item => {
             const a = item.a ?? 0, b = item.b ?? 0;
@@ -50,7 +50,7 @@
             { key:'b', label:'Im(z)  =  b', type:'number', step:'any' }
           ]},
         { key:'randomize', label:'Zufällig wählen', type:'boolean' },
-        // Abfrage
+        // Query options
         { type:'section', label:'Abfrage', key:'_sec_query' },
         { key:'questionMode', label:'Was wird gefragt?', type:'select', options:[
           {value:'all',       label:'Kartesisch und polar  (Re, Im, |z|, φ)'},
@@ -58,7 +58,7 @@
           {value:'polar',     label:'Nur polar  (|z| und φ)'},
           {value:'conjugate', label:'Konjugierte Zahl  z̄'}
         ]},
-        // Felder & Toleranzen
+        // Fields & tolerances
         { type:'section', label:'Felder & Toleranzen', key:'_sec_fields' },
         { key:'fields', label:'Felder individuell ein-/ausblenden',
           help:'Nur bei „Kartesisch und polar" relevant. Alle anderen Modi legen die Felder fest.',
@@ -74,7 +74,7 @@
           { key:'abs',  label:'|z|',     type:'number', step:'any' },
           { key:'arg',  label:'φ (rad)', type:'number', step:'any' }
         ]},
-        // Darstellung & Bewertung
+        // Display & scoring
         { type:'section', label:'Darstellung & Bewertung', key:'_sec_score' },
         { key:'plotRange', label:'Plot-Bereich (±)', type:'number', step:'any' },
         { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 }

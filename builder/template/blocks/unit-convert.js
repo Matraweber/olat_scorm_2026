@@ -2,9 +2,9 @@
   'use strict';
 
   // Einheitenregister
-  // Umrechnung: Basiswert = Wert × factor + (off || 0)
-  //             Ergebnis  = (Basiswert − (off || 0)) / factor
-  // Temperatur: Basis = Kelvin; off kompensiert den Nullpunkts-Versatz.
+  // Conversion: baseValue = value * factor + (off || 0)
+  //             result    = (baseValue - (off || 0)) / factor
+  // Temperature: base unit is Kelvin; `off` compensates for the zero-point offset.
   const UREG = {
     'nm':  { label:'nm',           cat:'Länge',            factor:1e-9 },
     'μm':  { label:'μm',           cat:'Länge',            factor:1e-6 },
@@ -144,7 +144,7 @@
       .replace(/\{toUnit\}/g,   toUnit || '?');
   }
 
-  // Beispiel-Vorlagen
+  // Built-in templates
   const PRESET_OPTIONS = [
     {value:'custom',     label:'Manuell (leer)'},
     {value:'ex-speed',   label:'Beispiel: Geschwindigkeit  (km/h, mph, m/s, kn)'},

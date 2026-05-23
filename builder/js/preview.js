@@ -1,6 +1,5 @@
-// preview.js: Run the real block mount() inside an isolated Shadow DOM so
-// the builder canvas matches the SCORM preview exactly. Falls back to
-// def.preview() or a text summary if mount() isn't usable.
+// preview.js: Mount each block in a shadow DOM so the canvas matches the SCORM preview.
+// Falls back to def.preview() or a text summary when mount() isn't usable.
 import { el } from './util.js';
 import { state } from './state.js';
 import { blockSummary } from './canvas.js';
@@ -47,9 +46,7 @@ function makeStubApi(block){
   };
 }
 
-// API for blocks that opt into in-canvas editing via builderMount(). They
-// mutate block.config directly and call requestConfigRefresh to update the
-// right-side config pane.
+// API for builderMount(): blocks mutate config directly and call requestConfigRefresh.
 function makeBuilderApi(block, host){
   return {
     utils: window.BlockUtils,
@@ -67,8 +64,7 @@ export function renderBlockPreview(host, block){
   host.innerHTML = '';
   const def = window.Blocks.get(block.type);
 
-  // builderMount() = interactive in-canvas editor, rendered in regular DOM
-  // so drag/click work without pointer-events tricks.
+  // builderMount(): interactive in-canvas editor in regular DOM (no shadow).
   if(def && typeof def.builderMount === 'function' && window.BlockUtils){
     try {
       def.builderMount(host, block, makeBuilderApi(block, host));
@@ -78,7 +74,7 @@ export function renderBlockPreview(host, block){
     }
   }
 
-  // Standard path: real mount() inside an isolated shadow DOM.
+  // Default: real mount() inside an isolated shadow DOM.
   if(def && typeof def.mount === 'function' && window.BlockUtils){
     try {
       const shadowHost = document.createElement('div');
@@ -105,7 +101,7 @@ export function renderBlockPreview(host, block){
       mountHost.className = 'canvas-mount-wrap';
       shadow.appendChild(mountHost);
 
-      // Stabilise random/shuffle so the canvas stays still while editing.
+      // Disable shuffle/randomize so the canvas stays still while editing.
       const stableConfig = Object.assign({}, block.config || {}, { shuffle: false, randomize: false });
       def.mount(mountHost, stableConfig, makeStubApi(block));
       if(window.BlockUtils && typeof window.BlockUtils.renderMath === 'function'){

@@ -1,5 +1,4 @@
-// util.js: DOM helpers, string/file utilities, toast.
-// No imports from other app modules.
+// util.js: DOM helpers, string/file utilities, toast. No app-module imports.
 
 // el(tag, { className, id, text, html, attrs, style, on, children })
 export function el(tag, opts){
@@ -43,7 +42,7 @@ export function cssEscape(s){
   return String(s).replace(/([!"#$%&'()*+,./:;<=>?@\[\\\]^`{|}~])/g, '\\$1');
 }
 
-// Cache-bust template fetches so preview iframes and ZIPs use fresh files.
+// Cache-bust so preview iframes and ZIPs use fresh template files.
 export function withBust(url){
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
 }
@@ -73,9 +72,7 @@ export function toast(msg, type){
   _toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-// Styled replacement for window.confirm(). Returns Promise<boolean>.
-// Options: title, message, confirmLabel, cancelLabel, danger.
-// Falls back to native confirm() if document.body is unavailable.
+// Styled confirm() replacement. Returns Promise<boolean>; falls back to native confirm().
 export function confirmDialog(opts){
   if(typeof document === 'undefined' || !document.body){
     return Promise.resolve(window.confirm(opts && opts.message ? opts.message : 'OK?'));
@@ -128,12 +125,7 @@ export function confirmDialog(opts){
   });
 }
 
-// Multi-field input dialog. Replaces stacked prompt() calls.
-// opts: {
-//   title, message?, fields: [{key, label, placeholder?, default?, type?, rows?}],
-//   confirmLabel = 'Speichern', cancelLabel = 'Abbrechen'
-// }
-// Returns Promise<{<key>: value, ...} | null>. Null = cancel.
+// Multi-field input dialog. Returns Promise<{key:value} | null>.
 export function formDialog(opts){
   const {
     title = '',
@@ -206,7 +198,7 @@ export function formDialog(opts){
     }
     function onKey(e){
       if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); cleanup(null); }
-      // Enter submits only when not in a textarea.
+      // Enter submits, unless caret is in a textarea.
       else if(e.key === 'Enter' && e.target.tagName !== 'TEXTAREA'){
         e.preventDefault();
         cleanup(collect());

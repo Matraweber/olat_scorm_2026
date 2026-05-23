@@ -84,8 +84,7 @@ async function gatherTemplateFiles(usedBlocks){
   return files;
 }
 
-// MIME -> extension for extracting data-URLs into separate binaries.
-// Unknown types fall back to the subtype after the slash.
+// MIME -> extension for extracting data-URLs into binaries. Unknown types use the subtype.
 const MIME_EXT = {
   'image/jpeg': 'jpg',
   'image/jpg':  'jpg',
@@ -121,10 +120,7 @@ function base64ToBytes(b64){
   return out;
 }
 
-// Replace base64 data-URLs in block configs with `media/{blockId}_{key}.{ext}`
-// paths, returning the rewritten tasks plus the extracted binaries. base64
-// in JSON inflates the payload by ~33% and gets bundled twice (tasks.json +
-// inline in index.html), so we split media into real files.
+// Extract base64 data-URLs into media/ files. ~33% smaller than inlining twice.
 function extractMediaFromTasks(tasks){
   const mediaFiles = new Map();
   function maybeExtract(value, blockId, key){
@@ -133,7 +129,7 @@ function extractMediaFromTasks(tasks){
     if(!m) return value;
     const mime = m[1].trim();
     const body = m[2];
-    // Plain (url-encoded) data-URLs are typically tiny SVGs - leave them.
+    // Plain url-encoded data-URLs are usually tiny SVGs; leave them inline.
     const isBase64 = /;base64,/.test(value);
     if(!isBase64) return value;
     const ext = extFromMime(mime);
@@ -289,11 +285,14 @@ export async function downloadZip(){
       const proceed = await confirmExportWithIssues(report);
       if(!proceed) return;
     }
+
+    const filename = sanitizeFilename(state.course.courseTitle || 'scorm') + '.zip';
+    // Open the save picker before the slow ZIP work so user-activation is still fresh.
+    const fileHandle = await pickSaveTarget(filename);
+
     toast('Paket wird erzeugt … 0 %');
     const zip = await buildZip();
     if(!zip) return;
-    // Surface JSZip's percent in the toast (each toast call resets the
-    // 3 s auto-dismiss). Repaint only when the integer percent changes.
     let lastPercent = -1;
     const blob = await zip.generateAsync({ type:'blob' }, (metadata) => {
       const p = metadata && typeof metadata.percent === 'number'
@@ -302,21 +301,54 @@ export async function downloadZip(){
       lastPercent = p;
       toast('Paket wird erzeugt … ' + p + ' %');
     });
-    const filename = sanitizeFilename(state.course.courseTitle || 'scorm') + '.zip';
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    toast('Download bereit: ' + filename);
+
+    if(fileHandle){
+      const stream = await fileHandle.createWritable();
+      await stream.write(blob);
+      await stream.close();
+      toast('Gespeichert: ' + fileHandle.name);
+      // Refresh folder browser so the new ZIP shows up immediately.
+      const folderMod = await import('./folder-browser.js').catch(() => null);
+      if(folderMod && typeof folderMod.refresh === 'function'){
+        folderMod.refresh().catch(() => {});
+      }
+    } else {
+      // Safari/Firefox lack FS Access API: anchor download + a hint for Safari's setting.
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if(isSafari){
+        toast('Gespeichert in Downloads. Tipp: Safari > Einstellungen > Allgemein > „Bei jedem Download nachfragen" für Speicherort-Auswahl.');
+      } else {
+        toast('Download bereit: ' + filename);
+      }
+    }
   } catch(err){
+    if(err && err.name === 'AbortError') return; // user cancelled the picker
     console.error(err);
     toast('Fehler: ' + err.message, 'error');
   }
 }
 
-// Inverse of extractMediaFromTasks: re-embed `media/...` paths as data-URLs
-// so the in-memory state stays uniformly data-URL based on import.
+// FS Access "Save as…" dialog. Returns null on unsupported browsers; throws AbortError on cancel.
+async function pickSaveTarget(filename){
+  if(typeof window.showSaveFilePicker !== 'function') return null;
+  const opts = {
+    suggestedName: filename,
+    types: [{ description: 'SCORM-Paket (ZIP)', accept: { 'application/zip': ['.zip'] } }]
+  };
+  // Open the dialog in the user's working folder when one is loaded.
+  const folderMod = await import('./folder-browser.js').catch(() => null);
+  const rootHandle = folderMod && typeof folderMod.getRootHandle === 'function'
+    ? folderMod.getRootHandle() : null;
+  if(rootHandle) opts.startIn = rootHandle;
+  return await window.showSaveFilePicker(opts);
+}
+
+// Inverse of extractMediaFromTasks: rebuild data-URLs from media/ paths on import.
 async function reembedMediaInTasks(tasks, zip){
   const EXT_MIME = {
     jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
@@ -366,7 +398,7 @@ async function reembedMediaInTasks(tasks, zip){
 
 export async function loadZipFile(file){
   if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return; }
-  // Parsing a multi-MB ZIP takes a moment, signal that the click registered.
+  // Parsing a multi-MB ZIP takes a moment; confirm the click registered.
   toast('Paket wird gelesen …');
   try {
     const buf = await file.arrayBuffer();
@@ -457,7 +489,7 @@ export async function showPreview(){
     const themeJson = JSON.stringify(previewTheme);
     let bodyInner = extractBodyInner(tmpl['index.html']);
     bodyInner = bodyInner.replace(/<script[^>]+src=[^>]+><\/script>/gi, '').replace(/<!--\s*BLOCK_SCRIPTS\s*-->/g, '');
-    // srcdoc iframes need <base> for relative URLs (e.g. local KaTeX).
+    // srcdoc iframes need <base> to resolve relative URLs (local KaTeX, etc.).
     const baseHref = window.location.href.replace(/[^/]*$/, '');
     const html = [
       '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Vorschau</title>',
@@ -491,7 +523,7 @@ export function applyJsonEditor(){
     if(parsed.theme) state.theme = parsed.theme;
     const s = document.getElementById('jsonStatus'); s.textContent = 'Übernommen.'; s.className = 'json-status ok';
     scheduleAutosave();
-    // render() would replace the textarea, so only refresh the task list.
+    // Don't call render() - it would replace the textarea. Just refresh the task list.
     import('./panes.js').then(m => m.renderTaskList());
   } catch(err){
     const s = document.getElementById('jsonStatus'); s.textContent = 'Fehler: ' + err.message; s.className = 'json-status error';

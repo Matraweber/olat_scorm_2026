@@ -34,7 +34,7 @@
           {value:'example-algo',    label:'Beispiel: Algorithmus, Merge-Sort-Phasen'}
         ], help:'Items werden in der eingegebenen Reihenfolge als korrekt gewertet. Beim Start zufällig gemischt.' },
         { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        // Frage & Items
+        // Question & items
         { type:'section', label:'Frage & Items', key:'_sec_q', showIf: isCustom },
         { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom },
         { key:'items', label:'Items', type:'list', itemLabel:'Item',
@@ -42,7 +42,7 @@
           help:'Items in der richtigen Reihenfolge eingeben. Beim Start werden sie zufällig gemischt.',
           itemSummary: item => (item.value || '…').slice(0, 70),
           itemSchema:[ { key:'value', label:'Text', type:'text', fullWidth:true } ] },
-        // Bewertung
+        // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
       ];

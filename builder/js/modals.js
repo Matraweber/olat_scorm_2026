@@ -58,7 +58,7 @@ function makeTplRow(tpl, isUser){
     e.stopPropagation();
     pushHistory();
     const newTask = instantiateTemplate(tpl);
-    // Flag for the post-render autofit pass on the canvas.
+    // Flag for the post-render autofit pass.
     const flag = (blocks) => (blocks || []).forEach(b => { b._needsAutofit = true; });
     if(newTask.tabs && newTask.tabs.length) newTask.tabs.forEach(t => flag(t.blocks));
     else flag(newTask.blocks);
@@ -129,14 +129,11 @@ export function openSaveTemplateModal(task){
   m.classList.remove('hidden');
 }
 
-// Block-type modal.
-// onPick receives either a block-type id (string) for built-ins, or a
-// block-template object for user-saved Vorlagen.
+// Block-type modal. onPick gets a block-type id (string) or a saved-template object.
 export function openBlockTypeModal(onPick){
   const nav    = document.getElementById('blockCatNav');
   const list   = document.getElementById('blockTypeList');
-  // `search` is reassigned after a cloneNode swap below to drop stale
-  // listeners. Closures must read the live binding.
+  // `search` is reassigned via cloneNode below to drop stale listeners.
   let   search = document.getElementById('blockPickerSearch');
   nav.innerHTML  = '';
   list.innerHTML = '';
@@ -156,8 +153,7 @@ export function openBlockTypeModal(onPick){
     (byCat[cat] = byCat[cat] || []).push(def);
   });
 
-  // User-saved Block-Vorlagen: synthesize a "def" with isTemplate=true.
-  // renderRow checks the flag and routes onPick to the tpl object.
+  // User block-templates: synthesize a def with isTemplate=true; renderRow routes onPick.
   const userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
   if(userBlockTemplates.length > 0){
     byCat['Eigene Vorlagen'] = userBlockTemplates.map(tpl => {
@@ -174,8 +170,7 @@ export function openBlockTypeModal(onPick){
     });
   }
 
-  // Canonical category order, stable regardless of block-file load order.
-  // Unknown categories sort alphabetically at the end.
+  // Stable category order; unknown categories sort alphabetically at the end.
   const CAT_ORDER = ['Medien & Inhalt', 'Frage', 'MINT', 'Visualisierung', 'Eigene Vorlagen'];
   const cats = Object.keys(byCat).sort((a, b) => {
     const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
@@ -248,8 +243,7 @@ export function openBlockTypeModal(onPick){
     (byCat[cat] || []).forEach(def => list.appendChild(renderRow(def)));
   }
 
-  // Live search across built-ins and user templates. Empty query restores
-  // the category view.
+  // Live search; empty query restores the category view.
   function applySearch(){
     if(!search) return;
     const q = search.value.trim().toLowerCase();
@@ -292,7 +286,7 @@ export function openBlockTypeModal(onPick){
   });
 
   if(search){
-    // Replace the input to drop stale listeners from a previous modal open.
+    // Replace the input to drop stale listeners from a prior open.
     const fresh = search.cloneNode(true);
     search.replaceWith(fresh);
     search = fresh;

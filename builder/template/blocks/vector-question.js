@@ -31,7 +31,7 @@
             { key:'y', label:'y-Komponente', type:'number', step:'any' }
           ]},
         { key:'randomize', label:'Vektor zufällig wählen', type:'boolean' },
-        // Abfrage
+        // Query options
         { type:'section', label:'Abfrage', key:'_sec_query' },
         { key:'questionMode', label:'Was wird gefragt?', type:'select', options:[
           {value:'all',         label:'Komponenten, Betrag und Winkel'},
@@ -59,7 +59,7 @@
           { key:'mag',   label:'|v|',    type:'number', step:'any' },
           { key:'angle', label:'Winkel', type:'number', step:'any' }
         ]},
-        // Darstellung & Bewertung
+        // Display & scoring
         { type:'section', label:'Darstellung & Bewertung', key:'_sec_score' },
         { key:'plotRange', label:'Plot-Bereich (±)', type:'number', step:'any' },
         { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 }

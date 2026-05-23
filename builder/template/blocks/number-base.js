@@ -38,7 +38,7 @@
       return [
         { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Zahlensysteme' },
         { key:'directionPreset', label:'Umrechnungs-Preset', type:'select', options: presetOpts },
-        // Richtungen (nur bei „Eigene Richtungen")
+        // Directions (only when "Custom directions" is selected)
         { type:'section', label:'Erlaubte Umrechnungs-Richtungen', key:'_sec_dir',
           showIf: c => (c.directionPreset || 'standard') === 'custom' },
         { key:'directions', label:'Richtungen', type:'list', itemLabel:'Richtung',
@@ -48,7 +48,7 @@
             { key:'from', label:'Von',  type:'select', options: baseOpts },
             { key:'to',   label:'Nach', type:'select', options: baseOpts }
           ]},
-        // Einstellungen & Bewertung
+        // Settings & scoring
         { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
         { key:'valueRange', label:'Wertebereich (dezimal)', type:'group', schema:[
           { key:'min', label:'von', type:'number', step:1 },

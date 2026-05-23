@@ -1,14 +1,11 @@
-// form.js: Schema-driven form renderer. renderField(spec, getObj, setObj)
-// builds one field. Types: group, list, text, textarea, number, boolean,
-// select, color, image, math-textarea, formula-text, zone-editor.
+// form.js: Schema-driven form renderer. renderField(spec, getObj, setObj) → one field.
+// Types: group, list, text, textarea, number, boolean, select, color, image, math-textarea,
+// formula-text, zone-editor.
 import { el } from './util.js';
 import { MATH_CATS, FORMULA_FN_BTNS } from './math-toolbar-data.js';
 
-// Upload limits, shared by image/audio/video/file fields.
-// WARN: autosave (localStorage ~5-10 MB) will likely fail above this, so a
-// reload loses unsaved edits. The final SCORM-ZIP still ships the file
-// because media extraction writes it as a separate binary.
-// SIZE: hard cap. Above this, FileReader risks an OOM.
+// WARN prompts the user; SIZE is the hard FileReader cap.
+// Autosave (~5-10 MB localStorage) won't survive WARN-sized uploads.
 const UPLOAD_SIZE_LIMITS = {
   image:  50 * 1024 * 1024,
   audio: 200 * 1024 * 1024,
@@ -57,7 +54,6 @@ export function validateUpload(file, kind){
   return { ok: true, sizeHuman: humanSize(file.size), warning };
 }
 // Inline status row below an upload input.
-// Returns { el, showError, showSuccess, showWarning, clear }.
 function makeUploadStatus(){
   const el = document.createElement('div');
   el.className = 'upload-status';
@@ -167,8 +163,7 @@ export function renderField(spec, getObj, setObj){
           conditionals.forEach(c => { c.el.style.display = c.showIf(item) ? '' : 'none'; });
         }
 
-        // Group itemSchema by section dividers so each label sits outside
-        // its field-row (Safari grid-column:-1 bug with auto-fit).
+        // Group by section dividers (works around Safari grid-column:-1 bug).
         const groups = [];
         let cur = { label: null, fields: [] };
         (spec.itemSchema || []).forEach(sub => {
@@ -254,8 +249,7 @@ export function renderField(spec, getObj, setObj){
     input.addEventListener('input', () => {
       const val = input.value === '' ? null : Number(input.value);
       setObj(spec.key, val);
-      // Cross-field hook for things like min/max sync. setLive(k,v) updates
-      // both the state and the sibling DOM input that carries the field key.
+      // Cross-field hook (e.g. min/max sync). setLive(k,v) updates state + DOM.
       if(typeof spec.onChange === 'function'){
         const setLive = (k, v) => {
           setObj(k, v);
@@ -349,7 +343,7 @@ function renderImageField(spec, getObj, setObj, wrap){
     const v = validateUpload(f, 'image');
     if(!v.ok){
       status.showError(v.error);
-      fileInp.value = '';  // reset so the same file can be retried
+      fileInp.value = '';  // reset so the user can retry the same file
       return;
     }
     const r = new FileReader();
@@ -468,7 +462,7 @@ function renderVideoField(spec, getObj, setObj, wrap){
     previewWrap.innerHTML = '';
     const v = (getObj() || {})[spec.key];
     if(!v) return;
-    // Mirror runtime detection so the editor preview matches the learner view.
+    // Match runtime's YouTube/Vimeo detection.
     const def = window.Blocks && window.Blocks.get('video');
     const info = def && typeof def.detectVideoSource === 'function' ? def.detectVideoSource(v) : null;
     if(info && (info.kind === 'youtube' || info.kind === 'vimeo')){
@@ -502,7 +496,7 @@ function renderVideoField(spec, getObj, setObj, wrap){
   return wrap;
 }
 
-// Generic file upload (any MIME). Auto-fills a sibling `filename` field.
+// Generic file upload. Auto-fills sibling `filename` field.
 function renderFileField(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
   const inner = el('div');
@@ -517,7 +511,7 @@ function renderFileField(spec, getObj, setObj, wrap){
     const r = new FileReader();
     r.onload = () => {
       setObj(spec.key, r.result);
-      // Seed a sibling `filename` field if present and still empty.
+      // Auto-fill sibling `filename` if empty.
       const cur = getObj() || {};
       if('filename' in cur && !cur.filename) setObj('filename', f.name);
       status.showSuccess('Datei eingebettet (' + v.sizeHuman + ')');
@@ -656,8 +650,7 @@ function renderFormulaText(spec, getObj, setObj, wrap){
   const finp  = el('input', {attrs:{type:'text', placeholder: spec.placeholder || ''}});
   finp.dataset.formulaFieldKey = spec.key;
   finp.value  = obj[spec.key] != null ? String(obj[spec.key]) : '';
-  // External updaters (z. B. Auto-Ableitung aus Frage-Vorlage) koennen
-  // dieses Event dispatchen, ohne die ganze Konfig-Pane neu zu rendern.
+  // Auto-derivation fires this event to update the input without a re-render.
   finp.addEventListener('formula-field-set', e => {
     if(e.detail && e.detail.value != null && finp.value !== e.detail.value){
       finp.value = e.detail.value;
@@ -793,7 +786,7 @@ function renderZoneEditor(spec, getObj, setObj, wrap){
     e.preventDefault();
   });
 
-  // Poll the sibling `src` field; peer fields don't notify on change.
+  // Poll sibling `src`; peer fields don't notify on change.
   const watcher = setInterval(() => {
     const cur = (getObj() || {}).src;
     if(cur !== lastRenderedSrc) render();
@@ -829,7 +822,6 @@ function renderUnitPairField(spec, getObj, setObj){
 
   const obj = getObj() || {};
 
-  // Build optgroup-grouped selects.
   const cats = {};
   Object.entries(units).forEach(([id, u]) => {
     if(!cats[u.cat]) cats[u.cat] = [];

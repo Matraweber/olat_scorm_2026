@@ -1,4 +1,4 @@
-// summary.js: Zusammenfassung - styled key-points callout with checkmarks.
+// summary.js: summary block - styled key-points callout with checkmarks.
 // Each point has a bold headline + optional explanation.
 (function(){
   'use strict';
