@@ -12,16 +12,11 @@
     'cm':  { label:'cm',           cat:'Länge',            factor:0.01 },
     'm':   { label:'m',            cat:'Länge',            factor:1 },
     'km':  { label:'km',           cat:'Länge',            factor:1000 },
-    'in':  { label:'in (Zoll)',    cat:'Länge',            factor:0.0254 },
-    'ft':  { label:'ft (Fuß)',     cat:'Länge',            factor:0.3048 },
-    'mi':  { label:'mi (Meile)',   cat:'Länge',            factor:1609.344 },
 
     'mg':  { label:'mg',           cat:'Masse',            factor:1e-6 },
     'g':   { label:'g',            cat:'Masse',            factor:1e-3 },
     'kg':  { label:'kg',           cat:'Masse',            factor:1 },
     't':   { label:'t (Tonne)',    cat:'Masse',            factor:1000 },
-    'lb':  { label:'lb (Pfund)',   cat:'Masse',            factor:0.453592 },
-    'oz':  { label:'oz (Unze)',    cat:'Masse',            factor:0.028350 },
 
     'ns':  { label:'ns',           cat:'Zeit',             factor:1e-9 },
     'μs':  { label:'μs',           cat:'Zeit',             factor:1e-6 },
@@ -33,7 +28,6 @@
 
     'm/s': { label:'m/s',          cat:'Geschwindigkeit',  factor:1 },
     'km/h':{ label:'km/h',         cat:'Geschwindigkeit',  factor:1/3.6 },
-    'mph': { label:'mph',          cat:'Geschwindigkeit',  factor:0.44704 },
     'kn':  { label:'kn (Knoten)', cat:'Geschwindigkeit',  factor:0.514444 },
     'km/s':{ label:'km/s',         cat:'Geschwindigkeit',  factor:1000 },
 
@@ -48,7 +42,6 @@
     'mbar':{ label:'mbar',         cat:'Druck',            factor:100 },
     'bar': { label:'bar',          cat:'Druck',            factor:1e5 },
     'atm': { label:'atm',          cat:'Druck',            factor:101325 },
-    'psi': { label:'psi',          cat:'Druck',            factor:6894.757 },
     'mmHg':{ label:'mmHg (Torr)', cat:'Druck',            factor:133.322 },
 
     'J':   { label:'J',            cat:'Energie',          factor:1 },
@@ -67,7 +60,7 @@
     'kW':  { label:'kW',           cat:'Leistung',         factor:1000 },
     'MW':  { label:'MW',           cat:'Leistung',         factor:1e6 },
     'GW':  { label:'GW',           cat:'Leistung',         factor:1e9 },
-    'hp':  { label:'hp (PS)',      cat:'Leistung',         factor:745.7 },
+    'PS':  { label:'PS (Pferdestärke)', cat:'Leistung',    factor:735.49875 },
 
     'mN':  { label:'mN',           cat:'Kraft',            factor:1e-3 },
     'N':   { label:'N',            cat:'Kraft',            factor:1 },
@@ -113,8 +106,6 @@
     'kg/L':   { label:'kg/L',          cat:'Dichte',           factor:1000 },
     'kg/dm³': { label:'kg/dm³',        cat:'Dichte',           factor:1000 },
     't/m³':   { label:'t/m³',          cat:'Dichte',           factor:1000 },
-    'lb/ft³': { label:'lb/ft³',        cat:'Dichte',           factor:16.01846 },
-    'lb/in³': { label:'lb/in³',        cat:'Dichte',           factor:27679.9 },
 
     'bit': { label:'bit',          cat:'Datenmenge',       factor:0.125 },
     'B':   { label:'B (Byte)',     cat:'Datenmenge',       factor:1 },
@@ -173,13 +164,13 @@
   // Built-in templates
   const PRESET_OPTIONS = [
     {value:'custom',     label:'Manuell (leer)'},
-    {value:'ex-speed',   label:'Beispiel: Geschwindigkeit  (km/h, mph, m/s, kn)'},
+    {value:'ex-speed',   label:'Beispiel: Geschwindigkeit  (km/h, m/s, kn)'},
     {value:'ex-temp',    label:'Beispiel: Temperatur  (°C, K, °F)'},
     {value:'ex-energy',  label:'Beispiel: Energie  (kWh, MJ, kJ, kcal)'},
-    {value:'ex-pressure',label:'Beispiel: Druck  (bar, Pa, atm, mmHg, psi)'},
+    {value:'ex-pressure',label:'Beispiel: Druck  (bar, Pa, atm, mmHg)'},
     {value:'ex-data',    label:'Beispiel: Datenmenge  (GiB ↔ GB, MiB ↔ MB)'},
-    {value:'ex-power',   label:'Beispiel: Leistung  (hp, kW, W)'},
-    {value:'ex-length',  label:'Beispiel: Länge  (nm, μm, km, mi, in)'},
+    {value:'ex-power',   label:'Beispiel: Leistung  (PS, kW, W, MW)'},
+    {value:'ex-length',  label:'Beispiel: Länge  (nm, μm, mm, m, km)'},
     {value:'ex-density', label:'Beispiel: Dichte  (g/cm³, kg/m³, kg/L)'},
     {value:'ex-mixed',   label:'Beispiel: Gemischt, alle Kategorien'}
   ];
@@ -189,7 +180,6 @@
       questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
       variants: [
         { fromUnit:'km/h', toUnit:'m/s',  valueMin:30, valueMax:200, integer:true },
-        { fromUnit:'mph',  toUnit:'km/h', valueMin:20, valueMax:120, integer:true },
         { fromUnit:'m/s',  toUnit:'km/h', valueMin:10, valueMax:50,  integer:true },
         { fromUnit:'kn',   toUnit:'km/h', valueMin:5,  valueMax:50,  integer:true }
       ],
@@ -219,7 +209,7 @@
         { fromUnit:'bar',  toUnit:'kPa',  valueMin:0.5, valueMax:10,  integer:false },
         { fromUnit:'hPa',  toUnit:'atm',  valueMin:900, valueMax:1100,integer:true },
         { fromUnit:'mmHg', toUnit:'kPa',  valueMin:300, valueMax:800, integer:true },
-        { fromUnit:'psi',  toUnit:'bar',  valueMin:10,  valueMax:100, integer:true }
+        { fromUnit:'MPa',  toUnit:'bar',  valueMin:1,   valueMax:50,  integer:false }
       ],
       randomSwap: true, tolerance: 0.02
     },
@@ -235,17 +225,18 @@
     'ex-power': {
       questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
       variants: [
-        { fromUnit:'hp', toUnit:'kW', valueMin:50,  valueMax:500,  integer:true },
-        { fromUnit:'kW', toUnit:'W',  valueMin:0.5, valueMax:20,   integer:false }
+        { fromUnit:'PS', toUnit:'kW', valueMin:50,  valueMax:500,  integer:true },
+        { fromUnit:'kW', toUnit:'W',  valueMin:0.5, valueMax:20,   integer:false },
+        { fromUnit:'MW', toUnit:'kW', valueMin:1,   valueMax:20,   integer:false }
       ],
       randomSwap: true, tolerance: 0.02
     },
     'ex-length': {
       questionTemplate: 'Wandeln Sie {value} {fromUnit} in {toUnit} um.',
       variants: [
-        { fromUnit:'km', toUnit:'mi', valueMin:1, valueMax:100, integer:true },
-        { fromUnit:'in', toUnit:'cm', valueMin:1, valueMax:50,  integer:true },
-        { fromUnit:'m',  toUnit:'ft', valueMin:1, valueMax:100, integer:true },
+        { fromUnit:'km', toUnit:'m',  valueMin:1, valueMax:100, integer:false },
+        { fromUnit:'cm', toUnit:'mm', valueMin:1, valueMax:50,  integer:true },
+        { fromUnit:'m',  toUnit:'cm', valueMin:1, valueMax:100, integer:true },
         { fromUnit:'nm', toUnit:'μm', valueMin:100, valueMax:10000, integer:true }
       ],
       randomSwap: true, tolerance: 0.02
@@ -270,7 +261,7 @@
         { fromUnit:'°C',   toUnit:'K',   valueMin:0,  valueMax:100, integer:true },
         { fromUnit:'bar',  toUnit:'kPa', valueMin:1,  valueMax:10,  integer:true },
         { fromUnit:'kWh',  toUnit:'MJ',  valueMin:1,  valueMax:10,  integer:false },
-        { fromUnit:'hp',   toUnit:'kW',  valueMin:50, valueMax:300, integer:true },
+        { fromUnit:'PS',   toUnit:'kW',  valueMin:50, valueMax:300, integer:true },
         { fromUnit:'GiB',  toUnit:'GB',  valueMin:1,  valueMax:10,  integer:true },
         { fromUnit:'N',    toUnit:'kN',  valueMin:100,valueMax:5000,integer:true },
         { fromUnit:'g/cm³',toUnit:'kg/m³', valueMin:1, valueMax:10, integer:false }
