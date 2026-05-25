@@ -326,8 +326,14 @@
     } else if(mode === 'minima' || mode === 'maxima' || mode === 'extrema'){
       runtime._answerKind = 'points';
       runtime._expected = findExtrema(fn.expr, xMin, xMax, yMin, yMax, mode, u);
-      const label = mode === 'minima' ? 'Tiefpunkt(e)' : (mode === 'maxima' ? 'Hochpunkt(e)' : 'Extrempunkt(e)');
-      runtime._question = runtime._question || 'Bestimmen Sie die ' + label + ' als Koordinaten (x; y).';
+      const n = runtime._expected.length;
+      const sing = mode === 'minima' ? 'Tiefpunkt' : (mode === 'maxima' ? 'Hochpunkt' : 'Extrempunkt');
+      const plur = mode === 'minima' ? 'Tiefpunkte' : (mode === 'maxima' ? 'Hochpunkte' : 'Extrempunkte');
+      let label;
+      if(n === 0)      label = 'Tragen Sie „keine" ein, falls keine ' + plur + ' im sichtbaren Bereich liegen.';
+      else if(n === 1) label = 'Bestimmen Sie den ' + sing + ' als Koordinate (x; y).';
+      else             label = 'Bestimmen Sie die ' + n + ' ' + plur + ' als Koordinaten (x; y).';
+      runtime._question = runtime._question || label;
     } else {
       runtime._expected = [];
       runtime._question = runtime._question || 'Lesen Sie den geforderten Wert aus dem Plot ab.';

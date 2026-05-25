@@ -1491,6 +1491,35 @@ html.welcome-active {
   display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.5rem;
 }
 
+/* Shape-picker dropdown rows: a row keeps its shape's tint colour by default
+   and switches to the standard light-blue panel hover (no white-on-white). */
+.comp-shape-picker-row {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.4rem 0.6rem; width: 100%; text-align: left;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  font: inherit; color: var(--text); cursor: pointer;
+}
+.comp-shape-picker-row:hover {
+  background: var(--panel-soft);
+  border-color: rgba(0,59,92,0.18);
+}
+.comp-shape-picker-row.is-selected {
+  background: rgba(132,191,102,0.18);
+  border-color: #84bf66;
+}
+.comp-shape-picker-row.is-selected:hover {
+  background: rgba(132,191,102,0.28);
+}
+.comp-shape-picker-ico {
+  display: inline-flex; width: 20px; height: 20px;
+  align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.comp-shape-picker-label {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* Replace / Append / Cancel chooser shown after picking a template
    when the composition already has shapes. */
 .comp-tpl-choose-actions {

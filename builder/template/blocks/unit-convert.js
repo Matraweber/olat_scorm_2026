@@ -280,6 +280,27 @@
         maxPoints: 1
       };
     },
+    validate(cfg){
+      if(cfg.preset && cfg.preset !== 'custom') return [];
+      const w = [];
+      const variants = (cfg.variants || []).filter(v => v && v.fromUnit && v.toUnit);
+      if(!variants.length){
+        w.push('Mindestens eine Umrechnung konfigurieren.');
+        return w;
+      }
+      variants.forEach((v, i) => {
+        const fromIsCat = typeof v.fromUnit === 'string' && v.fromUnit.indexOf('*:') === 0;
+        const toIsCat   = typeof v.toUnit   === 'string' && v.toUnit.indexOf('*:') === 0;
+        const fromCat = fromIsCat ? v.fromUnit.slice(2) : (UREG[v.fromUnit] && UREG[v.fromUnit].cat);
+        const toCat   = toIsCat   ? v.toUnit.slice(2)   : (UREG[v.toUnit]   && UREG[v.toUnit].cat);
+        if(!fromCat || !toCat){
+          w.push('Umrechnung ' + (i+1) + ': unbekannte Einheit.');
+        } else if(fromCat !== toCat){
+          w.push('Umrechnung ' + (i+1) + ': ' + fromCat + ' nach ' + toCat + ' ist nicht möglich.');
+        }
+      });
+      return w;
+    },
     previewConfig(){
       // Minutes -> seconds: intuitive without prior unit knowledge.
       return {
@@ -352,8 +373,21 @@
       unitLbl.style.cssText = 'font-weight:700; color:var(--primary); margin-left:0.5rem; font-size:1.05rem;';
       if(inp.parentNode) inp.parentNode.insertBefore(unitLbl, inp.nextSibling);
 
+      // Category-compatible variants only. Cross-category data (legacy JSON,
+      // mismatched wildcards) is filtered out so the student never sees an
+      // unanswerable question like "60 s in km/h".
+      function variantCategoriesMatch(v){
+        const fromIsCat = typeof v.fromUnit === 'string' && v.fromUnit.indexOf('*:') === 0;
+        const toIsCat   = typeof v.toUnit   === 'string' && v.toUnit.indexOf('*:') === 0;
+        const fromCat = fromIsCat ? v.fromUnit.slice(2) : (UREG[v.fromUnit] && UREG[v.fromUnit].cat);
+        const toCat   = toIsCat   ? v.toUnit.slice(2)   : (UREG[v.toUnit]   && UREG[v.toUnit].cat);
+        return !!fromCat && fromCat === toCat;
+      }
+
       function genInstance(){
-        const variants = (ac.variants || []).filter(v => v && v.fromUnit && v.toUnit);
+        const variants = (ac.variants || [])
+          .filter(v => v && v.fromUnit && v.toUnit)
+          .filter(variantCategoriesMatch);
         if(variants.length === 0) return null;
         const v = (ac.randomize !== false && variants.length > 1)
           ? variants[Math.floor(Math.random() * variants.length)]
@@ -376,13 +410,18 @@
           from = v.fromUnit;
           to   = v.toUnit;
         }
-        // Defensive fallback: never let from equal to.
+        // Defensive: never let from equal to (same category, same unit).
         if(from && to && from === to){
           const cat = UREG[from] && UREG[from].cat;
           if(cat){
             const others = Object.keys(UREG).filter(id => UREG[id].cat === cat && id !== from);
             if(others.length) to = others[Math.floor(Math.random() * others.length)];
           }
+        }
+        // Final safety net: bail if the resolved pair somehow ended up in
+        // different categories (should be unreachable given the filter above).
+        if(!from || !to || !UREG[from] || !UREG[to] || UREG[from].cat !== UREG[to].cat){
+          return null;
         }
         const min = Number(v.valueMin), max = Number(v.valueMax);
         let value = min + Math.random() * (max - min);

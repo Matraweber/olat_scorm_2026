@@ -320,26 +320,18 @@
         while(names.length < n) names.push(['x','y','z'][names.length]);
         let cLo = num(config.coeffMin, -5);
         let cHi = num(config.coeffMax,  5);
-        if(cLo >= cHi){ cLo = -5; cHi = 5; }
+        // Single-value ranges (e.g. [0, 0] or [2, 2]) are allowed; only swap
+        // the order if min > max. randCoeff handles the [0, 0] case via ±1.
+        if(cLo > cHi){ const t = cLo; cLo = cHi; cHi = t; }
         let sLo = num(config.solutionMin, -5);
         let sHi = num(config.solutionMax,  5);
-        if(sLo > sHi){ sLo = -5; sHi = 5; }
+        if(sLo > sHi){ const t = sLo; sLo = sHi; sHi = t; }
 
         function randInt(lo, hi){ return Math.floor(lo + Math.random() * (hi - lo + 1)); }
-        // 0 is allowed in coefficients. Tight ranges like [-1, 1] still produce
-        // ±1 frequently; with 0 in the range, some terms drop out (formatTerm
-        // hides them) which gives the system more variety.
+        // 0 is a valid coefficient. formatTerm drops zero terms so the
+        // corresponding variable disappears from the rendered equation, e.g.
+        // "0x + 3y = 6" renders as "3y = 6".
         function randCoeff(lo, hi){ return randInt(lo, hi); }
-        // Fallback when the range contains only 0 (e.g. [0, 0]): use ±1
-        // so we can still produce a non-singular matrix.
-        function randCoeffNonZero(lo, hi){
-          if(lo === 0 && hi === 0) return Math.random() < 0.5 ? -1 : 1;
-          let v;
-          let tries = 0;
-          do { v = randInt(lo, hi); tries++; } while(v === 0 && tries < 50);
-          if(v === 0) v = 1;
-          return v;
-        }
 
         solution = [];
         for(let i = 0; i < n; i++){
@@ -349,18 +341,11 @@
           }
           solution.push(v);
         }
-        // Aim for a non-singular and "dense" (many nonzero entries) matrix.
-        // Score = nonZeroCount * 10 + min(|det|, 5): density matters more than
-        // a larger determinant, so we prefer interesting-looking systems.
-        const MAX_TRIES = 80;
-        let bestA = null, bestScore = -1;
-        function densityScore(M){
-          let nz = 0;
-          for(const r of M) for(const v of r) if(v !== 0) nz++;
-          const d = Math.abs(det(M));
-          if(d <= 0.5) return -1; // singular -> reject
-          return nz * 10 + Math.min(d, 5);
-        }
+        // Pick the first non-singular matrix from the configured range. 0 is
+        // treated like any other coefficient, so the corresponding variable
+        // may simply not appear in some equations (formatTerm drops 0 terms).
+        const MAX_TRIES = 200;
+        let foundA = null;
         for(let t = 0; t < MAX_TRIES; t++){
           A = [];
           for(let i = 0; i < n; i++){
@@ -368,23 +353,16 @@
             for(let j = 0; j < n; j++) row.push(randCoeff(cLo, cHi));
             A.push(row);
           }
-          const score = densityScore(A);
-          if(score > bestScore){ bestA = A.map(r => r.slice()); bestScore = score; }
-          // Full matrix and non-singular -> ideal, stop early.
-          if(score >= n * n * 10) break;
+          if(Math.abs(det(A)) > 0.5){ foundA = A; break; }
         }
-        if(bestScore < 0){
-          // No non-singular matrix found (e.g. range [0, 0]): force a diagonal
-          // with ±1 entries.
-          A = [];
-          for(let i = 0; i < n; i++){
-            const row = [];
-            for(let j = 0; j < n; j++) row.push(i === j ? randCoeffNonZero(cLo, cHi) : 0);
-            A.push(row);
-          }
-        } else {
-          A = bestA;
+        // No non-singular matrix in the configured range (e.g. coeffMin =
+        // coeffMax = 0): mark the system as empty so renderSystem shows the
+        // "Kein gültiges Gleichungssystem konfiguriert"-warning.
+        if(!foundA){
+          A = []; b = []; solution = []; names = [];
+          return;
         }
+        A = foundA;
         b = A.map(row => row.reduce((s, c, j) => s + c * solution[j], 0));
       }
       function det(M){

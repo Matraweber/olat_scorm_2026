@@ -163,6 +163,25 @@
     };
   }
 
+  // Implicit canvas grid: every 10 SVG pixels. Used when no coordinate
+  // system is present so labels, rectangles, etc. still snap to clean values.
+  function makeCanvasGridSnap(canvasWidth, canvasHeight, step){
+    const gridStep = Math.max(2, Number(step) || 10);
+    const w = Math.max(10, Number(canvasWidth)  || 600);
+    const h = Math.max(10, Number(canvasHeight) || 360);
+    return function snap(svgX, svgY, threshold){
+      threshold = threshold == null ? 8 : threshold;
+      if(svgX < -threshold || svgX > w + threshold) return null;
+      if(svgY < -threshold || svgY > h + threshold) return null;
+      const sx = Math.round(svgX / gridStep) * gridStep;
+      const sy = Math.round(svgY / gridStep) * gridStep;
+      if(Math.abs(svgX - sx) <= threshold && Math.abs(svgY - sy) <= threshold){
+        return { x: sx, y: sy, dx: sx - svgX, dy: sy - svgY };
+      }
+      return null;
+    };
+  }
+
   function findCoordsForSnap(shapes, excludeSet){
     if(!Array.isArray(shapes)) return null;
     for(let i = 0; i < shapes.length; i++){
@@ -422,13 +441,15 @@
         { name:'b', min:3, max:9, integer:true }
       ],
       shapes: [
-        // Triangle (the picture)
-        { type:'polygon', sides:3, points:[[170, 290],[470, 290],[170, 110]],
+        // Triangle (the picture). Bottom-left at (200, 290), bottom-right at
+        // (470, 290), top at (200, 110). The 'a' label sits left of the
+        // vertical side; 'b' under the horizontal side.
+        { type:'polygon', sides:3, points:[[200, 290],[470, 290],[200, 110]],
           color:'#003b5c', fill:'#eef5f8', strokeWidth:3, dash:'solid' },
-        { type:'rect', x:170, y:274, w:16, h:16, color:'#5d6872', fill:'transparent', strokeWidth:1.5, dash:'solid' },
-        { type:'label', x:140, y:210, text:'a = {a}', color:'#003b5c', fontSize:20, fontWeight:'700' },
-        { type:'label', x:300, y:315, text:'b = {b}', color:'#003b5c', fontSize:20, fontWeight:'700' },
-        { type:'label', x:320, y:200, text:'c = ?', color:'#0f567d', fontSize:20, fontWeight:'700' },
+        { type:'rect', x:200, y:274, w:16, h:16, color:'#5d6872', fill:'transparent', strokeWidth:1.5, dash:'solid' },
+        { type:'label', x:130, y:210, text:'a = {a}', color:'#003b5c', fontSize:20, fontWeight:'700' },
+        { type:'label', x:300, y:320, text:'b = {b}', color:'#003b5c', fontSize:20, fontWeight:'700' },
+        { type:'label', x:340, y:200, text:'c = ?', color:'#0f567d', fontSize:20, fontWeight:'700' },
         // Step 1: enter c² in slot {1}
         { type:'label', x:60, y:50, text:'1. Schritt:  c² = a² + b² = {1}',
           color:'#003b5c', fontSize:17, fontWeight:'700',
@@ -733,17 +754,10 @@
     svg.style.background = config.background || '#ffffff';
     svg.style.border = '1px solid var(--line, #d8e0e6)';
     svg.style.borderRadius = '8px';
-    // Builder editor: drag-to-resize handles need pixel-based hit coords, so
-    // we keep the SVG locked to its native size. Runtime/preview: stretch the
-    // SVG to fill the container so shapes scale when the window resizes.
-    if(opts && opts.builder){
-      svg.style.maxWidth = w + 'px';
-    } else {
-      svg.setAttribute('height', '100%');
-      svg.style.width = '100%';
-      // aspectRatio keeps the box proportional when the parent has no fixed height.
-      svg.style.aspectRatio = w + ' / ' + h;
-    }
+    // SVG always fills the container width; aspectRatio keeps proportions.
+    // svgPoint() uses getScreenCTM so drag and snap-hit-tests work at any zoom.
+    svg.style.width = '100%';
+    svg.style.aspectRatio = w + ' / ' + h;
     if(opts && opts.fullHeight){ svg.style.height = h + 'px'; svg.style.maxHeight = 'none'; svg.style.aspectRatio = ''; }
     // capViewport: only in runtime/preview, never in the builder canvas.
     if(opts && opts.capViewport){
@@ -1397,17 +1411,17 @@
         (block.config.shapes || []).forEach((s, idx) => {
           const row = document.createElement('button');
           row.type = 'button';
-          row.className = 'comp-tool-btn-text comp-shape-picker-row';
-          const isSel = isSelected(idx);
-          row.style.cssText = 'display:flex; align-items:center; gap:0.55rem; padding:0.4rem 0.6rem; text-align:left; width:100%; ' +
-            'background:' + (isSel ? 'rgba(132,191,102,0.18)' : 'transparent') + '; ' +
-            'border:1px solid ' + (isSel ? '#84bf66' : 'transparent') + '; border-radius:6px;';
+          row.className = 'comp-shape-picker-row';
+          if(isSelected(idx)) row.classList.add('is-selected');
           const icoSpan = document.createElement('span');
-          icoSpan.style.cssText = 'display:inline-flex; width:20px; height:20px; align-items:center; justify-content:center; color:' + (s.color || '#003b5c') + ';';
+          icoSpan.className = 'comp-shape-picker-ico';
+          // Store the shape's color on a custom property so CSS can apply it
+          // by default and switch to white on hover via currentColor.
+          icoSpan.style.color = s.color || '#003b5c';
           icoSpan.innerHTML = SHAPE_ICONS[s.type] || '';
           row.appendChild(icoSpan);
           const txt = document.createElement('span');
-          txt.style.cssText = 'flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+          txt.className = 'comp-shape-picker-label';
           txt.textContent = shapeDisplayName(s, idx);
           row.appendChild(txt);
           row.addEventListener('click', () => {
@@ -2654,13 +2668,14 @@
         const start = svgPoint(svg, e.clientX, e.clientY);
         let moved = false;
 
-        // Snap-to-grid: if a coords system is on the canvas (not part of the
-        // dragged selection), snap vertices/endpoints/corners of the primary
-        // shape to the nearest grid intersection while dragging. Hold Alt
-        // to bypass.
+        // Snap-to-grid: a coords system on the canvas wins (real math units).
+        // Otherwise fall back to the implicit canvas pixel grid so labels and
+        // shapes still align cleanly. Hold Alt during drag to bypass.
         const excludeSet = new Set(draggedIndices);
         const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        const snapFn = snapCoords
+          ? makeGridSnap(snapCoords)
+          : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
         let snapIndicator = null;
 
         function applyDelta(shape, original, dx, dy){
@@ -2924,7 +2939,7 @@
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
         const excludeSet = new Set([idx]);
         const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
         let snapIndicator = null;
         function showEndpointSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
@@ -2974,7 +2989,7 @@
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
         const excludeSet = new Set([idx]);
         const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
         let snapIndicator = null;
         function showRadiusSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
@@ -3095,7 +3110,9 @@
         // Snap to grid (vertex mode only; uniform-scale keeps free movement).
         const excludeSet = new Set([idx]);
         const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = (!uniform && snapCoords) ? makeGridSnap(snapCoords) : null;
+        const snapFn = uniform
+          ? null
+          : (snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10));
         let snapIndicator = null;
         function showVertexSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
@@ -3175,7 +3192,7 @@
         // Snap the bottom-right corner to the grid while resizing.
         const excludeSet = new Set([idx]);
         const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
         let snapIndicator = null;
         function showResizeSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
@@ -3577,11 +3594,15 @@
       const slotOrder = Array.from(usedSlots).sort((a, b) => a - b);
       const results = {};
       const slotVars = {};
+      // Block-level tolerance as default; slot-specific tolerance still wins.
+      const defaultTolerance = Number(config.tolerance);
+      const blockTolerance = Number.isFinite(defaultTolerance) && defaultTolerance >= 0
+        ? defaultTolerance : 0.01;
       // For each slot, find the label(s) that own it and look up its formula.
       slotOrder.forEach(n => {
-        let formula = null, tolerance = 0.01, ownerLabel = null;
+        let formula = null, tolerance = blockTolerance, ownerLabel = null;
         for(const sh of shapes){
-          if(sh.type !== 'label') return;
+          if(sh.type !== 'label') continue;
           // Numbered slot: look in sh.formulas[n] first.
           if(n > 0 && sh.formulas && sh.formulas[n] && sh.formulas[n].formula){
             formula = sh.formulas[n].formula;
@@ -3771,7 +3792,8 @@
         let ok = false;
         if(b.expected.value != null){
           const gotNum = u.parseNum(given);
-          if(gotNum != null && u.nearlyEqual(gotNum, b.expected.value, b.tolerance)) ok = true;
+          const tol = b.expected.tolerance != null ? b.expected.tolerance : 0.01;
+          if(gotNum != null && u.nearlyEqual(gotNum, b.expected.value, tol)) ok = true;
         } else {
           ok = given.toLowerCase() === b.expected.asString.toLowerCase() && b.expected.asString !== '';
         }
@@ -3955,6 +3977,7 @@
         // Per-shape flags by mode: isCorrect, blank+correctText, isTarget/isMarker+markerTargetIdx.
         gradingMode: 'none',
         maxPoints: 1,
+        tolerance: 0.01,
         prompt: '',
         penalizeWrong: false,
         variables: [],
@@ -3994,6 +4017,9 @@
         { key:'prompt',    label:'Aufgabentext (optional)', type:'textarea', rows:2, showIf: isGraded,
           help:'Wird oberhalb der Komposition angezeigt.' },
         { key:'maxPoints', label:'Maximalpunkte', type:'number', min:1, max:100, step:1, showIf: isGraded },
+        { key:'tolerance', label:'Toleranz', type:'number', step:'any', min:0,
+          showIf: c => c.gradingMode === 'fillblanks',
+          help:'Zulässige Abweichung der Antwort vom berechneten Wert. 0.01 bedeutet ±0,01. Wird auf alle Lösungsfelder angewendet, die keine eigene Toleranz haben.' },
         { key:'penalizeWrong', label:'Falsche Klicks abziehen', type:'boolean',
           showIf: c => c.gradingMode === 'click',
           help:'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.' },
