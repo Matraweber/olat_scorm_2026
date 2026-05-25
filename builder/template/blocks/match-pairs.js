@@ -12,7 +12,8 @@
         mode: 'pairs',
         question: '', pairs: [],
         categories: [], items: [],
-        imgHeight: 70, shuffle: true, maxPoints: 1
+        imgHeight: 70, shuffle: true, maxPoints: 1,
+        poolSize: 0 // 0 = show all; >0 = sample this many for each round
       };
     },
     summary(cfg){
@@ -119,6 +120,8 @@
         { key:'imgHeight', label:'Bild-Höhe in px', type:'number', step:10, min:20, max:400,
           help:'Maximale Höhe für alle Bilder.' },
         { key:'shuffle',   label:'Reihenfolge mischen', type:'boolean' },
+        { key:'poolSize',  label:'Anzahl Aufgaben pro Durchlauf  (0 = alle)', type:'number', step:1, min:0,
+          help:'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Begriffen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.' },
         // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 }
@@ -130,6 +133,9 @@
         return mountCategorize(host, activeConfig, api);
       }
       const imgH = Number(activeConfig.imgHeight) || 70;
+      const allPairs = (activeConfig.pairs || []).filter(p => p && (p.left || p.leftImg || p.right || p.rightImg));
+      const poolSize = Math.max(0, Math.floor(Number(activeConfig.poolSize) || 0));
+      const hasPool = poolSize > 0 && poolSize < allPairs.length;
 
       const card = document.createElement('section');
       card.className = 'section-card block-question';
@@ -143,24 +149,22 @@
         card.appendChild(qBox);
       }
 
-      const pairs = (activeConfig.pairs || []).filter(p => p && (p.left || p.leftImg || p.right || p.rightImg));
-      const lefts  = pairs.map((p, i) => ({ id:'L'+i, text:p.left||'',  img:p.leftImg||''  }));
-      const rights = pairs.map((p, i) => ({ id:'R'+i, text:p.right||'', img:p.rightImg||'', correctLeftId:'L'+i }));
-      const rightOrder = activeConfig.shuffle ? window.BlockUtils.shuffle(rights.slice()) : rights.slice();
+      // Grid host re-built on each round so "Neu generieren" can swap the subset.
+      const gridHost = document.createElement('div');
+      card.appendChild(gridHost);
 
-      const grid = document.createElement('div');
-      grid.className = 'match-grid';
-      const colL = document.createElement('div'); colL.className = 'match-col match-col-left';
-      const colR = document.createElement('div'); colR.className = 'match-col match-col-right';
-      grid.appendChild(colL); grid.appendChild(colR);
-      card.appendChild(grid);
-
+      let lefts = [], rights = [];
       let currentMap = Object.create(null);
-      let selectedRightId = null;
-      let selectedLeftId = null;
+      let selectedRightId = null, selectedLeftId = null;
       const leftEls = {}, rightEls = {};
 
-      /** Render a cell that may contain an image, text, or both */
+      function pickPairs(){
+        if(!hasPool) return allPairs.slice();
+        const pool = allPairs.slice();
+        window.BlockUtils.shuffle(pool);
+        return pool.slice(0, poolSize);
+      }
+
       function makeContent(text, img){
         const wrap = document.createElement('div');
         wrap.className = 'match-content';
@@ -177,75 +181,89 @@
         return wrap;
       }
 
-      /* ---- Left column ---- */
-      lefts.forEach(L => {
-        const cell = document.createElement('div');
-        cell.className = 'match-cell match-cell-left';
-        cell.dataset.id = L.id;
+      function buildRound(){
+        gridHost.innerHTML = '';
+        currentMap = Object.create(null);
+        selectedRightId = null; selectedLeftId = null;
+        Object.keys(leftEls).forEach(k => delete leftEls[k]);
+        Object.keys(rightEls).forEach(k => delete rightEls[k]);
 
-        const textWrap = document.createElement('div');
-        textWrap.className = 'match-text';
-        textWrap.appendChild(makeContent(L.text, L.img));
+        const pairs = pickPairs();
+        lefts  = pairs.map((p, i) => ({ id:'L'+i, text:p.left||'',  img:p.leftImg||''  }));
+        rights = pairs.map((p, i) => ({ id:'R'+i, text:p.right||'', img:p.rightImg||'', correctLeftId:'L'+i }));
+        const rightOrder = activeConfig.shuffle ? window.BlockUtils.shuffle(rights.slice()) : rights.slice();
 
-        const slot = document.createElement('span');
-        slot.className = 'match-slot';
-        slot.dataset.empty = 'true';
-        slot.textContent = 'Hier ablegen';
+        const grid = document.createElement('div');
+        grid.className = 'match-grid';
+        const colL = document.createElement('div'); colL.className = 'match-col match-col-left';
+        const colR = document.createElement('div'); colR.className = 'match-col match-col-right';
+        grid.appendChild(colL); grid.appendChild(colR);
+        gridHost.appendChild(grid);
 
-        cell.appendChild(textWrap);
-        cell.appendChild(slot);
+        lefts.forEach(L => {
+          const cell = document.createElement('div');
+          cell.className = 'match-cell match-cell-left';
+          cell.dataset.id = L.id;
+          const textWrap = document.createElement('div');
+          textWrap.className = 'match-text';
+          textWrap.appendChild(makeContent(L.text, L.img));
+          const slot = document.createElement('span');
+          slot.className = 'match-slot';
+          slot.dataset.empty = 'true';
+          slot.textContent = 'Hier ablegen';
+          cell.appendChild(textWrap);
+          cell.appendChild(slot);
+          cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
+          cell.addEventListener('dragleave', () => cell.classList.remove('over'));
+          cell.addEventListener('drop', e => {
+            e.preventDefault();
+            cell.classList.remove('over');
+            const rid      = e.dataTransfer.getData('text/match-right');
+            const fromLeft = e.dataTransfer.getData('text/from-left');
+            if(fromLeft && fromLeft === L.id) return;
+            if(rid) assign(L.id, rid);
+          });
+          cell.addEventListener('click', () => {
+            if(selectedRightId){ assign(L.id, selectedRightId); selectedRightId = null; clearSelection(); }
+            else { selectedLeftId = (selectedLeftId === L.id ? null : L.id); updateSelection(); }
+          });
+          colL.appendChild(cell);
+          leftEls[L.id] = cell;
+        });
 
-        cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
-        cell.addEventListener('dragleave', () => cell.classList.remove('over'));
-        cell.addEventListener('drop', e => {
+        colR.addEventListener('dragover', e => { e.preventDefault(); colR.classList.add('over'); });
+        colR.addEventListener('dragleave', e => {
+          if(!colR.contains(e.relatedTarget)) colR.classList.remove('over');
+        });
+        colR.addEventListener('drop', e => {
           e.preventDefault();
-          cell.classList.remove('over');
-          const rid      = e.dataTransfer.getData('text/match-right');
+          colR.classList.remove('over');
           const fromLeft = e.dataTransfer.getData('text/from-left');
-          if(fromLeft && fromLeft === L.id) return;
-          if(rid) assign(L.id, rid);
+          if(fromLeft) unassign(fromLeft);
         });
-        cell.addEventListener('click', () => {
-          if(selectedRightId){ assign(L.id, selectedRightId); selectedRightId = null; clearSelection(); }
-          else { selectedLeftId = (selectedLeftId === L.id ? null : L.id); updateSelection(); }
-        });
-        colL.appendChild(cell);
-        leftEls[L.id] = cell;
-      });
 
-      /* ---- Right column drop zone (drag items back) ---- */
-      colR.addEventListener('dragover', e => { e.preventDefault(); colR.classList.add('over'); });
-      colR.addEventListener('dragleave', e => {
-        if(!colR.contains(e.relatedTarget)) colR.classList.remove('over');
-      });
-      colR.addEventListener('drop', e => {
-        e.preventDefault();
-        colR.classList.remove('over');
-        const fromLeft = e.dataTransfer.getData('text/from-left');
-        if(fromLeft) unassign(fromLeft);
-      });
-
-      /* ---- Right column items ---- */
-      rightOrder.forEach(R => {
-        const cell = document.createElement('div');
-        cell.className = 'match-cell match-cell-right';
-        cell.dataset.id = R.id;
-        cell.draggable = true;
-        cell.appendChild(makeContent(R.text, R.img));
-        cell.addEventListener('dragstart', e => {
-          e.dataTransfer.setData('text/match-right', R.id);
-          cell.classList.add('dragging');
+        rightOrder.forEach(R => {
+          const cell = document.createElement('div');
+          cell.className = 'match-cell match-cell-right';
+          cell.dataset.id = R.id;
+          cell.draggable = true;
+          cell.appendChild(makeContent(R.text, R.img));
+          cell.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/match-right', R.id);
+            cell.classList.add('dragging');
+          });
+          cell.addEventListener('dragend', () => cell.classList.remove('dragging'));
+          cell.addEventListener('click', () => {
+            if(selectedLeftId){ assign(selectedLeftId, R.id); selectedLeftId = null; clearSelection(); }
+            else { selectedRightId = (selectedRightId === R.id ? null : R.id); updateSelection(); }
+          });
+          colR.appendChild(cell);
+          rightEls[R.id] = cell;
         });
-        cell.addEventListener('dragend', () => cell.classList.remove('dragging'));
-        cell.addEventListener('click', () => {
-          if(selectedLeftId){ assign(selectedLeftId, R.id); selectedLeftId = null; clearSelection(); }
-          else { selectedRightId = (selectedRightId === R.id ? null : R.id); updateSelection(); }
-        });
-        colR.appendChild(cell);
-        rightEls[R.id] = cell;
-      });
 
-      /* ---- Assignment logic ---- */
+        renderAssignments();
+      }
+
       function assign(leftId, rightId){
         Object.keys(currentMap).forEach(lid => { if(currentMap[lid] === rightId) delete currentMap[lid]; });
         currentMap[leftId] = rightId;
@@ -288,15 +306,20 @@
       }
       function clearSelection(){ selectedLeftId = null; selectedRightId = null; updateSelection(); }
 
-      /* ---- Buttons ---- */
       const btnRow = document.createElement('div');
       btnRow.className = 'button-cluster';
-      
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
       const resetBtn = document.createElement('button');
       resetBtn.type = 'button'; resetBtn.className = 'btn btn-secondary'; resetBtn.textContent = 'Zurücksetzen';
       btnRow.appendChild(checkBtn); btnRow.appendChild(resetBtn);
+      // Neu generieren only when a pool is configured.
+      let newBtn = null;
+      if(hasPool){
+        newBtn = document.createElement('button');
+        newBtn.type = 'button'; newBtn.className = 'btn btn-secondary'; newBtn.textContent = 'Neu generieren';
+        btnRow.appendChild(newBtn);
+      }
       card.appendChild(btnRow);
 
       const fb = api.utils.feedbackBox(card);
@@ -325,8 +348,15 @@
         fb.neutral('Zurückgesetzt.');
       });
 
+      if(newBtn){
+        newBtn.addEventListener('click', () => {
+          buildRound();
+          fb.neutral('Neue Aufgabe generiert.');
+        });
+      }
+
       host.appendChild(card);
-      renderAssignments();
+      buildRound();
       api.initScore(activeConfig.maxPoints || 1);
       return {};
     },
@@ -464,9 +494,9 @@
       qBox.appendChild(qText);
       card.appendChild(qBox);
     }
-    const cats  = (cfg.categories || []).filter(c => c && c.id);
-    const items = (cfg.items || []).filter(it => it && (it.text || it.image));
-    if(cats.length === 0 || items.length === 0){
+    const cats     = (cfg.categories || []).filter(c => c && c.id);
+    const allItems = (cfg.items || []).filter(it => it && (it.text || it.image));
+    if(cats.length === 0 || allItems.length === 0){
       const ph = document.createElement('div');
       ph.style.cssText = 'color:var(--muted, #6a7986); font-style:italic;';
       ph.textContent = '(Keine Kategorien oder Begriffe definiert.)';
@@ -475,106 +505,148 @@
       api.initScore(Number(cfg.maxPoints) || 1);
       return {};
     }
+    const poolSize = Math.max(0, Math.floor(Number(cfg.poolSize) || 0));
+    const hasPool  = poolSize > 0 && poolSize < allItems.length;
 
-    const wrap = document.createElement('div');
-    wrap.className = 'cat-wrap';
-    card.appendChild(wrap);
+    // Wrap that gets rebuilt on "Neu generieren". The categories don't change,
+    // only which items are present in the pool.
+    const wrapHost = document.createElement('div');
+    card.appendChild(wrapHost);
+    let items = [], assigned = [], chips = [], dropZones = {}, poolList = null;
 
-    const pool = document.createElement('div');
-    pool.className = 'cat-pool';
-    const poolLabel = document.createElement('div');
-    poolLabel.className = 'cat-pool-label';
-    poolLabel.textContent = 'Begriffe';
-    pool.appendChild(poolLabel);
-    const poolList = document.createElement('div');
-    poolList.className = 'cat-pool-list';
-    pool.appendChild(poolList);
-    wrap.appendChild(pool);
-
-    const dropArea = document.createElement('div');
-    dropArea.className = 'cat-drops';
-    wrap.appendChild(dropArea);
-
-    const dropZones = {};
-    cats.forEach(c => {
-      const zone = document.createElement('div');
-      zone.className = 'cat-zone';
-      zone.dataset.categoryId = c.id;
-      const lbl = document.createElement('div');
-      lbl.className = 'cat-zone-label';
-      if(c.image){
-        const img = document.createElement('img');
-        img.src = c.image; img.alt = c.label || c.id;
-        img.style.cssText = 'max-height:' + Math.round(imgH*0.6) + 'px; vertical-align:middle; margin-right:0.4rem;';
-        lbl.appendChild(img);
-      }
-      const txt = document.createElement('span');
-      txt.textContent = c.label || c.id;
-      lbl.appendChild(txt);
-      zone.appendChild(lbl);
-      const list = document.createElement('div');
-      list.className = 'cat-zone-list';
-      zone.appendChild(list);
-      dropArea.appendChild(zone);
-      dropZones[c.id] = { zone, list };
-    });
-
-    const assigned = items.map(() => null);
-    const itemOrder = items.map((_, i) => i);
-    if(cfg.shuffle !== false) window.BlockUtils.shuffle(itemOrder);
-
-    const chips = items.map((it, idx) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'cat-chip';
-      chip.draggable = true;
-      chip.dataset.itemIdx = String(idx);
-      if(it.image){
-        const img = document.createElement('img');
-        img.src = it.image; img.alt = it.text || '';
-        img.style.cssText = 'max-height:' + imgH + 'px; vertical-align:middle; margin-right:0.4rem;';
-        chip.appendChild(img);
-      }
-      if(it.text){
-        const txt = document.createElement('span');
-        txt.textContent = it.text;
-        chip.appendChild(txt);
-      }
-      chip.addEventListener('dragstart', e => {
-        chip.classList.add('is-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setData('text/plain', String(idx)); } catch(_){}
+    function pickItems(){
+      if(!hasPool) return allItems.slice();
+      // Bucket items by category; first pass picks one per category so every
+      // category has at least one item (assuming poolSize >= category count).
+      const buckets = {};
+      cats.forEach(c => { buckets[c.id] = []; });
+      allItems.forEach(it => {
+        if(buckets[it.categoryId]) buckets[it.categoryId].push(it);
       });
-      chip.addEventListener('dragend', () => chip.classList.remove('is-dragging'));
-      chip.addEventListener('click', () => {
-        if(assigned[idx] != null){
-          assigned[idx] = null;
-          poolList.appendChild(chip);
+      Object.values(buckets).forEach(arr => window.BlockUtils.shuffle(arr));
+      const picked = [];
+      // First pass: one item from each non-empty category if pool allows.
+      cats.forEach(c => {
+        if(picked.length < poolSize && buckets[c.id].length){
+          picked.push(buckets[c.id].shift());
         }
       });
-      return chip;
-    });
-    itemOrder.forEach(i => poolList.appendChild(chips[i]));
-
-    function attachDrop(target, categoryId){
-      target.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        target.classList.add('is-drop-target');
-      });
-      target.addEventListener('dragleave', () => target.classList.remove('is-drop-target'));
-      target.addEventListener('drop', e => {
-        e.preventDefault();
-        target.classList.remove('is-drop-target');
-        const itemIdx = Number(e.dataTransfer.getData('text/plain'));
-        if(Number.isNaN(itemIdx) || !chips[itemIdx]) return;
-        assigned[itemIdx] = categoryId;
-        if(categoryId == null) poolList.appendChild(chips[itemIdx]);
-        else dropZones[categoryId].list.appendChild(chips[itemIdx]);
-      });
+      // Second pass: fill remaining slots from the leftover pool.
+      const leftover = [];
+      Object.values(buckets).forEach(arr => leftover.push(...arr));
+      window.BlockUtils.shuffle(leftover);
+      while(picked.length < poolSize && leftover.length){
+        picked.push(leftover.shift());
+      }
+      window.BlockUtils.shuffle(picked);
+      return picked;
     }
-    cats.forEach(c => attachDrop(dropZones[c.id].zone, c.id));
-    attachDrop(pool, null);
+
+    function buildRound(){
+      wrapHost.innerHTML = '';
+      items = pickItems();
+      assigned = items.map(() => null);
+      chips = [];
+      dropZones = {};
+
+      const wrap = document.createElement('div');
+      wrap.className = 'cat-wrap';
+      wrapHost.appendChild(wrap);
+
+      const pool = document.createElement('div');
+      pool.className = 'cat-pool';
+      const poolLabel = document.createElement('div');
+      poolLabel.className = 'cat-pool-label';
+      poolLabel.textContent = 'Begriffe';
+      pool.appendChild(poolLabel);
+      poolList = document.createElement('div');
+      poolList.className = 'cat-pool-list';
+      pool.appendChild(poolList);
+      wrap.appendChild(pool);
+
+      const dropArea = document.createElement('div');
+      dropArea.className = 'cat-drops';
+      wrap.appendChild(dropArea);
+
+      cats.forEach(c => {
+        const zone = document.createElement('div');
+        zone.className = 'cat-zone';
+        zone.dataset.categoryId = c.id;
+        const lbl = document.createElement('div');
+        lbl.className = 'cat-zone-label';
+        if(c.image){
+          const img = document.createElement('img');
+          img.src = c.image; img.alt = c.label || c.id;
+          img.style.cssText = 'max-height:' + Math.round(imgH*0.6) + 'px; vertical-align:middle; margin-right:0.4rem;';
+          lbl.appendChild(img);
+        }
+        const txt = document.createElement('span');
+        txt.textContent = c.label || c.id;
+        lbl.appendChild(txt);
+        zone.appendChild(lbl);
+        const list = document.createElement('div');
+        list.className = 'cat-zone-list';
+        zone.appendChild(list);
+        dropArea.appendChild(zone);
+        dropZones[c.id] = { zone, list };
+      });
+
+      const itemOrder = items.map((_, i) => i);
+      if(cfg.shuffle !== false) window.BlockUtils.shuffle(itemOrder);
+
+      chips = items.map((it, idx) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cat-chip';
+        chip.draggable = true;
+        chip.dataset.itemIdx = String(idx);
+        if(it.image){
+          const img = document.createElement('img');
+          img.src = it.image; img.alt = it.text || '';
+          img.style.cssText = 'max-height:' + imgH + 'px; vertical-align:middle; margin-right:0.4rem;';
+          chip.appendChild(img);
+        }
+        if(it.text){
+          const txt = document.createElement('span');
+          txt.textContent = it.text;
+          chip.appendChild(txt);
+        }
+        chip.addEventListener('dragstart', e => {
+          chip.classList.add('is-dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', String(idx)); } catch(_){}
+        });
+        chip.addEventListener('dragend', () => chip.classList.remove('is-dragging'));
+        chip.addEventListener('click', () => {
+          if(assigned[idx] != null){
+            assigned[idx] = null;
+            poolList.appendChild(chip);
+          }
+        });
+        return chip;
+      });
+      itemOrder.forEach(i => poolList.appendChild(chips[i]));
+
+      function attachDrop(target, categoryId){
+        target.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          target.classList.add('is-drop-target');
+        });
+        target.addEventListener('dragleave', () => target.classList.remove('is-drop-target'));
+        target.addEventListener('drop', e => {
+          e.preventDefault();
+          target.classList.remove('is-drop-target');
+          const itemIdx = Number(e.dataTransfer.getData('text/plain'));
+          if(Number.isNaN(itemIdx) || !chips[itemIdx]) return;
+          assigned[itemIdx] = categoryId;
+          if(categoryId == null) poolList.appendChild(chips[itemIdx]);
+          else dropZones[categoryId].list.appendChild(chips[itemIdx]);
+        });
+      }
+      cats.forEach(c => attachDrop(dropZones[c.id].zone, c.id));
+      attachDrop(pool, null);
+    }
 
     const btnRow = document.createElement('div');
     btnRow.className = 'button-cluster';
@@ -582,6 +654,13 @@
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
     checkBtn.textContent = 'Korrektur';
     btnRow.appendChild(checkBtn);
+    let newBtn = null;
+    if(hasPool){
+      newBtn = document.createElement('button');
+      newBtn.type = 'button'; newBtn.className = 'btn btn-secondary';
+      newBtn.textContent = 'Neu generieren';
+      btnRow.appendChild(newBtn);
+    }
     card.appendChild(btnRow);
     const fb = api.utils.feedbackBox(card);
     host.appendChild(card);
@@ -605,6 +684,14 @@
       api.reportScore(pts);
     });
 
+    if(newBtn){
+      newBtn.addEventListener('click', () => {
+        buildRound();
+        fb.neutral('Neue Aufgabe generiert.');
+      });
+    }
+
+    buildRound();
     api.initScore(Number(cfg.maxPoints) || 1);
     return {};
   }

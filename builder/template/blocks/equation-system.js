@@ -44,7 +44,7 @@
     if(!s) return { ok: false, err: 'leere Gleichung' };
     const idx = s.indexOf('=');
     if(idx < 0) return { ok: false, err: 'kein "=" gefunden' };
-    if(s.indexOf('=', idx + 1) >= 0) return { ok: false, err: 'mehr als ein "=" - bitte eine Gleichung pro Zeile' };
+    if(s.indexOf('=', idx + 1) >= 0) return { ok: false, err: 'mehr als ein "=", bitte eine Gleichung pro Zeile' };
     const lhs = parseLinear(s.slice(0, idx), varNames);
     if(!lhs.ok) return { ok: false, err: 'linke Seite: ' + lhs.err };
     const rhs = parseLinear(s.slice(idx + 1), varNames);
@@ -129,31 +129,34 @@
     }
     const result = solveSystem(A, b);
     if(result.kind === 'invalid') return { ok: false, err: 'System ungültig' };
-    if(result.kind === 'inconsistent') return { ok: false, err: 'Widerspruch in den Gleichungen - System ist nicht lösbar' };
+    if(result.kind === 'inconsistent') return { ok: false, err: 'Widerspruch in den Gleichungen; System ist nicht lösbar' };
     if(result.kind === 'underdetermined'){
       return { ok: false, err: 'nicht eindeutig lösbar (' + result.freeCount + ' freie Variable' + (result.freeCount === 1 ? '' : 'n') + ')' };
     }
     return { ok: true, names, A, b, solution: result.solution, rawLines };
   }
 
-  // Render a coefficient row as LaTeX.
+  // Render a coefficient row as LaTeX. Near-zero (< 1e-9) drops the term so the
+  // variable disappears from the equation rather than printing "0x".
   function formatTerm(coeff, varName, first){
-    if(coeff === 0) return '';
+    if(!Number.isFinite(coeff) || Math.abs(coeff) < 1e-9) return '';
     const absC = Math.abs(coeff);
     const sign = coeff < 0 ? ' - ' : (first ? '' : ' + ');
-    // Show integer coefficients without trailing .0; floats keep up to 4 digits.
     let numStr;
     if(Number.isInteger(absC)) numStr = (absC === 1 ? '' : String(absC));
     else numStr = String(Math.round(absC * 10000) / 10000);
     return sign + numStr + varName;
   }
 
+  // Rows for an `aligned` LaTeX environment: `& =` keeps the equals
+  // sign on a fixed column so it doesn't shift between rows.
   function systemToLatex(A, b, names){
     return A.map((row, i) => {
       let latex = '';
       row.forEach((c, j) => { latex += formatTerm(c, names[j], latex === ''); });
       if(latex === '') latex = '0';
-      return latex + ' = ' + (Number.isInteger(b[i]) ? b[i] : (Math.round(b[i] * 10000) / 10000));
+      const rhs = Number.isInteger(b[i]) ? b[i] : (Math.round(b[i] * 10000) / 10000);
+      return latex + ' &= ' + rhs;
     });
   }
 
@@ -323,11 +326,18 @@
         if(sLo > sHi){ sLo = -5; sHi = 5; }
 
         function randInt(lo, hi){ return Math.floor(lo + Math.random() * (hi - lo + 1)); }
-        function randNonZero(lo, hi){
+        // 0 is allowed in coefficients. Tight ranges like [-1, 1] still produce
+        // ±1 frequently; with 0 in the range, some terms drop out (formatTerm
+        // hides them) which gives the system more variety.
+        function randCoeff(lo, hi){ return randInt(lo, hi); }
+        // Fallback when the range contains only 0 (e.g. [0, 0]): use ±1
+        // so we can still produce a non-singular matrix.
+        function randCoeffNonZero(lo, hi){
+          if(lo === 0 && hi === 0) return Math.random() < 0.5 ? -1 : 1;
           let v;
           let tries = 0;
           do { v = randInt(lo, hi); tries++; } while(v === 0 && tries < 50);
-          if(v === 0) v = 1; // ultimate fallback
+          if(v === 0) v = 1;
           return v;
         }
 
@@ -339,16 +349,41 @@
           }
           solution.push(v);
         }
-        // Non-singular coefficient matrix.
-        const MAX_TRIES = 50;
+        // Aim for a non-singular and "dense" (many nonzero entries) matrix.
+        // Score = nonZeroCount * 10 + min(|det|, 5): density matters more than
+        // a larger determinant, so we prefer interesting-looking systems.
+        const MAX_TRIES = 80;
+        let bestA = null, bestScore = -1;
+        function densityScore(M){
+          let nz = 0;
+          for(const r of M) for(const v of r) if(v !== 0) nz++;
+          const d = Math.abs(det(M));
+          if(d <= 0.5) return -1; // singular -> reject
+          return nz * 10 + Math.min(d, 5);
+        }
         for(let t = 0; t < MAX_TRIES; t++){
           A = [];
           for(let i = 0; i < n; i++){
             const row = [];
-            for(let j = 0; j < n; j++) row.push(randNonZero(cLo, cHi));
+            for(let j = 0; j < n; j++) row.push(randCoeff(cLo, cHi));
             A.push(row);
           }
-          if(Math.abs(det(A)) > 0.5) break;
+          const score = densityScore(A);
+          if(score > bestScore){ bestA = A.map(r => r.slice()); bestScore = score; }
+          // Full matrix and non-singular -> ideal, stop early.
+          if(score >= n * n * 10) break;
+        }
+        if(bestScore < 0){
+          // No non-singular matrix found (e.g. range [0, 0]): force a diagonal
+          // with ±1 entries.
+          A = [];
+          for(let i = 0; i < n; i++){
+            const row = [];
+            for(let j = 0; j < n; j++) row.push(i === j ? randCoeffNonZero(cLo, cHi) : 0);
+            A.push(row);
+          }
+        } else {
+          A = bestA;
         }
         b = A.map(row => row.reduce((s, c, j) => s + c * solution[j], 0));
       }
@@ -393,12 +428,11 @@
         }
         const sysWrap = document.createElement('div');
         sysWrap.className = 'eqsys-system';
-        systemToLatex(A, b, names).forEach(latex => {
-          const line = document.createElement('div');
-          line.className = 'eqsys-line';
-          line.innerHTML = '\\(' + latex + '\\)';
-          sysWrap.appendChild(line);
-        });
+        const block = document.createElement('div');
+        block.className = 'eqsys-line eqsys-aligned';
+        const body = systemToLatex(A, b, names).join(' \\\\ ');
+        block.innerHTML = '\\[\\begin{aligned} ' + body + ' \\end{aligned}\\]';
+        sysWrap.appendChild(block);
         content.appendChild(sysWrap);
 
         const inputWrap = document.createElement('div');
@@ -495,8 +529,9 @@
         'background:var(--panel-soft, #eef5f8); border-radius:10px; border-left:5px solid var(--accent, #84bf66); ' +
         'margin:0.6rem 0 1rem; font-size:1.05rem; line-height:1.6;';
       sys.innerHTML =
-        '<div class="eqsys-line" style="padding:0.15rem 0;">\\(2x + 3y = 13\\)</div>' +
-        '<div class="eqsys-line" style="padding:0.15rem 0;">\\(x - y = 1\\)</div>';
+        '<div class="eqsys-line eqsys-aligned" style="padding:0.15rem 0;">' +
+        '\\[\\begin{aligned} 2x + 3y &= 13 \\\\ x - y &= 1 \\end{aligned}\\]' +
+        '</div>';
       card.appendChild(sys);
 
       const inputs = document.createElement('div');

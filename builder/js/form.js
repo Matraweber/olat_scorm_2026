@@ -29,7 +29,7 @@ export function validateUpload(file, kind){
   const limit = UPLOAD_SIZE_LIMITS[kind] || UPLOAD_SIZE_LIMITS.file;
   if(file.size > limit){
     const suggestion = kind === 'video'
-      ? ' Tipp: YouTube oder Vimeo unterstützen beliebig große Videos - einfach den Link einfügen.'
+      ? ' Tipp: YouTube oder Vimeo unterstützen beliebig große Videos; einfach den Link einfügen.'
       : '';
     return { ok:false, error:'Datei ist zu groß (' + humanSize(file.size) + '). Maximum: ' + humanSize(limit) + '.' + suggestion };
   }
@@ -49,7 +49,7 @@ export function validateUpload(file, kind){
     const suggestion = kind === 'video'
       ? ' Für sehr lange Videos kann ein YouTube-/Vimeo-Link sinnvoller sein.'
       : '';
-    warning = 'Sehr große Datei - der Auto-Save im Browser kann scheitern, d. h. bei Reload wäre die Datei weg. Der SCORM-Export funktioniert weiterhin.' + suggestion;
+    warning = 'Sehr große Datei: der Auto-Save im Browser kann scheitern, d. h. bei Reload wäre die Datei weg. Der SCORM-Export funktioniert weiterhin.' + suggestion;
   }
   return { ok: true, sizeHuman: humanSize(file.size), warning };
 }
@@ -937,7 +937,10 @@ function renderUnitPairField(spec, getObj, setObj){
   return outer;
 }
 
-// unit-from-to: two unit selects + swap button (no value inputs).
+// unit-from-to: two unit selects + swap button. "To" is restricted to "from"'s
+// category, so incompatible pairs (time to speed) can't be picked. Each
+// category also has a "Zufällig (cat)" entry stored as "*:<cat>"; the runtime
+// resolves it to a random unit from that category per round.
 function renderUnitFromToField(spec, getObj, setObj){
   const units = spec.units || {};
   const fk = spec.fromKey || 'fromUnit';
@@ -949,12 +952,22 @@ function renderUnitFromToField(spec, getObj, setObj){
     if(!cats[u.cat]) cats[u.cat] = [];
     cats[u.cat].push({ id, label: u.label || id });
   });
-  function buildSelect(currentVal){
-    const sel = el('select');
-    sel.style.cssText = 'flex:1; min-width:90px;';
+  function isCatRef(v){ return typeof v === 'string' && v.indexOf('*:') === 0; }
+  function categoryOf(unitId){
+    if(isCatRef(unitId)) return unitId.slice(2);
+    return units[unitId] ? units[unitId].cat : null;
+  }
+  function populateSelect(sel, currentVal, restrictCat){
+    sel.innerHTML = '';
     Object.entries(cats).forEach(([catName, items]) => {
+      if(restrictCat && catName !== restrictCat) return;
       const og = document.createElement('optgroup');
       og.label = catName;
+      // Category-wildcard entry: picks a random unit from this category every round.
+      const wildcard = document.createElement('option');
+      wildcard.value = '*:' + catName;
+      wildcard.textContent = 'Zufällig  (' + catName + ')';
+      og.appendChild(wildcard);
       items.forEach(({id, label}) => {
         const op = document.createElement('option');
         op.value = id; op.textContent = label;
@@ -962,7 +975,16 @@ function renderUnitFromToField(spec, getObj, setObj){
       });
       sel.appendChild(og);
     });
-    sel.value = currentVal || (Object.keys(units)[0] || '');
+    const valid = Array.from(sel.querySelectorAll('option')).some(o => o.value === currentVal);
+    if(valid){
+      sel.value = currentVal;
+    } else {
+      sel.value = sel.querySelector('option')?.value || '';
+    }
+  }
+  function buildSelect(){
+    const sel = el('select');
+    sel.style.cssText = 'flex:1; min-width:90px;';
     return sel;
   }
 
@@ -973,18 +995,33 @@ function renderUnitFromToField(spec, getObj, setObj){
   const row = el('div');
   row.style.cssText = 'display:flex; align-items:center; gap:0.4rem; margin-top:0.2rem;';
 
-  const fromSel = buildSelect(obj[fk]);
+  const fromSel = buildSelect();
   const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Von ↔ Nach vertauschen'}, text:'⇄'});
   swapBtn.style.cssText = 'font-weight:700; color:var(--primary); font-size:1rem; flex:none; min-width:32px;';
-  const toSel = buildSelect(obj[tk]);
+  const toSel = buildSelect();
 
-  fromSel.addEventListener('change', () => setObj(fk, fromSel.value));
-  toSel.addEventListener('change',   () => setObj(tk, toSel.value));
+  // From: all categories. To: only the same category as From.
+  populateSelect(fromSel, obj[fk] || (Object.keys(units)[0] || ''), null);
+  populateSelect(toSel,   obj[tk] || '', categoryOf(fromSel.value));
+  // Persist any auto-correction (e.g. when from/to started in mismatched
+  // categories) so the config matches the visible state.
+  if(toSel.value && toSel.value !== obj[tk]) setObj(tk, toSel.value);
+
+  fromSel.addEventListener('change', () => {
+    setObj(fk, fromSel.value);
+    // Re-populate "to" with the new category; pick the first compatible unit
+    // if the previous one is no longer valid.
+    populateSelect(toSel, toSel.value, categoryOf(fromSel.value));
+    setObj(tk, toSel.value);
+  });
+  toSel.addEventListener('change', () => setObj(tk, toSel.value));
   swapBtn.addEventListener('click', e => {
     e.preventDefault();
     const f = fromSel.value, t = toSel.value;
-    fromSel.value = t; toSel.value = f;
-    setObj(fk, t); setObj(tk, f);
+    // Both stay in the same category, so swapping is always safe.
+    fromSel.value = t;
+    populateSelect(toSel, f, categoryOf(t));
+    setObj(fk, t); setObj(tk, toSel.value);
   });
 
   row.appendChild(fromSel); row.appendChild(swapBtn); row.appendChild(toSel);

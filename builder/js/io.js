@@ -523,7 +523,7 @@ export function applyJsonEditor(){
     if(parsed.theme) state.theme = parsed.theme;
     const s = document.getElementById('jsonStatus'); s.textContent = 'Übernommen.'; s.className = 'json-status ok';
     scheduleAutosave();
-    // Don't call render() - it would replace the textarea. Just refresh the task list.
+    // Don't call render(); it would replace the textarea. Refresh the task list only.
     import('./panes.js').then(m => m.renderTaskList());
   } catch(err){
     const s = document.getElementById('jsonStatus'); s.textContent = 'Fehler: ' + err.message; s.className = 'json-status error';

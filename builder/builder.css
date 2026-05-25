@@ -531,7 +531,7 @@ textarea:focus-visible,
   display: flex; flex-direction: column; min-height: 0;
 }
 .canvas-block-body > * { width: 100%; box-sizing: border-box; }
-.canvas-block-summary { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.canvas-block-summary { display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .canvas-block-resize {
   position: absolute; right: 0; bottom: 0;
   width: 18px; height: 18px;

@@ -266,7 +266,7 @@ let _activeOutsideClick = null;
 let _activeKeydown = null;
 
 function renderDropdown(){
-  // Render is the single source of truth - remove the previous instance first.
+  // Render is the single source of truth; drop any previous instance first.
   const existing = document.getElementById('folderDropdown');
   if(existing) existing.remove();
   if(_activeOutsideClick){

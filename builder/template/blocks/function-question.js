@@ -90,9 +90,15 @@
       plotCard.innerHTML = '<div class="card-header"><h3>' + (config.blockTitle || 'Funktionsplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>f(x)</span></div></div><div class="plot-host-wrap wide-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
       controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Antwort'}));
-      const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'text-input'; inp.placeholder = 'Antwort eingeben';
-      controls.appendChild(inp);
-      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster'; 
+      // Dynamic answer area: re-built per question so the number of input fields
+      // matches the count of visible solutions (extrema / zeros / x-for-y).
+      const answerWrap = document.createElement('div');
+      answerWrap.className = 'fn-answer-wrap';
+      answerWrap.style.cssText = 'display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.8rem;';
+      controls.appendChild(answerWrap);
+      let answerInputs = []; // [{x, y}] for points, [{v}] for numbers, [{v}] for custom/single
+      let noneCheckbox = null;
+      const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
       const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
       const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
@@ -134,17 +140,77 @@
         });
         plotCard.querySelector('#' + api.blockId + '_q').textContent = current._question || '';
       }
+      function makeInput(placeholder, width){
+        const el = document.createElement('input');
+        el.type = 'text';
+        el.className = 'text-input';
+        el.placeholder = placeholder;
+        if(width) el.style.cssText = 'width:' + width + '; min-width:0;';
+        return el;
+      }
+      function buildAnswerInputs(){
+        answerWrap.innerHTML = '';
+        answerInputs = [];
+        noneCheckbox = null;
+        if(current._mode === 'custom'){
+          const inp = makeInput('Antwort eingeben');
+          answerWrap.appendChild(inp);
+          answerInputs.push({ v: inp });
+          return;
+        }
+        const isPoints = current._answerKind === 'points';
+        const count = current._expected.length;
+        if(count === 0){
+          const lbl = document.createElement('label');
+          lbl.style.cssText = 'display:flex; align-items:center; gap:0.5rem; color:var(--muted, #5d6872); font-size:0.92rem;';
+          noneCheckbox = document.createElement('input');
+          noneCheckbox.type = 'checkbox';
+          lbl.appendChild(noneCheckbox);
+          lbl.appendChild(document.createTextNode('Keine im sichtbaren Bereich'));
+          answerWrap.appendChild(lbl);
+          return;
+        }
+        for(let i = 0; i < count; i++){
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex; align-items:center; gap:0.4rem;';
+          if(count > 1){
+            const idx = document.createElement('span');
+            idx.textContent = (i + 1) + '.';
+            idx.style.cssText = 'min-width:1.4rem; color:var(--primary, #003b5c); font-weight:700;';
+            row.appendChild(idx);
+          }
+          if(isPoints){
+            const lp = document.createElement('span'); lp.textContent = '('; lp.style.cssText = 'color:var(--muted, #5d6872);';
+            const sep = document.createElement('span'); sep.textContent = ';'; sep.style.cssText = 'color:var(--muted, #5d6872); padding:0 0.1rem;';
+            const rp = document.createElement('span'); rp.textContent = ')'; rp.style.cssText = 'color:var(--muted, #5d6872);';
+            const px = makeInput('x', '5.5rem');
+            const py = makeInput('y', '5.5rem');
+            row.appendChild(lp); row.appendChild(px); row.appendChild(sep); row.appendChild(py); row.appendChild(rp);
+            answerInputs.push({ x: px, y: py });
+          } else {
+            const v = makeInput('Wert', '8rem');
+            row.appendChild(v);
+            answerInputs.push({ v: v });
+          }
+          answerWrap.appendChild(row);
+        }
+      }
+      function readAnswerText(){
+        if(current._mode === 'custom') return answerInputs[0] ? answerInputs[0].v.value : '';
+        if(current._expected.length === 0) return (noneCheckbox && noneCheckbox.checked) ? 'keine' : '';
+        if(current._answerKind === 'points'){
+          return answerInputs.map(p => '(' + p.x.value + '; ' + p.y.value + ')').join('; ');
+        }
+        return answerInputs.map(p => p.v.value).join('; ');
+      }
       function chooseNew(){
         current = pickInstance();
-        inp.value = '';
-        inp.placeholder = current._answerKind === 'points'
-          ? 'z. B. (1; -4)'
-          : (current._answerKind === 'numbers' ? 'z. B. -1; 3' : 'Antwort eingeben');
+        buildAnswerInputs();
         fb.neutral('Neue Aufgabe generiert.');
         renderPlot();
       }
       function grade(){
-        const result = gradeFunctionAnswer(current, inp.value, u);
+        const result = gradeFunctionAnswer(current, readAnswerText(), u);
         if(result.ok){ fb.ok(result.message); api.reportScore(config.maxPoints || 1); }
         else { fb.bad(result.message); api.reportScore(0); }
       }

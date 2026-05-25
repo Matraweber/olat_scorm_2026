@@ -124,6 +124,20 @@
     return (base - (to.off || 0)) / to.factor;
   }
 
+  // Resolve a unit reference. "km/h" returns as-is; "*:<cat>" picks a random
+  // unit from that category. If `exclude` is given, the picked unit differs
+  // from it so from and to are never identical.
+  function resolveUnitRef(ref, exclude){
+    if(!ref || typeof ref !== 'string') return ref || null;
+    if(ref.indexOf('*:') !== 0) return ref;
+    const cat = ref.slice(2);
+    const pool = Object.keys(UREG).filter(id => UREG[id].cat === cat);
+    if(pool.length === 0) return null;
+    let candidates = exclude ? pool.filter(id => id !== exclude) : pool;
+    if(candidates.length === 0) candidates = pool; // single-unit category fallback
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
   function fmtNum(v){
     if(v == null || !isFinite(v)) return '?';
     if(v === 0) return '0';
@@ -294,8 +308,11 @@
           showIf: isCustom,
           itemSummary: item => {
             if(!item) return '…';
+            const fmt = u => typeof u === 'string' && u.indexOf('*:') === 0
+              ? 'zufällig ' + u.slice(2)
+              : (u || '?');
             const range = (item.valueMin ?? '') + ' … ' + (item.valueMax ?? '');
-            return range + ' ' + (item.fromUnit || '?') + '  →  ' + (item.toUnit || '?') + (item.integer ? '  (ganz)' : '');
+            return range + ' ' + fmt(item.fromUnit) + '  ->  ' + fmt(item.toUnit) + (item.integer ? '  (ganz)' : '');
           },
           itemSchema:[
             { key:'_dir', type:'unit-from-to', label:'Richtung',
@@ -341,11 +358,36 @@
         const v = (ac.randomize !== false && variants.length > 1)
           ? variants[Math.floor(Math.random() * variants.length)]
           : variants[0];
+        // Resolve "*:cat" wildcards. Fixed side first so the wildcard side
+        // can exclude the fixed unit (prevents from == to).
+        const fromIsCat = typeof v.fromUnit === 'string' && v.fromUnit.indexOf('*:') === 0;
+        const toIsCat   = typeof v.toUnit   === 'string' && v.toUnit.indexOf('*:') === 0;
+        let from, to;
+        if(fromIsCat && !toIsCat){
+          to = v.toUnit;
+          from = resolveUnitRef(v.fromUnit, to);
+        } else if(!fromIsCat && toIsCat){
+          from = v.fromUnit;
+          to = resolveUnitRef(v.toUnit, from);
+        } else if(fromIsCat && toIsCat){
+          from = resolveUnitRef(v.fromUnit, null);
+          to   = resolveUnitRef(v.toUnit, from);
+        } else {
+          from = v.fromUnit;
+          to   = v.toUnit;
+        }
+        // Defensive fallback: never let from equal to.
+        if(from && to && from === to){
+          const cat = UREG[from] && UREG[from].cat;
+          if(cat){
+            const others = Object.keys(UREG).filter(id => UREG[id].cat === cat && id !== from);
+            if(others.length) to = others[Math.floor(Math.random() * others.length)];
+          }
+        }
         const min = Number(v.valueMin), max = Number(v.valueMax);
         let value = min + Math.random() * (max - min);
         if(v.integer) value = Math.round(value);
         else value = Math.round(value * 100) / 100;
-        let from = v.fromUnit, to = v.toUnit;
         if(ac.randomSwap && Math.random() < 0.5){
           const inv = convertUnits(value, from, to);
           if(inv != null && isFinite(inv)){

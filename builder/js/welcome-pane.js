@@ -383,7 +383,7 @@ function openBlockDetailModal(id, def){
   });
   left.appendChild(factList);
 
-  // Live preview via def.preview() / mount() - same rendering as the canvas.
+  // Live preview via def.preview() / mount(); same rendering as the canvas.
   const right = el('div', {className:'welcome-block-modal-preview'});
   right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text:'Live-Vorschau'}));
   const previewHost = el('div', {className:'welcome-block-modal-preview-host'});

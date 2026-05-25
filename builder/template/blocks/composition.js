@@ -69,6 +69,205 @@
     return factory ? factory() : { type };
   }
 
+  // Solution-slot token parser. Splits a label text into segments and
+  // `{N}` / `{N*}` / `{}` placeholders. Tokens:
+  //   { kind:'text',   text:'…' }
+  //   { kind:'slot',   n:1 }       student input bound to slot 1
+  //   { kind:'mirror', n:1 }       read-only display of slot 1's input
+  //   { kind:'slot',   n:null }    legacy unnamed slot {}
+  function parseSlotTokens(text){
+    const out = [];
+    const re = /\{(\d+)(\*)?\}|\{\}/g;
+    let last = 0, m;
+    while((m = re.exec(text)) !== null){
+      if(m.index > last) out.push({ kind:'text', text: text.slice(last, m.index) });
+      if(m[0] === '{}'){
+        out.push({ kind:'slot', n: null });
+      } else if(m[2] === '*'){
+        out.push({ kind:'mirror', n: Number(m[1]) });
+      } else {
+        out.push({ kind:'slot', n: Number(m[1]) });
+      }
+      last = m.index + m[0].length;
+    }
+    if(last < text.length) out.push({ kind:'text', text: text.slice(last) });
+    return out;
+  }
+
+  // Collect all slot numbers used by a label's text (input slots only;
+  // mirrors are ignored).
+  function slotNumbersInLabel(text){
+    const out = [];
+    const re = /\{(\d+)\}/g;
+    let m;
+    while((m = re.exec(text)) !== null){
+      const n = Number(m[1]);
+      if(out.indexOf(n) < 0) out.push(n);
+    }
+    return out.sort((a, b) => a - b);
+  }
+
+  // Pre-process a formula so authors can write {1*} as a shorthand for s1.
+  // After this step the formula uses only legal identifiers and can be passed
+  // to safeMathExpr.
+  function expandSlotRefs(formula){
+    return String(formula || '').replace(/\{(\d+)\*\}/g, 's$1');
+  }
+
+  // Format a number for display in a {N*} mirror span.
+  function formatSlotValue(v){
+    if(v == null || !Number.isFinite(v)) return '?';
+    if(Number.isInteger(v)) return String(v);
+    return String(Math.round(v * 1000) / 1000);
+  }
+
+  // Snap-to-grid for shapes dragged over a coordinate system. Returns a
+  // function: (svgX, svgY, threshold) -> nearest grid intersection or null.
+  function makeGridSnap(coords){
+    if(!coords || coords.type !== 'coords') return null;
+    const x = Number(coords.x) || 0;
+    const y = Number(coords.y) || 0;
+    const w = Math.max(40, Number(coords.w) || 200);
+    const h = Math.max(40, Number(coords.h) || 150);
+    const xMin = Number(coords.xMin ?? -5);
+    const xMax = Number(coords.xMax ??  5);
+    const yMin = Number(coords.yMin ?? -3);
+    const yMax = Number(coords.yMax ??  3);
+    const step = Math.max(0.01, Number(coords.step) || 1);
+    const equalAspect = coords.equalAspect !== false;
+    const xRange = (xMax - xMin) || 1;
+    const yRange = (yMax - yMin) || 1;
+    let effW = w, effH = h, offX = 0, offY = 0;
+    if(equalAspect){
+      const scale = Math.min(w / xRange, h / yRange);
+      effW = xRange * scale;
+      effH = yRange * scale;
+      offX = (w - effW) / 2;
+      offY = (h - effH) / 2;
+    }
+    return function snap(svgX, svgY, threshold){
+      threshold = threshold == null ? 12 : threshold;
+      // Reject points well outside the grid box.
+      if(svgX < x + offX - threshold || svgX > x + offX + effW + threshold) return null;
+      if(svgY < y + offY - threshold || svgY > y + offY + effH + threshold) return null;
+      const mx = xMin + (svgX - x - offX) / effW * xRange;
+      const my = yMax - (svgY - y - offY) / effH * yRange;
+      const mxs = Math.round(mx / step) * step;
+      const mys = Math.round(my / step) * step;
+      const sx = x + offX + (mxs - xMin) / xRange * effW;
+      const sy = y + offY + (yMax - mys) / yRange * effH;
+      if(Math.abs(svgX - sx) <= threshold && Math.abs(svgY - sy) <= threshold){
+        return { x: sx, y: sy, mathX: mxs, mathY: mys, dx: sx - svgX, dy: sy - svgY };
+      }
+      return null;
+    };
+  }
+
+  function findCoordsForSnap(shapes, excludeSet){
+    if(!Array.isArray(shapes)) return null;
+    for(let i = 0; i < shapes.length; i++){
+      if(excludeSet && excludeSet.has(i)) continue;
+      if(shapes[i] && shapes[i].type === 'coords') return shapes[i];
+    }
+    return null;
+  }
+
+  // Snap candidates: points that may align with a grid intersection during a
+  // drag. The closest candidate wins; the whole shape shifts so it lands on grid.
+  function shapeSnapCandidates(shape){
+    if(!shape) return [];
+    switch(shape.type){
+      case 'line': case 'arrow': {
+        const x1 = shape.x1 || 0, y1 = shape.y1 || 0;
+        const x2 = shape.x2 || 0, y2 = shape.y2 || 0;
+        return [
+          { x: x1, y: y1 },
+          { x: x2, y: y2 },
+          { x: (x1 + x2) / 2, y: (y1 + y2) / 2 }
+        ];
+      }
+      case 'circle': {
+        const cx = shape.cx || 0, cy = shape.cy || 0, r = shape.r || 0;
+        // Center + 4 cardinal points so the perimeter can also align.
+        return [
+          { x: cx, y: cy },
+          { x: cx + r, y: cy }, { x: cx - r, y: cy },
+          { x: cx, y: cy + r }, { x: cx, y: cy - r }
+        ];
+      }
+      case 'ellipse': {
+        const cx = shape.cx || 0, cy = shape.cy || 0;
+        const rx = shape.rx || 0, ry = shape.ry || 0;
+        return [
+          { x: cx, y: cy },
+          { x: cx + rx, y: cy }, { x: cx - rx, y: cy },
+          { x: cx, y: cy + ry }, { x: cx, y: cy - ry }
+        ];
+      }
+      case 'polygon': {
+        const out = Array.isArray(shape.points)
+          ? shape.points.map(p => ({ x: p[0], y: p[1] }))
+          : [];
+        if(shape.cx != null && shape.cy != null) out.push({ x: shape.cx, y: shape.cy });
+        return out;
+      }
+      case 'rect': case 'image': case 'coords': {
+        const x = shape.x || 0, y = shape.y || 0;
+        const w = shape.w || 0, h = shape.h || 0;
+        return [
+          { x: x, y: y },                  // top-left
+          { x: x + w, y: y },              // top-right
+          { x: x, y: y + h },              // bottom-left
+          { x: x + w, y: y + h },          // bottom-right
+          { x: x + w / 2, y: y + h / 2 },  // center
+          { x: x + w / 2, y: y },          // top-center
+          { x: x + w / 2, y: y + h },      // bottom-center
+          { x: x, y: y + h / 2 },          // left-center
+          { x: x + w, y: y + h / 2 }       // right-center
+        ];
+      }
+      case 'label': {
+        // Labels render baseline-left, so (x, y) is the baseline anchor.
+        // The visual box reaches from (x, y - fontSize) to (x + textWidth, y).
+        const fs = Number(shape.fontSize) || 18;
+        const charW = fs * 0.55;
+        const textW = Math.max(charW, String(shape.text || ' ').length * charW);
+        const x = shape.x || 0, y = shape.y || 0;
+        return [
+          { x: x, y: y },                       // baseline-left (the anchor)
+          { x: x + textW, y: y },               // baseline-right
+          { x: x, y: y - fs },                  // top-left
+          { x: x + textW, y: y - fs },          // top-right
+          { x: x + textW / 2, y: y - fs / 2 }   // visual center
+        ];
+      }
+      default:
+        return [];
+    }
+  }
+
+  // Human-readable shape label for the picker dropdown (and any future UI
+  // that needs to name a shape).
+  function shapeDisplayName(shape, idx){
+    if(!shape || !shape.type) return 'Form ' + (idx + 1);
+    const polyByCount = { 3:'Dreieck', 4:'Viereck', 5:'Fünfeck', 6:'Sechseck', 7:'Siebeneck', 8:'Achteck' };
+    switch(shape.type){
+      case 'line':    return 'Linie';
+      case 'arrow':   return 'Pfeil';
+      case 'circle':  return 'Kreis  (r=' + (shape.r ?? '?') + ')';
+      case 'ellipse': return 'Ellipse';
+      case 'polygon': {
+        const n = Array.isArray(shape.points) ? shape.points.length : (shape.sides || 0);
+        return polyByCount[n] || (n + '-Eck');
+      }
+      case 'rect':    return 'Rechteck';
+      case 'label':   return 'Beschriftung „' + String(shape.text || '').slice(0, 20) + '"';
+      case 'coords':  return 'Koordinatensystem';
+      case 'image':   return shape.src ? 'Bild' : 'Bild  (leer)';
+      default:        return shape.type;
+    }
+  }
+
   // Polygon picker presets. Points are designed for 600×360; the add
   // handler translates them to the current canvas center.
   const POLYGON_PRESETS = [
@@ -211,6 +410,34 @@
         { type:'label',  x:255, y:192, text:'r = {r}', color:'#003b5c', fontSize:20, fontWeight:'700' },
         { type:'label',  x:380, y:215, text:'A = {}',  color:'#003b5c', fontSize:22, fontWeight:'700', formula:'pi*r*r' }
       ]
+    },
+    {
+      id: 'tpl-multi-step-pyth',
+      label: 'Mehrstufig: Pythagoras  (Lösung als Variable)',
+      description: '{1} und {2}, dabei nutzt {2} die Antwort {1*}',
+      canvasWidth: 640, canvasHeight: 380,
+      gradingMode: 'fillblanks',
+      variables: [
+        { name:'a', min:3, max:9, integer:true },
+        { name:'b', min:3, max:9, integer:true }
+      ],
+      shapes: [
+        // Triangle (the picture)
+        { type:'polygon', sides:3, points:[[170, 290],[470, 290],[170, 110]],
+          color:'#003b5c', fill:'#eef5f8', strokeWidth:3, dash:'solid' },
+        { type:'rect', x:170, y:274, w:16, h:16, color:'#5d6872', fill:'transparent', strokeWidth:1.5, dash:'solid' },
+        { type:'label', x:140, y:210, text:'a = {a}', color:'#003b5c', fontSize:20, fontWeight:'700' },
+        { type:'label', x:300, y:315, text:'b = {b}', color:'#003b5c', fontSize:20, fontWeight:'700' },
+        { type:'label', x:320, y:200, text:'c = ?', color:'#0f567d', fontSize:20, fontWeight:'700' },
+        // Step 1: enter c² in slot {1}
+        { type:'label', x:60, y:50, text:'1. Schritt:  c² = a² + b² = {1}',
+          color:'#003b5c', fontSize:17, fontWeight:'700',
+          formulas: { 1: { formula:'a*a + b*b', tolerance:0.01 } } },
+        // Step 2: enter c in slot {2}, using the previous answer {1*} = student's c²
+        { type:'label', x:60, y:80, text:'2. Schritt:  c = √{1*}  = {2}',
+          color:'#003b5c', fontSize:17, fontWeight:'700',
+          formulas: { 2: { formula:'sqrt({1*})', tolerance:0.01 } } }
+      ]
     }
   ];
 
@@ -322,8 +549,27 @@
     const axisColor  = shape.color || '#003b5c';
     const gridColor  = '#d8e0e6';
     const labelColor = '#5d6872';
-    const toSvgX = dx => x + (dx - xMin) / (xMax - xMin) * w;
-    const toSvgY = dy => y + (yMax - dy) / (yMax - yMin) * h;
+
+    // Equal aspect (default): one math unit takes the same number of SVG pixels
+    // on both axes, so a 1x1 grid cell renders as a square. Letterbox the
+    // unused space on the shorter side.
+    const equalAspect = shape.equalAspect !== false;
+    const xRange = (xMax - xMin) || 1;
+    const yRange = (yMax - yMin) || 1;
+    let effW = w, effH = h, offX = 0, offY = 0;
+    if(equalAspect){
+      const scale = Math.min(w / xRange, h / yRange);
+      effW = xRange * scale;
+      effH = yRange * scale;
+      offX = (w - effW) / 2;
+      offY = (h - effH) / 2;
+    }
+    const toSvgX = dx => x + offX + (dx - xMin) / xRange * effW;
+    const toSvgY = dy => y + offY + (yMax - dy) / yRange * effH;
+    const innerLeft   = x + offX;
+    const innerTop    = y + offY;
+    const innerRight  = x + offX + effW;
+    const innerBottom = y + offY + effH;
 
     // Invisible hit-rect so the whole area is draggable, not just the axes.
     const hit = document.createElementNS(NS, 'rect');
@@ -337,8 +583,8 @@
         if(Math.abs(v) < 1e-9) continue;
         const sx = toSvgX(v);
         const ln = document.createElementNS(NS, 'line');
-        ln.setAttribute('x1', sx); ln.setAttribute('y1', y);
-        ln.setAttribute('x2', sx); ln.setAttribute('y2', y + h);
+        ln.setAttribute('x1', sx); ln.setAttribute('y1', innerTop);
+        ln.setAttribute('x2', sx); ln.setAttribute('y2', innerBottom);
         ln.setAttribute('stroke', gridColor); ln.setAttribute('stroke-width', 1);
         g.appendChild(ln);
       }
@@ -346,8 +592,8 @@
         if(Math.abs(v) < 1e-9) continue;
         const sy = toSvgY(v);
         const ln = document.createElementNS(NS, 'line');
-        ln.setAttribute('x1', x); ln.setAttribute('y1', sy);
-        ln.setAttribute('x2', x + w); ln.setAttribute('y2', sy);
+        ln.setAttribute('x1', innerLeft); ln.setAttribute('y1', sy);
+        ln.setAttribute('x2', innerRight); ln.setAttribute('y2', sy);
         ln.setAttribute('stroke', gridColor); ln.setAttribute('stroke-width', 1);
         g.appendChild(ln);
       }
@@ -356,22 +602,22 @@
     if(yMin <= 0 && yMax >= 0){
       const sy = toSvgY(0);
       const ax = document.createElementNS(NS, 'line');
-      ax.setAttribute('x1', x); ax.setAttribute('y1', sy);
-      ax.setAttribute('x2', x + w); ax.setAttribute('y2', sy);
+      ax.setAttribute('x1', innerLeft); ax.setAttribute('y1', sy);
+      ax.setAttribute('x2', innerRight); ax.setAttribute('y2', sy);
       ax.setAttribute('stroke', axisColor); ax.setAttribute('stroke-width', 1.6);
       g.appendChild(ax);
     }
     if(xMin <= 0 && xMax >= 0){
       const sx = toSvgX(0);
       const ax = document.createElementNS(NS, 'line');
-      ax.setAttribute('x1', sx); ax.setAttribute('y1', y);
-      ax.setAttribute('x2', sx); ax.setAttribute('y2', y + h);
+      ax.setAttribute('x1', sx); ax.setAttribute('y1', innerTop);
+      ax.setAttribute('x2', sx); ax.setAttribute('y2', innerBottom);
       ax.setAttribute('stroke', axisColor); ax.setAttribute('stroke-width', 1.6);
       g.appendChild(ax);
     }
     if(shape.showLabels !== false){
-      const baseY = (yMin <= 0 && yMax >= 0) ? toSvgY(0) + 12 : y + h - 4;
-      const baseX = (xMin <= 0 && xMax >= 0) ? toSvgX(0) - 6 : x - 4;
+      const baseY = (yMin <= 0 && yMax >= 0) ? toSvgY(0) + 12 : innerBottom - 4;
+      const baseX = (xMin <= 0 && xMax >= 0) ? toSvgX(0) - 6 : innerLeft - 4;
       for(let v = Math.ceil(xMin / step) * step; v <= xMax + 1e-9; v += step){
         if(Math.abs(v) < 1e-9) continue;
         const tx = document.createElementNS(NS, 'text');
@@ -484,11 +730,21 @@
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.setAttribute('width', '100%');
     svg.style.display = 'block';
-    svg.style.maxWidth = w + 'px';
     svg.style.background = config.background || '#ffffff';
     svg.style.border = '1px solid var(--line, #d8e0e6)';
     svg.style.borderRadius = '8px';
-    if(opts && opts.fullHeight){ svg.style.height = h + 'px'; svg.style.maxHeight = 'none'; }
+    // Builder editor: drag-to-resize handles need pixel-based hit coords, so
+    // we keep the SVG locked to its native size. Runtime/preview: stretch the
+    // SVG to fill the container so shapes scale when the window resizes.
+    if(opts && opts.builder){
+      svg.style.maxWidth = w + 'px';
+    } else {
+      svg.setAttribute('height', '100%');
+      svg.style.width = '100%';
+      // aspectRatio keeps the box proportional when the parent has no fixed height.
+      svg.style.aspectRatio = w + ' / ' + h;
+    }
+    if(opts && opts.fullHeight){ svg.style.height = h + 'px'; svg.style.maxHeight = 'none'; svg.style.aspectRatio = ''; }
     // capViewport: only in runtime/preview, never in the builder canvas.
     if(opts && opts.capViewport){
       // Cap to viewport minus SCORM chrome (~420 px), minimum 240 px.
@@ -718,17 +974,20 @@
       tplGroup.appendChild(tplBtn);
       bar.appendChild(tplGroup);
 
-      // Formula popover: formula + tolerance + helper buttons. Blank-toggle
-      // only when the label has no {} in its text (legacy workflow).
+      // Formula popover: per-slot formulas (one row per {N} placeholder) or the
+      // legacy single formula for {} / blank:true.
       function openBewertungPopover(anchorEl, sel){
         document.querySelectorAll('.comp-bew-popover').forEach(n => n.remove());
         const pop = document.createElement('div');
         pop.className = 'comp-bew-popover';
         pop.addEventListener('click', ev => ev.stopPropagation());
 
-        const hasInlineBlank = !!(sel.text && sel.text.indexOf('{}') >= 0);
+        const labelText = sel.text || '';
+        const numberedSlots = slotNumbersInLabel(labelText);
+        const hasLegacy    = labelText.indexOf('{}') >= 0;
+        const hasInlineBlank = hasLegacy || numberedSlots.length > 0;
 
-        // Blank-toggle only in legacy cases (no {} in text).
+        // Blank-toggle only in legacy cases (no {} or {N} in text).
         if(!hasInlineBlank){
           const luWrap = document.createElement('label');
           luWrap.className = 'comp-bew-row';
@@ -751,44 +1010,18 @@
         body.className = 'comp-bew-body';
         pop.appendChild(body);
 
-        function renderBewBody(){
-          body.innerHTML = '';
-          const isBlank = hasInlineBlank || !!sel.blank;
-          if(!isBlank) return;
-
-          // 2) Static solution - only when no formula is set
-          const hasFormula = !!(sel.formula && String(sel.formula).trim());
-          const solWrap = document.createElement('div');
-          solWrap.className = 'comp-bew-field';
-          if(hasFormula) solWrap.style.display = 'none';
-          const solLbl = document.createElement('label');
-          solLbl.textContent = 'Lösung (statisch)';
-          solWrap.appendChild(solLbl);
-          const sol = document.createElement('input');
-          sol.type = 'text';
-          sol.placeholder = 'z. B. 42 oder "Wasser"';
-          sol.value = sel.correctText || '';
-          sol.title = 'Erwartete Antwort ohne Berechnung. Wird ignoriert sobald eine Formel gesetzt ist.';
-          sol.addEventListener('input', () => { sel.correctText = sol.value; commitQuiet(); });
-          solWrap.appendChild(sol);
-          body.appendChild(solWrap);
-
-          // 3) Formula input + helper buttons
+        function mkFormulaField(currentFormula, currentTolerance, onChange, slotN){
           const fmlWrap = document.createElement('div');
           fmlWrap.className = 'comp-bew-field';
           const fmlLbl = document.createElement('label');
-          fmlLbl.textContent = 'Formel (mit Variablen)';
+          fmlLbl.textContent = slotN != null ? ('Formel für {' + slotN + '}') : 'Formel (mit Variablen)';
           fmlWrap.appendChild(fmlLbl);
           const fml = document.createElement('input');
           fml.type = 'text';
-          fml.placeholder = 'z. B. a*b oder sqrt(a*a+b*b)';
-          fml.value = sel.formula || '';
-          fml.title = 'Formel überschreibt die statische Lösung';
-          fml.addEventListener('input', () => {
-            sel.formula = fml.value;
-            solWrap.style.display = fml.value.trim() ? 'none' : '';
-            commitQuiet();
-          });
+          fml.placeholder = 'z. B. a*b · sqrt(a*a+b*b) · sqrt({1*})';
+          fml.value = currentFormula || '';
+          fml.title = 'Formel · Schüler-Antworten als {1*}, {2*} … oder s1, s2 …';
+          fml.addEventListener('input', () => { onChange(fml.value); commitQuiet(); });
           fmlWrap.appendChild(fml);
 
           function insertAtCaret(snippet, caretOffset){
@@ -796,11 +1029,10 @@
             const end   = fml.selectionEnd   ?? fml.value.length;
             const next  = fml.value.slice(0, start) + snippet + fml.value.slice(end);
             fml.value = next;
-            sel.formula = next;
+            onChange(next);
             fml.focus();
             const c = start + (caretOffset != null ? caretOffset : snippet.length);
             fml.setSelectionRange(c, c);
-            solWrap.style.display = next.trim() ? 'none' : '';
             commitQuiet();
           }
           const helpRow = document.createElement('div');
@@ -832,8 +1064,83 @@
             });
             helpRow.appendChild(sel2);
           }
+          // Insert other slots' answer variables {N*}.
+          const otherSlots = numberedSlots.filter(n => slotN == null || n !== slotN);
+          if(otherSlots.length){
+            const slotSel = document.createElement('select');
+            slotSel.className = 'comp-formula-btn';
+            slotSel.title = 'Schüler-Antwort eines anderen Slots in die Formel einfügen';
+            slotSel.innerHTML = '<option value="">Antwort {N*}…</option>' +
+              otherSlots.map(n => '<option value="{' + n + '*}">{' + n + '*}</option>').join('');
+            slotSel.addEventListener('change', () => {
+              const v = slotSel.value;
+              slotSel.value = '';
+              if(v) insertAtCaret(v);
+            });
+            helpRow.appendChild(slotSel);
+          }
           fmlWrap.appendChild(helpRow);
-          body.appendChild(fmlWrap);
+          return fmlWrap;
+        }
+
+        function renderBewBody(){
+          body.innerHTML = '';
+          const isBlank = hasInlineBlank || !!sel.blank;
+          if(!isBlank) return;
+
+          if(numberedSlots.length > 0){
+            // Multi-slot mode: one formula field per {N}.
+            const hint = document.createElement('div');
+            hint.style.cssText = 'font-size:0.78rem; color:#5d6872; line-height:1.35; padding:0 0 0.4rem;';
+            hint.innerHTML = numberedSlots.length === 1
+              ? 'Slot <strong>{' + numberedSlots[0] + '}</strong>: Formel für die erwartete Antwort.'
+              : 'Pro Slot eine Formel. Nutze <code>{N*}</code> oder <code>s<i>N</i></code>, um die Antwort aus einem früheren Slot weiterzunutzen.';
+            body.appendChild(hint);
+            sel.formulas = sel.formulas || {};
+            numberedSlots.forEach(n => {
+              const entry = sel.formulas[n] || {};
+              const fieldWrap = mkFormulaField(
+                entry.formula || (n === numberedSlots[0] ? (sel.formula || '') : ''),
+                entry.tolerance,
+                v => {
+                  sel.formulas = sel.formulas || {};
+                  sel.formulas[n] = Object.assign({}, sel.formulas[n] || {}, { formula: v });
+                  // Mirror the first slot into the legacy sel.formula for back-compat.
+                  if(n === numberedSlots[0]) sel.formula = v;
+                },
+                n
+              );
+              body.appendChild(fieldWrap);
+            });
+          } else {
+            // Legacy single-formula path.
+            const hasFormula = !!(sel.formula && String(sel.formula).trim());
+            const solWrap = document.createElement('div');
+            solWrap.className = 'comp-bew-field';
+            if(hasFormula) solWrap.style.display = 'none';
+            const solLbl = document.createElement('label');
+            solLbl.textContent = 'Lösung (statisch)';
+            solWrap.appendChild(solLbl);
+            const sol = document.createElement('input');
+            sol.type = 'text';
+            sol.placeholder = 'z. B. 42 oder "Wasser"';
+            sol.value = sel.correctText || '';
+            sol.title = 'Erwartete Antwort ohne Berechnung. Wird ignoriert sobald eine Formel gesetzt ist.';
+            sol.addEventListener('input', () => { sel.correctText = sol.value; commitQuiet(); });
+            solWrap.appendChild(sol);
+            body.appendChild(solWrap);
+
+            const fmlWrap = mkFormulaField(
+              sel.formula,
+              sel.tolerance,
+              v => {
+                sel.formula = v;
+                solWrap.style.display = v.trim() ? 'none' : '';
+              },
+              null
+            );
+            body.appendChild(fmlWrap);
+          }
         }
         renderBewBody();
 
@@ -911,7 +1218,7 @@
           const card = document.createElement('button');
           card.type = 'button';
           card.className = 'comp-poly-card';
-          card.title = preset.label + ' - ' + preset.hint;
+          card.title = preset.label + ': ' + preset.hint;
           card.innerHTML =
             '<div class="comp-poly-card-icon">' + preset.icon + '</div>' +
             '<div class="comp-poly-card-label">' + preset.label + '</div>' +
@@ -1070,6 +1377,67 @@
         }, 0);
       }
 
+      // Quick shape-picker dropdown: lists every shape with its type and a
+// short label so the author can re-select a previously-added shape without
+// having to find it on the canvas.
+      function openShapePicker(anchorEl){
+        document.querySelectorAll('.comp-shape-picker').forEach(n => n.remove());
+        const pop = document.createElement('div');
+        pop.className = 'comp-var-dialog comp-shape-picker';
+        pop.addEventListener('click', e => e.stopPropagation());
+
+        const head = document.createElement('div');
+        head.className = 'comp-var-dialog-head';
+        head.innerHTML = '<strong>Formen</strong>' +
+          '<span style="font-size:0.78rem;color:#5d6872;">zum Auswählen klicken</span>';
+        pop.appendChild(head);
+
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex; flex-direction:column; gap:2px; max-height:340px; overflow:auto;';
+        (block.config.shapes || []).forEach((s, idx) => {
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'comp-tool-btn-text comp-shape-picker-row';
+          const isSel = isSelected(idx);
+          row.style.cssText = 'display:flex; align-items:center; gap:0.55rem; padding:0.4rem 0.6rem; text-align:left; width:100%; ' +
+            'background:' + (isSel ? 'rgba(132,191,102,0.18)' : 'transparent') + '; ' +
+            'border:1px solid ' + (isSel ? '#84bf66' : 'transparent') + '; border-radius:6px;';
+          const icoSpan = document.createElement('span');
+          icoSpan.style.cssText = 'display:inline-flex; width:20px; height:20px; align-items:center; justify-content:center; color:' + (s.color || '#003b5c') + ';';
+          icoSpan.innerHTML = SHAPE_ICONS[s.type] || '';
+          row.appendChild(icoSpan);
+          const txt = document.createElement('span');
+          txt.style.cssText = 'flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+          txt.textContent = shapeDisplayName(s, idx);
+          row.appendChild(txt);
+          row.addEventListener('click', () => {
+            setSingleSelection(idx);
+            close();
+            render();
+          });
+          list.appendChild(row);
+        });
+        pop.appendChild(list);
+
+        const r = anchorEl.getBoundingClientRect();
+        pop.style.left = Math.max(8, r.left) + 'px';
+        pop.style.top  = (r.bottom + 4) + 'px';
+        pop.style.minWidth = '240px';
+        document.body.appendChild(pop);
+
+        function close(){
+          pop.remove();
+          document.removeEventListener('click', onDoc, true);
+          document.removeEventListener('keydown', onKey, true);
+        }
+        const onDoc = e => { if(!pop.contains(e.target) && e.target !== anchorEl) close(); };
+        const onKey = e => { if(e.key === 'Escape') close(); };
+        setTimeout(() => {
+          document.addEventListener('click', onDoc, true);
+          document.addEventListener('keydown', onKey, true);
+        }, 0);
+      }
+
       // Inline mini-form to add a random variable. Avoids the round-trip
       // through the config-pane's deeply-nested variables list.
       function openVariableDialog(anchorEl){
@@ -1189,7 +1557,7 @@
           });
           block.config.shapes    = (block.config.shapes || []).concat(newShapes);
           block.config.variables = (block.config.variables || []).concat(newVars);
-          // Keep existing gradingMode unless still 'none' - then promote.
+          // Keep existing gradingMode unless still 'none'; in that case promote.
           if(!block.config.gradingMode || block.config.gradingMode === 'none'){
             block.config.gradingMode = tpl.gradingMode || 'none';
           }
@@ -1242,7 +1610,7 @@
           const card = document.createElement('button');
           card.type = 'button';
           card.className = 'comp-tpl-card';
-          card.title = tpl.label + ' - ' + tpl.description;
+          card.title = tpl.label + ': ' + tpl.description;
 
           // Mini-SVG preview using the template's shapes at a thumbnail scale.
           const previewSvg = buildSvg({
@@ -1374,7 +1742,7 @@
       });
       bar.appendChild(addGroup);
 
-      // Clickable mode chip. Only three modes - click/hotspot belong in other blocks.
+      // Clickable mode chip. Only three modes; click/hotspot belong in other blocks.
       const modeBadge = document.createElement('div');
       modeBadge.className = 'comp-tool-group comp-mode-badge';
       const _gradingMode = block.config.gradingMode || 'none';
@@ -1454,6 +1822,23 @@
         });
       }
       modeBadge.appendChild(addVarBtn);
+
+      // Shape picker: lists all shapes for quick selection (e.g. to resize an
+      // existing triangle without having to click it on the canvas).
+      const shapes = block.config.shapes || [];
+      if(shapes.length > 0){
+        const shapesBtn = document.createElement('button');
+        shapesBtn.type = 'button';
+        shapesBtn.className = 'comp-tool-btn-text';
+        shapesBtn.title = shapes.length + ' Form' + (shapes.length === 1 ? '' : 'en') + ' in dieser Komposition. Klicken zum Auswählen.';
+        shapesBtn.textContent = 'Formen (' + shapes.length + ')';
+        shapesBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          openShapePicker(shapesBtn);
+        });
+        modeBadge.appendChild(shapesBtn);
+      }
+
       bar.appendChild(modeBadge);
 
       // Style controls (active only when a shape is selected).
@@ -1674,24 +2059,50 @@
           const pop = document.createElement('div');
           pop.className = 'comp-insert-popover';
           pop.addEventListener('click', ev => ev.stopPropagation());
-          // Solution field {}: insert at caret. Becomes an answer input at runtime.
-          const hSol = document.createElement('div'); hSol.className = 'comp-insert-head'; hSol.textContent = 'Lösungsfeld';
+          // Solution fields: numbered slots {N} and answer-mirrors {N*}.
+          const hSol = document.createElement('div'); hSol.className = 'comp-insert-head'; hSol.textContent = 'Lösungsfelder';
           pop.appendChild(hSol);
+          // Discover which slot numbers are already used across all labels.
+          const usedSlots = new Set();
+          (block.config.shapes || []).forEach(sh => {
+            if(sh.type === 'label' && sh.text){
+              slotNumbersInLabel(sh.text).forEach(n => usedSlots.add(n));
+            }
+          });
+          let nextSlot = 1;
+          while(usedSlots.has(nextSlot)) nextSlot++;
+
           const solRow = document.createElement('div'); solRow.className = 'comp-insert-row';
-          const solBtn = document.createElement('button');
-          solBtn.type = 'button'; solBtn.className = 'comp-insert-cell comp-insert-cell-var';
-          solBtn.textContent = '{}';
-          solBtn.title = 'Antwort-Eingabefeld. Erwartet die Formel des Labels.';
-          solBtn.addEventListener('click', () => {
-            tiInsertAtCaret('{}');
+          const newSlotBtn = document.createElement('button');
+          newSlotBtn.type = 'button'; newSlotBtn.className = 'comp-insert-cell comp-insert-cell-var';
+          newSlotBtn.textContent = '{' + nextSlot + '}';
+          newSlotBtn.title = 'Neues Antwort-Eingabefeld (Slot ' + nextSlot + ')';
+          newSlotBtn.addEventListener('click', () => {
+            tiInsertAtCaret('{' + nextSlot + '}');
             if((block.config.gradingMode || 'none') !== 'fillblanks'){
               block.config.gradingMode = 'fillblanks';
             }
             pop.remove();
             commit();
           });
-          solRow.appendChild(solBtn);
+          solRow.appendChild(newSlotBtn);
+
+          // Mirror buttons for existing slots: insert {N*} to display the answer.
+          Array.from(usedSlots).sort((a,b)=>a-b).forEach(n => {
+            const mirBtn = document.createElement('button');
+            mirBtn.type = 'button'; mirBtn.className = 'comp-insert-cell';
+            mirBtn.textContent = '{' + n + '*}';
+            mirBtn.title = 'Spiegelung: zeigt die Schüler-Antwort aus Slot ' + n + ' an (auch nutzbar in Formeln)';
+            mirBtn.addEventListener('click', () => { tiInsertAtCaret('{' + n + '*}'); pop.remove(); });
+            solRow.appendChild(mirBtn);
+          });
           pop.appendChild(solRow);
+
+          // Help line so professors discover the feature.
+          const hint = document.createElement('div');
+          hint.style.cssText = 'font-size:0.72rem; color:#5d6872; padding:0.3rem 0.5rem 0.4rem; line-height:1.35;';
+          hint.innerHTML = '<strong>{N}</strong>: Antwortfeld · <strong>{N*}</strong>: Schüler-Antwort weiternutzen (im Text oder in einer Formel)';
+          pop.appendChild(hint);
           if(definedVars.length > 0){
             const h = document.createElement('div'); h.className = 'comp-insert-head'; h.textContent = 'Variablen';
             pop.appendChild(h);
@@ -1852,8 +2263,8 @@
             () => sel.isCorrect, v => { sel.isCorrect = v; });
         }
         if(gMode === 'fillblanks' && sel.type === 'label'){
-          // Formula popover only shows once the label has {} or legacy blank=true.
-          const hasInline = !!(sel.text && sel.text.indexOf('{}') >= 0);
+          // Formula popover only shows once the label has {}/{N} or legacy blank=true.
+          const hasInline = !!(sel.text && (sel.text.indexOf('{}') >= 0 || slotNumbersInLabel(sel.text).length > 0));
           if(hasInline || sel.blank){
             const bewBtn = document.createElement('button');
             bewBtn.type = 'button';
@@ -2075,7 +2486,7 @@
           )
         });
       }
-      const svg = buildSvg(renderConfig, { interactive: true, idPrefix: 'comp-edit-' + (block.id || 'b') });
+      const svg = buildSvg(renderConfig, { interactive: true, builder: true, idPrefix: 'comp-edit-' + (block.id || 'b') });
       svg.classList.add('comp-canvas');
       svg.style.cursor = block._compTool === 'select' ? 'crosshair' : 'default';
 
@@ -2135,9 +2546,18 @@
       const fo = document.createElementNS(NS, 'foreignObject');
       fo.setAttribute('x', shape.x - 4);
       fo.setAttribute('y', (shape.y || 0) - fs - 2);
-      // Width grows with text length (heuristic).
-      fo.setAttribute('width', Math.max(120, ((shape.text || '').length + 6) * fs * 0.6));
       fo.setAttribute('height', fs + 12);
+      // Resize the foreign-object so the input grows with the text, capped to
+      // the available SVG width so it never spills out of the canvas.
+      function resizeForeignObject(value){
+        const charW = fs * 0.6;
+        const padding = 6;
+        const ideal = Math.max(120, (String(value || '').length + padding) * charW);
+        const canvasW = Math.max(100, Number(block.config && block.config.canvasWidth) || 600);
+        const maxW = Math.max(120, canvasW - (shape.x || 0) - 8);
+        fo.setAttribute('width', Math.min(ideal, maxW));
+      }
+      resizeForeignObject(shape.text || '');
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.value = shape.text || '';
@@ -2171,6 +2591,7 @@
         fo.remove();
         node.style.display = '';
       }
+      inp.addEventListener('input', () => resizeForeignObject(inp.value));
       inp.addEventListener('blur', save);
       inp.addEventListener('keydown', e => {
         if(e.key === 'Enter'){ e.preventDefault(); save(); }
@@ -2233,6 +2654,15 @@
         const start = svgPoint(svg, e.clientX, e.clientY);
         let moved = false;
 
+        // Snap-to-grid: if a coords system is on the canvas (not part of the
+        // dragged selection), snap vertices/endpoints/corners of the primary
+        // shape to the nearest grid intersection while dragging. Hold Alt
+        // to bypass.
+        const excludeSet = new Set(draggedIndices);
+        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        let snapIndicator = null;
+
         function applyDelta(shape, original, dx, dy){
           if(shape.type === 'line' || shape.type === 'arrow'){
             shape.x1 = Math.round(original.x1 + dx); shape.y1 = Math.round(original.y1 + dy);
@@ -2250,11 +2680,60 @@
             shape.y = Math.round((original.y || 0) + dy);
           }
         }
+
+        // Compute snap correction for the primary shape's anchor points so
+        // the closest grid-aligned vertex pulls the whole shape into position.
+        function computeSnapAdjust(dx, dy){
+          if(!snapFn) return null;
+          const primary = block.config.shapes[idx];
+          if(!primary || primary.type === 'coords') return null;
+          const origPrimary = snapshots.find(s => s.i === idx)?.original;
+          if(!origPrimary) return null;
+          const candidates = shapeSnapCandidates(origPrimary).map(c => ({ x: c.x + dx, y: c.y + dy }));
+          let best = null;
+          for(const c of candidates){
+            const s = snapFn(c.x, c.y, 12);
+            if(s && (!best || (s.dx*s.dx + s.dy*s.dy) < (best.dx*best.dx + best.dy*best.dy))){
+              best = s;
+            }
+          }
+          return best;
+        }
+
+        function showSnapIndicator(p){
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
+          if(!p) return;
+          const g = document.createElementNS(NS, 'g');
+          g.setAttribute('data-snap-indicator', '1');
+          g.style.pointerEvents = 'none';
+          const ring = document.createElementNS(NS, 'circle');
+          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
+          ring.setAttribute('r', 7);
+          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
+          ring.setAttribute('stroke', '#84bf66');
+          ring.setAttribute('stroke-width', '1.5');
+          g.appendChild(ring);
+          const dot = document.createElementNS(NS, 'circle');
+          dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
+          dot.setAttribute('r', 2);
+          dot.setAttribute('fill', '#84bf66');
+          g.appendChild(dot);
+          svg.appendChild(g);
+          snapIndicator = g;
+        }
+
         function onMove(ev){
           const p = svgPoint(svg, ev.clientX, ev.clientY);
-          const dx = p.x - start.x, dy = p.y - start.y;
+          let dx = p.x - start.x, dy = p.y - start.y;
           if(!moved && (Math.abs(dx) > 1 || Math.abs(dy) > 1)){ moved = true; }
           if(!moved) return;
+          // Snap adjust unless Alt is held (free-drag override).
+          let snapHit = null;
+          if(!ev.altKey){
+            snapHit = computeSnapAdjust(dx, dy);
+            if(snapHit){ dx += snapHit.dx; dy += snapHit.dy; }
+          }
+          showSnapIndicator(snapHit);
           snapshots.forEach(snap => {
             const sh = block.config.shapes[snap.i];
             if(!sh) return;
@@ -2267,6 +2746,7 @@
         function onUp(){
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(moved){
             commit();
           } else if(!wasSelected){
@@ -2442,10 +2922,36 @@
         e.stopPropagation(); e.preventDefault();
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
+        const excludeSet = new Set([idx]);
+        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        let snapIndicator = null;
+        function showEndpointSnap(p){
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
+          if(!p) return;
+          const g = document.createElementNS(NS, 'g');
+          g.setAttribute('data-snap-indicator', '1');
+          g.style.pointerEvents = 'none';
+          const ring = document.createElementNS(NS, 'circle');
+          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
+          ring.setAttribute('r', 7);
+          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
+          ring.setAttribute('stroke', '#84bf66');
+          ring.setAttribute('stroke-width', '1.5');
+          g.appendChild(ring);
+          svg.appendChild(g);
+          snapIndicator = g;
+        }
         let moved = false;
         function onMove(ev){
-          const p = svgPoint(svg, ev.clientX, ev.clientY);
+          let p = svgPoint(svg, ev.clientX, ev.clientY);
           moved = true;
+          let snapped = null;
+          if(snapFn && !ev.altKey){
+            snapped = snapFn(p.x, p.y, 12);
+            if(snapped) p = { x: snapped.x, y: snapped.y };
+          }
+          showEndpointSnap(snapped);
           if(which === 'p1'){ shape.x1 = Math.round(p.x); shape.y1 = Math.round(p.y); }
           else              { shape.x2 = Math.round(p.x); shape.y2 = Math.round(p.y); }
           updateShapeNode(node, shape, idx);
@@ -2454,6 +2960,7 @@
         function onUp(){
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(moved) commit();
         }
         document.addEventListener('mousemove', onMove);
@@ -2465,9 +2972,35 @@
         e.stopPropagation(); e.preventDefault();
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
+        const excludeSet = new Set([idx]);
+        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        let snapIndicator = null;
+        function showRadiusSnap(p){
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
+          if(!p) return;
+          const g = document.createElementNS(NS, 'g');
+          g.setAttribute('data-snap-indicator', '1');
+          g.style.pointerEvents = 'none';
+          const ring = document.createElementNS(NS, 'circle');
+          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
+          ring.setAttribute('r', 7);
+          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
+          ring.setAttribute('stroke', '#84bf66');
+          ring.setAttribute('stroke-width', '1.5');
+          g.appendChild(ring);
+          svg.appendChild(g);
+          snapIndicator = g;
+        }
         let moved = false;
         function onMove(ev){
-          const p = svgPoint(svg, ev.clientX, ev.clientY);
+          let p = svgPoint(svg, ev.clientX, ev.clientY);
+          let snapped = null;
+          if(snapFn && !ev.altKey){
+            snapped = snapFn(p.x, p.y, 12);
+            if(snapped) p = { x: snapped.x, y: snapped.y };
+          }
+          showRadiusSnap(snapped);
           const r = Math.max(4, Math.round(Math.abs(p.x - shape.cx)));
           shape.r = r;
           moved = true;
@@ -2478,6 +3011,7 @@
         function onUp(){
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(moved) commit();
         }
         document.addEventListener('mousemove', onMove);
@@ -2558,12 +3092,39 @@
         const startDist = Math.hypot(startPt[0] - startCentroid.x, startPt[1] - startCentroid.y) || 1;
         const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
+        // Snap to grid (vertex mode only; uniform-scale keeps free movement).
+        const excludeSet = new Set([idx]);
+        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
+        const snapFn = (!uniform && snapCoords) ? makeGridSnap(snapCoords) : null;
+        let snapIndicator = null;
+        function showVertexSnap(p){
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
+          if(!p) return;
+          const g = document.createElementNS(NS, 'g');
+          g.setAttribute('data-snap-indicator', '1');
+          g.style.pointerEvents = 'none';
+          const ring = document.createElementNS(NS, 'circle');
+          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
+          ring.setAttribute('r', 7);
+          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
+          ring.setAttribute('stroke', '#84bf66');
+          ring.setAttribute('stroke-width', '1.5');
+          g.appendChild(ring);
+          svg.appendChild(g);
+          snapIndicator = g;
+        }
         // rAF-coalesced updates: at most one change per repaint.
-        let pendingPoint = null, rafScheduled = false;
+        let pendingPoint = null, rafScheduled = false, pendingAlt = false;
         function applyUpdate(){
           rafScheduled = false;
           if(!pendingPoint) return;
-          const p = pendingPoint; pendingPoint = null;
+          let p = pendingPoint; pendingPoint = null;
+          let snapped = null;
+          if(snapFn && !pendingAlt){
+            snapped = snapFn(p.x, p.y, 12);
+            if(snapped) p = { x: snapped.x, y: snapped.y };
+          }
+          showVertexSnap(snapped);
           if(uniform){
             const dist = Math.hypot(p.x - startCentroid.x, p.y - startCentroid.y);
             const ratio = Math.max(0.1, dist / startDist);
@@ -2585,6 +3146,7 @@
         function onMove(ev){
           moved = true;
           pendingPoint = svgPoint(svg, ev.clientX, ev.clientY);
+          pendingAlt = ev.altKey;
           if(!rafScheduled){
             rafScheduled = true;
             requestAnimationFrame(applyUpdate);
@@ -2594,6 +3156,7 @@
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
           if(rafScheduled){ applyUpdate(); } // flush tail
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(moved) commit();
         }
         document.addEventListener('mousemove', onMove);
@@ -2609,8 +3172,35 @@
         const aspect = startH / startW;
         const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
+        // Snap the bottom-right corner to the grid while resizing.
+        const excludeSet = new Set([idx]);
+        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
+        const snapFn = snapCoords ? makeGridSnap(snapCoords) : null;
+        let snapIndicator = null;
+        function showResizeSnap(p){
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
+          if(!p) return;
+          const g = document.createElementNS(NS, 'g');
+          g.setAttribute('data-snap-indicator', '1');
+          g.style.pointerEvents = 'none';
+          const ring = document.createElementNS(NS, 'circle');
+          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
+          ring.setAttribute('r', 7);
+          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
+          ring.setAttribute('stroke', '#84bf66');
+          ring.setAttribute('stroke-width', '1.5');
+          g.appendChild(ring);
+          svg.appendChild(g);
+          snapIndicator = g;
+        }
         function onMove(ev){
-          const p = svgPoint(svg, ev.clientX, ev.clientY);
+          let p = svgPoint(svg, ev.clientX, ev.clientY);
+          let snapped = null;
+          if(snapFn && !ev.altKey){
+            snapped = snapFn(p.x, p.y, 12);
+            if(snapped) p = { x: snapped.x, y: snapped.y };
+          }
+          showResizeSnap(snapped);
           const w = Math.max(4, Math.round(p.x - shape.x));
           if(uniform){
             shape.w = w;
@@ -2632,6 +3222,7 @@
         function onUp(){
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(moved) commit();
         }
         document.addEventListener('mousemove', onMove);
@@ -2721,7 +3312,7 @@
         return;
       }
 
-      // Consume Ctrl+A/Delete even without shapes - otherwise main.js acts on the card.
+      // Consume Ctrl+A/Delete even without shapes, otherwise main.js acts on the card.
       const sels = selIndices();
       if(mod && (key === 'a' || key === 'A')){
         e.preventDefault();
@@ -2950,7 +3541,9 @@
     return {};
   }
 
-  // Mode: fillblanks. Label shapes with blank=true become inputs.
+  // Mode: fillblanks. Label shapes with {} / {N} placeholders become inputs.
+  // {N*} renders as a read-only mirror of slot N's expected value, so authors
+  // can build multi-step problems where step 2 references step 1's solution.
   function runFillBlanks(ui, config, api, maxPoints){
     const u = window.BlockUtils;
     const variables = Array.isArray(config.variables) ? config.variables : [];
@@ -2958,60 +3551,99 @@
     let renderedSvgHost = document.createElement('div');
     ui.content.appendChild(renderedSvgHost);
 
-    // Shared helpers (compGenVars/compFillTemplate) bound locally for brevity.
     const genVars       = () => compGenVars(variables);
     const fillTemplate  = compFillTemplate;
     function evalFormula(expr, vars){
       if(!expr) return null;
       try {
-        const r = u.safeMathExpr(String(expr), vars);
+        const r = u.safeMathExpr(expandSlotRefs(expr), vars);
         if(typeof r === 'number' && Number.isFinite(r)) return r;
       } catch(e){}
       return null;
     }
-    // Resolve a blank's expected answer: if `formula` is set, evaluate it
-    // with the current variables; otherwise use `correctText` (static fallback).
-    function expectedFor(sh, vars){
-      if(sh.formula && String(sh.formula).trim()){
-        const v = evalFormula(sh.formula, vars);
-        if(v != null) return { value: v, asString: Number.isInteger(v) ? String(v) : String(Math.round(v * 1000) / 1000) };
-      }
-      const txt = String(sh.correctText || sh.text || '').trim();
-      const filled = fillTemplate(txt, vars);
-      const asNum = u.parseNum(filled);
-      return { value: asNum, asString: filled };
+    // Pre-compute expected values for every input slot in slot-number order,
+    // so a slot's formula can reference earlier slots via {1*}/s1. Returns
+    // { 1: {value, asString, tolerance, formula}, 2: ... } and `slotVars`
+    // (the s1, s2, ... map suitable for safeMathExpr).
+    function computeSlotExpected(){
+      const shapes = config.shapes || [];
+      const usedSlots = new Set();
+      shapes.forEach(sh => {
+        if(sh.type !== 'label' || !sh.text) return;
+        slotNumbersInLabel(sh.text).forEach(n => usedSlots.add(n));
+        // Legacy {} counts as the first unnamed slot.
+        if(sh.text.indexOf('{}') >= 0) usedSlots.add(0);
+      });
+      const slotOrder = Array.from(usedSlots).sort((a, b) => a - b);
+      const results = {};
+      const slotVars = {};
+      // For each slot, find the label(s) that own it and look up its formula.
+      slotOrder.forEach(n => {
+        let formula = null, tolerance = 0.01, ownerLabel = null;
+        for(const sh of shapes){
+          if(sh.type !== 'label') return;
+          // Numbered slot: look in sh.formulas[n] first.
+          if(n > 0 && sh.formulas && sh.formulas[n] && sh.formulas[n].formula){
+            formula = sh.formulas[n].formula;
+            tolerance = Number(sh.formulas[n].tolerance) || tolerance;
+            ownerLabel = sh; break;
+          }
+          // Legacy: a label that has {N} (or {} for n=0) AND a sh.formula.
+          const hasNumbered = n > 0 && slotNumbersInLabel(sh.text || '').indexOf(n) >= 0;
+          const hasLegacy   = n === 0 && (sh.text || '').indexOf('{}') >= 0;
+          if((hasNumbered || hasLegacy) && sh.formula && String(sh.formula).trim()){
+            formula = sh.formula;
+            tolerance = Number(sh.tolerance) || tolerance;
+            ownerLabel = sh; break;
+          }
+        }
+        const allVars = Object.assign({}, currentVars, slotVars);
+        let value = formula ? evalFormula(formula, allVars) : null;
+        // Static fallback: if no formula but label has correctText.
+        if(value == null && ownerLabel && ownerLabel.correctText){
+          const filled = fillTemplate(String(ownerLabel.correctText), allVars);
+          const asNum = u.parseNum(filled);
+          if(asNum != null) value = asNum;
+        }
+        const asString = value == null ? '' : formatSlotValue(value);
+        results[n] = { value, asString, tolerance, formula };
+        if(n > 0 && value != null) slotVars['s' + n] = value;
+      });
+      return { results, slotVars };
     }
 
     function render(){
       renderedSvgHost.innerHTML = '';
-      // Substitute named variables {name}; the {} solution placeholder is preserved.
+      // Substitute named variables {name} (numbered {N} placeholders are kept).
       const shapes = (config.shapes || []).map(sh => {
         if(sh.type !== 'label') return sh;
         return Object.assign({}, sh, { text: fillTemplate(sh.text, currentVars) });
       });
       const renderConfig = Object.assign({}, config, { shapes });
       const svg = appendSvg(renderedSvgHost, renderConfig, 'comp-blanks-' + (api?.blockId || ''));
+      const slotInfo = computeSlotExpected();
       const blanks = [];
+      // Mirror spans grouped by the slot they display, so we can refresh them
+      // when the matching input changes.
+      const mirrorsBySlot = {};
+
       shapes.forEach((sh, idx) => {
         if(sh.type !== 'label') return;
-        const hasInline = sh.text && sh.text.indexOf('{}') >= 0;
-        // Blank: explicit (blank:true) OR via {} in the text.
+        const text = sh.text || '';
+        const tokens = parseSlotTokens(text);
+        const hasInline = tokens.some(t => t.kind === 'slot' || t.kind === 'mirror');
         if(!sh.blank && !hasInline) return;
         const textNode = svg.querySelector('text[data-shape-idx="' + idx + '"]');
         if(!textNode) return;
         const fs = sh.fontSize || 18;
         const fontWeight = sh.fontWeight || 400;
         const color = sh.color || '#003b5c';
-        const exp = expectedFor(sh, currentVars);
-        const expectedStr = exp.asString || '';
-        const inputW = Math.max(60, expectedStr.length * fs * 0.55 + 20);
-        const h = fs + 12;
 
-        function makeInput(){
+        function makeInput(width){
           const inp = document.createElement('input');
           inp.type = 'text';
           inp.className = 'comp-blank-input';
-          inp.style.cssText = 'min-width:' + inputW + 'px; width:' + inputW + 'px; height:' + h + 'px; box-sizing:border-box; ' +
+          inp.style.cssText = 'min-width:' + width + 'px; width:' + width + 'px; height:' + (fs + 12) + 'px; box-sizing:border-box; ' +
             'font:' + fontWeight + ' ' + (fs - 2) + 'px Verdana,Arial,sans-serif; ' +
             'padding:0 0.4rem; border:1px solid var(--line, #d8e0e6); border-radius:6px; background:#fff; color:#003b5c;';
           inp.placeholder = '?';
@@ -3019,56 +3651,94 @@
         }
 
         if(hasInline){
-          // Inline mode: text + input(s) mixed. "A = {}" -> span "A = " + input.
-          const parts = sh.text.split('{}');
-          // Estimate total width (text segments + inputs).
+          // Mixed text + slots + mirrors. Build a flow layout with a foreignObject.
           const charW = fs * 0.55;
-          const textW = parts.reduce((sum, p) => sum + p.length * charW, 0);
-          const totalW = textW + (parts.length - 1) * inputW + 12;
+          // Width estimate: text segments + per-slot input + per-mirror span.
+          let estW = 12;
+          tokens.forEach(t => {
+            if(t.kind === 'text') estW += t.text.length * charW;
+            else if(t.kind === 'slot'){
+              const n = t.n == null ? 0 : t.n;
+              const expectedStr = (slotInfo.results[n] && slotInfo.results[n].asString) || '';
+              estW += Math.max(60, expectedStr.length * fs * 0.55 + 20);
+            } else if(t.kind === 'mirror'){
+              estW += Math.max(40, 4 * charW + 8);
+            }
+          });
 
           const fo = document.createElementNS(NS, 'foreignObject');
           fo.setAttribute('x', sh.x - 2);
           fo.setAttribute('y', sh.y - fs);
-          fo.setAttribute('width', totalW);
-          fo.setAttribute('height', h + 4);
+          fo.setAttribute('width', estW);
+          fo.setAttribute('height', fs + 16);
           fo.setAttribute('data-shape-idx', String(idx));
 
           const wrap = document.createElement('div');
-          wrap.style.cssText = 'display:flex; align-items:center; gap:3px; height:' + h + 'px; ' +
+          wrap.style.cssText = 'display:flex; align-items:center; gap:3px; height:' + (fs + 12) + 'px; ' +
             'font:' + fontWeight + ' ' + fs + 'px Verdana,Arial,sans-serif; color:' + color + '; white-space:nowrap;';
-          const localInputs = [];
-          parts.forEach((part, i) => {
-            if(part){
-              const s = document.createElement('span');
-              s.textContent = part;
-              wrap.appendChild(s);
-            }
-            if(i < parts.length - 1){
-              const inp = makeInput();
+
+          tokens.forEach(t => {
+            if(t.kind === 'text'){
+              if(t.text){
+                const s = document.createElement('span');
+                s.textContent = t.text;
+                wrap.appendChild(s);
+              }
+            } else if(t.kind === 'slot'){
+              const n = t.n == null ? 0 : t.n;
+              const exp = slotInfo.results[n] || { value:null, asString:'', tolerance:0.01, formula:null };
+              const expectedStr = exp.asString || '';
+              const inputW = Math.max(60, expectedStr.length * fs * 0.55 + 20);
+              const inp = makeInput(inputW);
               wrap.appendChild(inp);
-              localInputs.push(inp);
+              blanks.push({ slotN: n, idx, input: inp, expected: exp });
+            } else if(t.kind === 'mirror'){
+              const n = t.n;
+              const span = document.createElement('span');
+              span.className = 'comp-mirror';
+              span.style.cssText = 'display:inline-block; min-width:1.5em; padding:0 0.25rem; ' +
+                'border-bottom:1px dashed #84bf66; color:#0f567d; font-style:italic;';
+              span.textContent = '?';
+              wrap.appendChild(span);
+              (mirrorsBySlot[n] = mirrorsBySlot[n] || []).push(span);
             }
           });
           fo.appendChild(wrap);
           textNode.replaceWith(fo);
-          localInputs.forEach(inp => {
-            blanks.push({ idx, input: inp, expected: exp, formula: sh.formula, tolerance: Number(sh.tolerance) || 0.01 });
-          });
-        } else {
-          // Legacy: replace the entire label with a single input.
+        } else if(sh.blank){
+          // Legacy blank:true with no inline placeholder. Replace whole label.
+          const exp = slotInfo.results[0] || { value:null, asString:'', tolerance:0.01, formula:null };
+          const expectedStr = exp.asString || '';
+          const inputW = Math.max(60, expectedStr.length * fs * 0.55 + 20);
           const fo = document.createElementNS(NS, 'foreignObject');
           fo.setAttribute('x', sh.x - 2);
           fo.setAttribute('y', sh.y - fs);
           fo.setAttribute('width', inputW + 8);
-          fo.setAttribute('height', h);
+          fo.setAttribute('height', fs + 12);
           fo.setAttribute('data-shape-idx', String(idx));
-          const inp = makeInput();
+          const inp = makeInput(inputW);
           inp.style.width = '100%';
           fo.appendChild(inp);
           textNode.replaceWith(fo);
-          blanks.push({ idx, input: inp, expected: exp, formula: sh.formula, tolerance: Number(sh.tolerance) || 0.01 });
+          blanks.push({ slotN: 0, idx, input: inp, expected: exp });
         }
       });
+
+      // Mirror spans show the student's actual entered value (live update).
+      function updateMirrorsForSlot(slotN){
+        const spans = mirrorsBySlot[slotN];
+        if(!spans) return;
+        const matching = blanks.filter(b => b.slotN === slotN);
+        const val = matching.length ? matching[0].input.value : '';
+        const trimmed = String(val || '').trim();
+        spans.forEach(s => { s.textContent = trimmed === '' ? '?' : trimmed; });
+      }
+      blanks.forEach(b => {
+        b.input.addEventListener('input', () => updateMirrorsForSlot(b.slotN));
+      });
+      // Initial fill in case prior values exist (regenerate path).
+      Object.keys(mirrorsBySlot).forEach(n => updateMirrorsForSlot(Number(n)));
+
       return blanks;
     }
 
@@ -3387,7 +4057,7 @@
         });
         if(mode === 'none') mountStatic(host, substituted, api);
         else mountGraded(host, substituted, api, mode);
-        // Append "Neu generieren" to ui.buttons; static mode has no row - create one.
+        // Append "Neu generieren" to ui.buttons; static mode has no row, so create one.
         let buttonsRow = host.querySelector('.scorm-buttons, .qcard-buttons');
         if(!buttonsRow){
           buttonsRow = document.createElement('div');
