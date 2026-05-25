@@ -288,36 +288,53 @@
       width: 640, height: 640, pad: 54,
       xMin: -5.5, xMax: 5.5, yMin: -5.5, yMax: 5.5,
       xLabel: 'x', yLabel: 'y',
-      showGrid: true, gridStep: 1,
+      showGrid: true, gridStep: 1, equalAspect: true,
       paths: [], lines: [], circles: [], points: [], arcs: []
     }, options || {});
     const W = opts.width, H = opts.height, P = opts.pad;
-    const sx = (x) => P + ((x - opts.xMin)/(opts.xMax - opts.xMin)) * (W - 2*P);
-    const sy = (y) => H - P - ((y - opts.yMin)/(opts.yMax - opts.yMin)) * (H - 2*P);
+    const xRange = opts.xMax - opts.xMin;
+    const yRange = opts.yMax - opts.yMin;
+    let scaleX, scaleY, offX = 0, offY = 0;
+    if(opts.equalAspect !== false && xRange > 0 && yRange > 0){
+      const usableW = W - 2*P;
+      const usableH = H - 2*P;
+      const s = Math.min(usableW / xRange, usableH / yRange);
+      scaleX = scaleY = s;
+      offX = (usableW - s * xRange) / 2;
+      offY = (usableH - s * yRange) / 2;
+    } else {
+      scaleX = (W - 2*P) / xRange;
+      scaleY = (H - 2*P) / yRange;
+    }
+    const sx = (x) => P + offX + (x - opts.xMin) * scaleX;
+    const sy = (y) => H - P - offY - (y - opts.yMin) * scaleY;
     host.innerHTML = '';
     const svg = utils.svg('svg', {viewBox: '0 0 ' + W + ' ' + H, width: '100%', height: '100%'});
     svg.appendChild(utils.svg('rect', {x:0, y:0, width:W, height:H, fill:'#ffffff'}));
+    // Bounds of the letterboxed plot area (equal-aspect leaves blank margins).
+    const plotLeft = P + offX, plotRight = W - P - offX;
+    const plotTop = P + offY, plotBottom = H - P - offY;
     if(opts.showGrid){
       const step = opts.gridStep;
       for(let xv = Math.ceil(opts.xMin/step)*step; xv <= opts.xMax; xv += step){
         if(Math.abs(xv) < 1e-9) continue;
         const x = sx(xv);
-        svg.appendChild(utils.svg('line', {x1:x, y1:P, x2:x, y2:H-P, stroke:'#e2e8ed', 'stroke-width':1}));
+        svg.appendChild(utils.svg('line', {x1:x, y1:plotTop, x2:x, y2:plotBottom, stroke:'#e2e8ed', 'stroke-width':1}));
         const t = utils.svg('text', {x:x, y:sy(0)+18, 'font-size':14, 'text-anchor':'middle', fill:'#5d6872'});
         t.textContent = (Math.round(xv*100)/100); svg.appendChild(t);
       }
       for(let yv = Math.ceil(opts.yMin/step)*step; yv <= opts.yMax; yv += step){
         if(Math.abs(yv) < 1e-9) continue;
         const y = sy(yv);
-        svg.appendChild(utils.svg('line', {x1:P, y1:y, x2:W-P, y2:y, stroke:'#e2e8ed', 'stroke-width':1}));
+        svg.appendChild(utils.svg('line', {x1:plotLeft, y1:y, x2:plotRight, y2:y, stroke:'#e2e8ed', 'stroke-width':1}));
         const t = utils.svg('text', {x:sx(0)-10, y:y+5, 'font-size':14, 'text-anchor':'end', fill:'#5d6872'});
         t.textContent = (Math.round(yv*100)/100); svg.appendChild(t);
       }
     }
-    svg.appendChild(utils.svg('line', {x1:P, y1:sy(0), x2:W-P, y2:sy(0), stroke:'#003b5c', 'stroke-width':2}));
-    svg.appendChild(utils.svg('line', {x1:sx(0), y1:P, x2:sx(0), y2:H-P, stroke:'#003b5c', 'stroke-width':2}));
-    const xl = utils.svg('text', {x:W-P+6, y:sy(0)-8, 'font-size':16, fill:'#003b5c'}); xl.textContent = opts.xLabel; svg.appendChild(xl);
-    const yl = utils.svg('text', {x:sx(0)+10, y:P+16, 'font-size':16, fill:'#003b5c'}); yl.textContent = opts.yLabel; svg.appendChild(yl);
+    svg.appendChild(utils.svg('line', {x1:plotLeft, y1:sy(0), x2:plotRight, y2:sy(0), stroke:'#003b5c', 'stroke-width':2}));
+    svg.appendChild(utils.svg('line', {x1:sx(0), y1:plotTop, x2:sx(0), y2:plotBottom, stroke:'#003b5c', 'stroke-width':2}));
+    const xl = utils.svg('text', {x:plotRight+6, y:sy(0)-8, 'font-size':16, fill:'#003b5c'}); xl.textContent = opts.xLabel; svg.appendChild(xl);
+    const yl = utils.svg('text', {x:sx(0)+10, y:plotTop+16, 'font-size':16, fill:'#003b5c'}); yl.textContent = opts.yLabel; svg.appendChild(yl);
     (opts.paths || []).forEach(p => {
       if(!p.points || !p.points.length) return;
       const d = p.points.map((pt,i) => (i===0?'M':'L') + sx(pt[0]) + ' ' + sy(pt[1])).join(' ');

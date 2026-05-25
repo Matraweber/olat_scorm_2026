@@ -226,8 +226,16 @@
       const W = 360, H = 220, P = 24;
       const xMin = numOr(fn.xMin, -5), xMax = numOr(fn.xMax, 5);
       const yMin = numOr(fn.yMin, -5), yMax = numOr(fn.yMax, 5);
-      const sx = x => P + ((x - xMin)/(xMax - xMin))*(W - 2*P);
-      const sy = y => H - P - ((y - yMin)/(yMax - yMin))*(H - 2*P);
+      // Equal-aspect mapping: 1 unit in x equals 1 unit in y, letterbox the rest.
+      const xRange = xMax - xMin, yRange = yMax - yMin;
+      const usableW = W - 2*P, usableH = H - 2*P;
+      const scale = (xRange > 0 && yRange > 0) ? Math.min(usableW / xRange, usableH / yRange) : 1;
+      const offX = (usableW - scale * xRange) / 2;
+      const offY = (usableH - scale * yRange) / 2;
+      const plotLeft = P + offX, plotRight = W - P - offX;
+      const plotTop = P + offY, plotBottom = H - P - offY;
+      const sx = x => plotLeft + (x - xMin) * scale;
+      const sy = y => plotBottom - (y - yMin) * scale;
       const ns = 'http://www.w3.org/2000/svg';
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.4rem 0.7rem; font-size:0.78rem; display:flex; flex-direction:column; height:100%; gap:0.25rem; overflow:hidden;';
@@ -236,7 +244,7 @@
       const svg = document.createElementNS(ns, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       svg.style.cssText = 'flex:1; min-height:0; max-height:240px; display:block; margin:0 auto; background:#fff; border:1px solid #e2e8ed; border-radius:6px;';
-      [[P,sy(0),W-P,sy(0)],[sx(0),P,sx(0),H-P]].forEach(c => {
+      [[plotLeft,sy(0),plotRight,sy(0)],[sx(0),plotTop,sx(0),plotBottom]].forEach(c => {
         const l = document.createElementNS(ns,'line');
         l.setAttribute('x1',c[0]); l.setAttribute('y1',c[1]); l.setAttribute('x2',c[2]); l.setAttribute('y2',c[3]);
         l.setAttribute('stroke','#003b5c'); l.setAttribute('stroke-width',1.5); svg.appendChild(l);

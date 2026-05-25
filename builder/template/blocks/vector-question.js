@@ -167,8 +167,15 @@
       const v = (config.pool || [])[0] || {x:3, y:2};
       const R = config.plotRange || 5.5;
       const W = 300, H = 220, P = 22;
-      const sx = x => P + ((x + R)/(2*R))*(W - 2*P);
-      const sy = y => H - P - ((y + R)/(2*R))*(H - 2*P);
+      // Equal-aspect: same px/unit on x and y so a unit circle stays a circle.
+      const usableW = W - 2*P, usableH = H - 2*P;
+      const scale = Math.min(usableW / (2*R), usableH / (2*R));
+      const offX = (usableW - scale * 2*R) / 2;
+      const offY = (usableH - scale * 2*R) / 2;
+      const plotLeft = P + offX, plotRight = W - P - offX;
+      const plotTop = P + offY, plotBottom = H - P - offY;
+      const sx = x => plotLeft + (x + R) * scale;
+      const sy = y => plotBottom - (y + R) * scale;
       const ns = 'http://www.w3.org/2000/svg';
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.4rem 0.7rem; font-size:0.78rem; display:flex; flex-direction:column; height:100%; gap:0.25rem; overflow:hidden;';
@@ -179,7 +186,7 @@
       const svg = document.createElementNS(ns, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       svg.style.cssText = 'flex:1; min-height:0; max-height:240px; display:block; margin:0 auto; background:#fff; border:1px solid #e2e8ed; border-radius:6px;';
-      [[P,sy(0),W-P,sy(0)],[sx(0),P,sx(0),H-P]].forEach(c => {
+      [[plotLeft,sy(0),plotRight,sy(0)],[sx(0),plotTop,sx(0),plotBottom]].forEach(c => {
         const l = document.createElementNS(ns,'line');
         l.setAttribute('x1',c[0]); l.setAttribute('y1',c[1]); l.setAttribute('x2',c[2]); l.setAttribute('y2',c[3]);
         l.setAttribute('stroke','#003b5c'); l.setAttribute('stroke-width',1.5); svg.appendChild(l);

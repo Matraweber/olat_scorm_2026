@@ -191,6 +191,110 @@
     return null;
   }
 
+  // Combined snap stack used by every drag handler: element-to-element
+  // alignment wins (most predictable, draws guide lines), grid as fallback.
+  // Returns null only when both layers are empty.
+  function makeCompositionSnap(shapes, excludeSet, canvasW, canvasH){
+    const el = makeElementSnap(shapes, excludeSet);
+    const coords = findCoordsForSnap(shapes, excludeSet);
+    const grid = coords
+      ? makeGridSnap(coords)
+      : makeCanvasGridSnap(canvasW, canvasH, 10);
+    if(!el && !grid) return null;
+    return function(svgX, svgY, threshold){
+      if(el){
+        const r = el(svgX, svgY, threshold == null ? 8 : threshold);
+        if(r) return r;
+      }
+      if(grid){
+        return grid(svgX, svgY, threshold == null ? 12 : threshold);
+      }
+      return null;
+    };
+  }
+
+  // Shared snap-indicator rendering: a small green ring on the locked point
+  // plus full-canvas guide lines when element alignment is active.
+  function buildSnapIndicator(p, canvasW, canvasH){
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('data-snap-indicator', '1');
+    g.style.pointerEvents = 'none';
+    if(p && p.vGuide){
+      const l = document.createElementNS(NS, 'line');
+      l.setAttribute('x1', p.vGuide.x); l.setAttribute('y1', 0);
+      l.setAttribute('x2', p.vGuide.x); l.setAttribute('y2', canvasH);
+      l.setAttribute('stroke', '#1565ff');
+      l.setAttribute('stroke-width', '1');
+      l.setAttribute('stroke-dasharray', '4 3');
+      l.setAttribute('opacity', '0.85');
+      g.appendChild(l);
+    }
+    if(p && p.hGuide){
+      const l = document.createElementNS(NS, 'line');
+      l.setAttribute('x1', 0); l.setAttribute('y1', p.hGuide.y);
+      l.setAttribute('x2', canvasW); l.setAttribute('y2', p.hGuide.y);
+      l.setAttribute('stroke', '#1565ff');
+      l.setAttribute('stroke-width', '1');
+      l.setAttribute('stroke-dasharray', '4 3');
+      l.setAttribute('opacity', '0.85');
+      g.appendChild(l);
+    }
+    if(p){
+      const ring = document.createElementNS(NS, 'circle');
+      ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
+      ring.setAttribute('r', 7);
+      ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
+      ring.setAttribute('stroke', '#84bf66');
+      ring.setAttribute('stroke-width', '1.5');
+      g.appendChild(ring);
+    }
+    return g;
+  }
+
+  // Element-to-element alignment snap. Returns a function that, given a point,
+  // returns the nearest x-aligned and/or y-aligned anchor from other shapes
+  // along with the reference points needed to draw a guide line.
+  function makeElementSnap(shapes, excludeSet){
+    if(!Array.isArray(shapes)) return null;
+    const xCands = []; // { x, y, idx } - vertical alignment candidates
+    const yCands = []; // { x, y, idx } - horizontal alignment candidates
+    for(let i = 0; i < shapes.length; i++){
+      if(excludeSet && excludeSet.has(i)) continue;
+      const sh = shapes[i];
+      if(!sh) continue;
+      const pts = shapeSnapCandidates(sh);
+      for(const p of pts){
+        if(!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+        xCands.push({ x: p.x, y: p.y, idx: i });
+        yCands.push({ x: p.x, y: p.y, idx: i });
+      }
+    }
+    if(!xCands.length && !yCands.length) return null;
+    return function snap(svgX, svgY, threshold){
+      threshold = threshold == null ? 8 : threshold;
+      let bestX = null, bestXd = threshold + 1;
+      for(const c of xCands){
+        const d = Math.abs(svgX - c.x);
+        if(d <= threshold && d < bestXd){ bestX = c; bestXd = d; }
+      }
+      let bestY = null, bestYd = threshold + 1;
+      for(const c of yCands){
+        const d = Math.abs(svgY - c.y);
+        if(d <= threshold && d < bestYd){ bestY = c; bestYd = d; }
+      }
+      if(!bestX && !bestY) return null;
+      const newX = bestX ? bestX.x : svgX;
+      const newY = bestY ? bestY.y : svgY;
+      return {
+        x: newX, y: newY,
+        dx: newX - svgX, dy: newY - svgY,
+        // Guide line endpoints - drawn from the moving point to the reference.
+        vGuide: bestX ? { x: newX, fromY: bestX.y, toY: svgY } : null,
+        hGuide: bestY ? { y: newY, fromX: bestY.x, toX: svgX } : null
+      };
+    };
+  }
+
   // Snap candidates: points that may align with a grid intersection during a
   // drag. The closest candidate wins; the whole shape shifts so it lands on grid.
   function shapeSnapCandidates(shape){
@@ -450,14 +554,18 @@
         { type:'label', x:130, y:210, text:'a = {a}', color:'#003b5c', fontSize:20, fontWeight:'700' },
         { type:'label', x:300, y:320, text:'b = {b}', color:'#003b5c', fontSize:20, fontWeight:'700' },
         { type:'label', x:340, y:200, text:'c = ?', color:'#0f567d', fontSize:20, fontWeight:'700' },
-        // Step 1: enter c² in slot {1}
+        // Step 1: enter c² in slot {1}. Sum of two integer squares -> integer
+        // answer, so a tight tolerance is fine here.
         { type:'label', x:60, y:50, text:'1. Schritt:  c² = a² + b² = {1}',
           color:'#003b5c', fontSize:17, fontWeight:'700',
           formulas: { 1: { formula:'a*a + b*b', tolerance:0.01 } } },
-        // Step 2: enter c in slot {2}, using the previous answer {1*} = student's c²
-        { type:'label', x:60, y:80, text:'2. Schritt:  c = √{1*}  = {2}',
-          color:'#003b5c', fontSize:17, fontWeight:'700',
-          formulas: { 2: { formula:'sqrt({1*})', tolerance:0.01 } } }
+        // Step 2: enter c in slot {2}. {1*} mirrors the student's c² answer
+        // and the formula resolves it to s1 at grading time. For most a, b
+        // the square root is irrational, so the tolerance allows one decimal
+        // place of rounding.
+        { type:'label', x:60, y:80, text:'2. Schritt:  c = √{1*}  = {2}  (auf 2 Nachkommastellen runden)',
+          color:'#003b5c', fontSize:15, fontWeight:'700',
+          formulas: { 2: { formula:'sqrt({1*})', tolerance:0.05 } } }
       ]
     }
   ];
@@ -2668,14 +2776,14 @@
         const start = svgPoint(svg, e.clientX, e.clientY);
         let moved = false;
 
-        // Snap-to-grid: a coords system on the canvas wins (real math units).
-        // Otherwise fall back to the implicit canvas pixel grid so labels and
-        // shapes still align cleanly. Hold Alt during drag to bypass.
+        // Snap stack - element alignment first (so dragging a label onto
+        // another label's edge produces a visible guide line), then grid as
+        // a secondary fallback. Works regardless of whether a coordinate
+        // system is present. Hold Alt to bypass all snapping.
         const excludeSet = new Set(draggedIndices);
-        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords
-          ? makeGridSnap(snapCoords)
-          : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
+        const snapFn = makeCompositionSnap(
+          block.config.shapes, excludeSet,
+          block.config.canvasWidth, block.config.canvasHeight);
         let snapIndicator = null;
 
         function applyDelta(shape, original, dx, dy){
@@ -2696,8 +2804,8 @@
           }
         }
 
-        // Compute snap correction for the primary shape's anchor points so
-        // the closest grid-aligned vertex pulls the whole shape into position.
+        // Compute snap correction by checking each anchor point of the
+        // primary shape against the combined snap stack. Closest hit wins.
         function computeSnapAdjust(dx, dy){
           if(!snapFn) return null;
           const primary = block.config.shapes[idx];
@@ -2707,7 +2815,7 @@
           const candidates = shapeSnapCandidates(origPrimary).map(c => ({ x: c.x + dx, y: c.y + dy }));
           let best = null;
           for(const c of candidates){
-            const s = snapFn(c.x, c.y, 12);
+            const s = snapFn(c.x, c.y);
             if(s && (!best || (s.dx*s.dx + s.dy*s.dy) < (best.dx*best.dx + best.dy*best.dy))){
               best = s;
             }
@@ -2718,23 +2826,10 @@
         function showSnapIndicator(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(!p) return;
-          const g = document.createElementNS(NS, 'g');
-          g.setAttribute('data-snap-indicator', '1');
-          g.style.pointerEvents = 'none';
-          const ring = document.createElementNS(NS, 'circle');
-          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
-          ring.setAttribute('r', 7);
-          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
-          ring.setAttribute('stroke', '#84bf66');
-          ring.setAttribute('stroke-width', '1.5');
-          g.appendChild(ring);
-          const dot = document.createElementNS(NS, 'circle');
-          dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
-          dot.setAttribute('r', 2);
-          dot.setAttribute('fill', '#84bf66');
-          g.appendChild(dot);
-          svg.appendChild(g);
-          snapIndicator = g;
+          const cw = Number(block.config.canvasWidth)  || 600;
+          const ch = Number(block.config.canvasHeight) || 360;
+          snapIndicator = buildSnapIndicator(p, cw, ch);
+          svg.appendChild(snapIndicator);
         }
 
         function onMove(ev){
@@ -2938,24 +3033,17 @@
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
         const excludeSet = new Set([idx]);
-        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
+        const snapFn = makeCompositionSnap(
+          block.config.shapes, excludeSet,
+          block.config.canvasWidth, block.config.canvasHeight);
         let snapIndicator = null;
         function showEndpointSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(!p) return;
-          const g = document.createElementNS(NS, 'g');
-          g.setAttribute('data-snap-indicator', '1');
-          g.style.pointerEvents = 'none';
-          const ring = document.createElementNS(NS, 'circle');
-          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
-          ring.setAttribute('r', 7);
-          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
-          ring.setAttribute('stroke', '#84bf66');
-          ring.setAttribute('stroke-width', '1.5');
-          g.appendChild(ring);
-          svg.appendChild(g);
-          snapIndicator = g;
+          const cw = Number(block.config.canvasWidth)  || 600;
+          const ch = Number(block.config.canvasHeight) || 360;
+          snapIndicator = buildSnapIndicator(p, cw, ch);
+          svg.appendChild(snapIndicator);
         }
         let moved = false;
         function onMove(ev){
@@ -2963,7 +3051,7 @@
           moved = true;
           let snapped = null;
           if(snapFn && !ev.altKey){
-            snapped = snapFn(p.x, p.y, 12);
+            snapped = snapFn(p.x, p.y);
             if(snapped) p = { x: snapped.x, y: snapped.y };
           }
           showEndpointSnap(snapped);
@@ -2988,31 +3076,24 @@
         const shape = block.config.shapes[idx];
         const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
         const excludeSet = new Set([idx]);
-        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
+        const snapFn = makeCompositionSnap(
+          block.config.shapes, excludeSet,
+          block.config.canvasWidth, block.config.canvasHeight);
         let snapIndicator = null;
         function showRadiusSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(!p) return;
-          const g = document.createElementNS(NS, 'g');
-          g.setAttribute('data-snap-indicator', '1');
-          g.style.pointerEvents = 'none';
-          const ring = document.createElementNS(NS, 'circle');
-          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
-          ring.setAttribute('r', 7);
-          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
-          ring.setAttribute('stroke', '#84bf66');
-          ring.setAttribute('stroke-width', '1.5');
-          g.appendChild(ring);
-          svg.appendChild(g);
-          snapIndicator = g;
+          const cw = Number(block.config.canvasWidth)  || 600;
+          const ch = Number(block.config.canvasHeight) || 360;
+          snapIndicator = buildSnapIndicator(p, cw, ch);
+          svg.appendChild(snapIndicator);
         }
         let moved = false;
         function onMove(ev){
           let p = svgPoint(svg, ev.clientX, ev.clientY);
           let snapped = null;
           if(snapFn && !ev.altKey){
-            snapped = snapFn(p.x, p.y, 12);
+            snapped = snapFn(p.x, p.y);
             if(snapped) p = { x: snapped.x, y: snapped.y };
           }
           showRadiusSnap(snapped);
@@ -3107,28 +3188,22 @@
         const startDist = Math.hypot(startPt[0] - startCentroid.x, startPt[1] - startCentroid.y) || 1;
         const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
-        // Snap to grid (vertex mode only; uniform-scale keeps free movement).
+        // Snap to other shapes / grid. Uniform-scale (Ctrl/Cmd) skips snap
+        // because scale ratios shouldn't be quantized to pixel grids.
         const excludeSet = new Set([idx]);
-        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
         const snapFn = uniform
           ? null
-          : (snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10));
+          : makeCompositionSnap(
+              block.config.shapes, excludeSet,
+              block.config.canvasWidth, block.config.canvasHeight);
         let snapIndicator = null;
         function showVertexSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(!p) return;
-          const g = document.createElementNS(NS, 'g');
-          g.setAttribute('data-snap-indicator', '1');
-          g.style.pointerEvents = 'none';
-          const ring = document.createElementNS(NS, 'circle');
-          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
-          ring.setAttribute('r', 7);
-          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
-          ring.setAttribute('stroke', '#84bf66');
-          ring.setAttribute('stroke-width', '1.5');
-          g.appendChild(ring);
-          svg.appendChild(g);
-          snapIndicator = g;
+          const cw = Number(block.config.canvasWidth)  || 600;
+          const ch = Number(block.config.canvasHeight) || 360;
+          snapIndicator = buildSnapIndicator(p, cw, ch);
+          svg.appendChild(snapIndicator);
         }
         // rAF-coalesced updates: at most one change per repaint.
         let pendingPoint = null, rafScheduled = false, pendingAlt = false;
@@ -3138,7 +3213,7 @@
           let p = pendingPoint; pendingPoint = null;
           let snapped = null;
           if(snapFn && !pendingAlt){
-            snapped = snapFn(p.x, p.y, 12);
+            snapped = snapFn(p.x, p.y);
             if(snapped) p = { x: snapped.x, y: snapped.y };
           }
           showVertexSnap(snapped);
@@ -3189,32 +3264,25 @@
         const aspect = startH / startW;
         const uniform = e.ctrlKey || e.metaKey;
         let moved = false;
-        // Snap the bottom-right corner to the grid while resizing.
+        // Snap the bottom-right corner to other elements or the grid.
         const excludeSet = new Set([idx]);
-        const snapCoords = findCoordsForSnap(block.config.shapes, excludeSet);
-        const snapFn = snapCoords ? makeGridSnap(snapCoords) : makeCanvasGridSnap(block.config.canvasWidth, block.config.canvasHeight, 10);
+        const snapFn = makeCompositionSnap(
+          block.config.shapes, excludeSet,
+          block.config.canvasWidth, block.config.canvasHeight);
         let snapIndicator = null;
         function showResizeSnap(p){
           if(snapIndicator){ snapIndicator.remove(); snapIndicator = null; }
           if(!p) return;
-          const g = document.createElementNS(NS, 'g');
-          g.setAttribute('data-snap-indicator', '1');
-          g.style.pointerEvents = 'none';
-          const ring = document.createElementNS(NS, 'circle');
-          ring.setAttribute('cx', p.x); ring.setAttribute('cy', p.y);
-          ring.setAttribute('r', 7);
-          ring.setAttribute('fill', 'rgba(132,191,102,0.25)');
-          ring.setAttribute('stroke', '#84bf66');
-          ring.setAttribute('stroke-width', '1.5');
-          g.appendChild(ring);
-          svg.appendChild(g);
-          snapIndicator = g;
+          const cw = Number(block.config.canvasWidth)  || 600;
+          const ch = Number(block.config.canvasHeight) || 360;
+          snapIndicator = buildSnapIndicator(p, cw, ch);
+          svg.appendChild(snapIndicator);
         }
         function onMove(ev){
           let p = svgPoint(svg, ev.clientX, ev.clientY);
           let snapped = null;
           if(snapFn && !ev.altKey){
-            snapped = snapFn(p.x, p.y, 12);
+            snapped = snapFn(p.x, p.y);
             if(snapped) p = { x: snapped.x, y: snapped.y };
           }
           showResizeSnap(snapped);

@@ -104,6 +104,18 @@
     'kΩ':  { label:'kΩ',           cat:'Widerstand',       factor:1000 },
     'MΩ':  { label:'MΩ',           cat:'Widerstand',       factor:1e6 },
 
+    // Density: base unit is kg/m³. 1 g/cm³ = 1 g/mL = 1 kg/L = 1 kg/dm³
+    // = 1 t/m³ = 1000 kg/m³. 1 g/L = 1 kg/m³.
+    'kg/m³':  { label:'kg/m³',         cat:'Dichte',           factor:1 },
+    'g/L':    { label:'g/L',           cat:'Dichte',           factor:1 },
+    'g/cm³':  { label:'g/cm³',         cat:'Dichte',           factor:1000 },
+    'g/mL':   { label:'g/mL',          cat:'Dichte',           factor:1000 },
+    'kg/L':   { label:'kg/L',          cat:'Dichte',           factor:1000 },
+    'kg/dm³': { label:'kg/dm³',        cat:'Dichte',           factor:1000 },
+    't/m³':   { label:'t/m³',          cat:'Dichte',           factor:1000 },
+    'lb/ft³': { label:'lb/ft³',        cat:'Dichte',           factor:16.01846 },
+    'lb/in³': { label:'lb/in³',        cat:'Dichte',           factor:27679.9 },
+
     'bit': { label:'bit',          cat:'Datenmenge',       factor:0.125 },
     'B':   { label:'B (Byte)',     cat:'Datenmenge',       factor:1 },
     'KB':  { label:'KB (1000 B)', cat:'Datenmenge',       factor:1000 },
@@ -168,6 +180,7 @@
     {value:'ex-data',    label:'Beispiel: Datenmenge  (GiB ↔ GB, MiB ↔ MB)'},
     {value:'ex-power',   label:'Beispiel: Leistung  (hp, kW, W)'},
     {value:'ex-length',  label:'Beispiel: Länge  (nm, μm, km, mi, in)'},
+    {value:'ex-density', label:'Beispiel: Dichte  (g/cm³, kg/m³, kg/L)'},
     {value:'ex-mixed',   label:'Beispiel: Gemischt, alle Kategorien'}
   ];
 
@@ -237,6 +250,19 @@
       ],
       randomSwap: true, tolerance: 0.02
     },
+    'ex-density': {
+      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
+      variants: [
+        // Material-Dichten in der Größenordnung üblicher Stoffe:
+        // Wasser 1, Aluminium 2.7, Eisen 7.87, Blei 11.3 g/cm³.
+        { fromUnit:'g/cm³', toUnit:'kg/m³', valueMin:1,    valueMax:12,    integer:false },
+        { fromUnit:'kg/m³', toUnit:'g/cm³', valueMin:500,  valueMax:11000, integer:true  },
+        { fromUnit:'g/cm³', toUnit:'kg/L',  valueMin:1,    valueMax:10,    integer:false },
+        { fromUnit:'g/mL',  toUnit:'kg/m³', valueMin:1,    valueMax:5,     integer:false },
+        { fromUnit:'t/m³',  toUnit:'g/cm³', valueMin:1,    valueMax:10,    integer:false }
+      ],
+      randomSwap: false, tolerance: 0.02
+    },
     'ex-mixed': {
       questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
       variants: [
@@ -246,7 +272,8 @@
         { fromUnit:'kWh',  toUnit:'MJ',  valueMin:1,  valueMax:10,  integer:false },
         { fromUnit:'hp',   toUnit:'kW',  valueMin:50, valueMax:300, integer:true },
         { fromUnit:'GiB',  toUnit:'GB',  valueMin:1,  valueMax:10,  integer:true },
-        { fromUnit:'N',    toUnit:'kN',  valueMin:100,valueMax:5000,integer:true }
+        { fromUnit:'N',    toUnit:'kN',  valueMin:100,valueMax:5000,integer:true },
+        { fromUnit:'g/cm³',toUnit:'kg/m³', valueMin:1, valueMax:10, integer:false }
       ],
       randomSwap: true, tolerance: 0.02
     }

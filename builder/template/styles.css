@@ -202,8 +202,15 @@ table.truth-table th { background: var(--panel-soft); color: var(--primary); }
 .comp-target-zone    { stroke-dasharray: 7 5 !important; opacity: 0.7; }
 .comp-marker         { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18)); }
 .comp-marker:active  { cursor: grabbing !important; }
-/* Fill-in-the-blank inputs */
-.comp-blank-input.comp-blank-ok  { border-color: #2e8540 !important; background: rgba(46,133,64,0.08); }
-.comp-blank-input.comp-blank-bad { border-color: #b42318 !important; background: rgba(180,35,24,0.08); }
+/* Fill-in-the-blank inputs. Aligned with eqsys / table-cell / match-cell feedback:
+   soft tint background + colored border, original text colour preserved. */
+.comp-blank-input.comp-blank-ok {
+  background: rgba(132,191,102,0.18) !important;
+  border-color: var(--accent-dark) !important;
+}
+.comp-blank-input.comp-blank-bad {
+  background: rgba(180,35,24,0.1) !important;
+  border-color: var(--danger) !important;
+}
 
 @media (max-width: 900px) { .hero-card, .content-grid { grid-template-columns: 1fr; } .square-plot-wrap { width: min(100%, 440px); } .brand-block { flex-direction: column; } .match-grid { grid-template-columns: 1fr; } }
