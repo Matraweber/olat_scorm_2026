@@ -86,7 +86,7 @@
       function safeEval(x){
         try {
           const fns = ['sin','cos','tan','asin','acos','atan','sinh','cosh','tanh','exp','log','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
-          let s = String(config.expr || '0').replace(/\s+/g,'').replace(/,/g,'.').replace(/\^/g,'**');
+          const s = String(config.expr || '0').replace(/\s+/g,'').replace(/,/g,'.').replace(/\^/g,'**');
           const ids = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
           const allowed = Object.keys(vars).concat(['x','pi','e','PI','E']).concat(fns);
           for(const id of ids) if(!allowed.includes(id)) return null;
@@ -96,7 +96,7 @@
           const f = new Function(...argNames, '"use strict";return ('+body+');');
           const r = f(...argNames.map(n => n === 'x' ? x : vars[n]));
           return Number.isFinite(r) ? r : null;
-        } catch(e){ return null; }
+        } catch{ return null; }
       }
 
       function render(){
@@ -156,10 +156,10 @@
       });
       // safe eval inline
       const fns = ['sin','cos','tan','asin','acos','atan','sinh','cosh','tanh','exp','log','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
-      let s = String(config.expr || '0').replace(/\s+/g,'').replace(/,/g,'.').replace(/\^/g,'**');
+      const s = String(config.expr || '0').replace(/\s+/g,'').replace(/,/g,'.').replace(/\^/g,'**');
       const allowed = Object.keys(vars).concat(['x','pi','e','PI','E']).concat(fns);
       const ids = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
-      let safe = ids.every(id => allowed.includes(id));
+      const safe = ids.every(id => allowed.includes(id));
       let body = s.replace(/\bpi\b/g,'(Math.PI)').replace(/\bPI\b/g,'(Math.PI)').replace(/\be\b/g,'(Math.E)').replace(/\bE\b/g,'(Math.E)');
       fns.forEach(fn => { body = body.replace(new RegExp('\\b'+fn+'\\b','g'),'Math.'+fn); });
       const argNames = Object.keys(vars).concat(['x']);
@@ -172,7 +172,7 @@
             const y = f(...argNames.map(n => n === 'x' ? x : vars[n]));
             if(Number.isFinite(y) && y >= yMin - 5 && y <= yMax + 5) points.push([x, y]);
           }
-        } catch(e){}
+        } catch{}
       }
       if(points.length){
         const d = points.map((pt,i) => (i===0?'M':'L') + sx(pt[0]) + ' ' + sy(pt[1])).join(' ');

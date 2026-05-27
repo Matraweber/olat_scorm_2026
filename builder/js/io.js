@@ -1,6 +1,6 @@
 // io.js: JSON config, SCORM-1.2 ZIP packaging, preview iframe.
 import {
-  el, escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
+  escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
 } from './util.js';
 import { state, render, defaultTheme, scheduleAutosave } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
@@ -45,16 +45,22 @@ const KATEX_FONTS = [
   'KaTeX_Size4-Regular.woff2','KaTeX_Typewriter-Regular.woff2'
 ];
 async function addKatexToZip(zip){
-  const css = await fetchText('lib/katex/katex.min.css');
-  const js  = await fetchText('lib/katex/katex.min.js');
-  const ar  = await fetchText('lib/katex/contrib/auto-render.min.js');
+  // Parallel-fetch the three text assets + every font so this stage is
+  // bound by the slowest fetch, not by sum-of-fetches.
+  const [css, js, ar, ...fonts] = await Promise.all([
+    fetchText('lib/katex/katex.min.css'),
+    fetchText('lib/katex/katex.min.js'),
+    fetchText('lib/katex/contrib/auto-render.min.js'),
+    ...KATEX_FONTS.map(f => fetchBinary('lib/katex/fonts/' + f))
+  ]);
   zip.file('katex/katex.min.css', css);
   zip.file('katex/katex.min.js', js);
   zip.file('katex/contrib/auto-render.min.js', ar);
-  for(const f of KATEX_FONTS){
-    const blob = await fetchBinary('lib/katex/fonts/' + f);
-    if(blob) zip.file('katex/fonts/' + f, blob);
-  }
+  // woff2 fonts are already compressed; STORE skips a wasted DEFLATE pass.
+  KATEX_FONTS.forEach((f, i) => {
+    const blob = fonts[i];
+    if(blob) zip.file('katex/fonts/' + f, blob, { compression: 'STORE' });
+  });
 }
 function katexZipFileList(){
   return [
@@ -79,14 +85,24 @@ function buildIndexHtml(template, blockFiles, themeJson, tasksJson){
     .replace('<!-- BLOCK_SCRIPTS -->', tags)
     .replace('<!-- DATA_SCRIPT -->', dataScript);
 }
+// BLOCK_FILES values can be a single filename or an array (helpers + main).
+// resolveBlockFiles flattens to a string[] so the rest of the code stays simple.
+function resolveBlockFiles(blockType){
+  const v = BLOCK_FILES[blockType];
+  if(!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
+
 async function gatherTemplateFiles(usedBlocks){
-  const files = {};
-  const list = ['scorm12.js', 'utils.js', 'styles.css', 'runtime.js', 'index.html', 'blocks/_registry.js'];
-  for(const f of list) files[f] = await fetchTextRel(f);
+  // Collect every path first, then fetch in parallel. Sequential awaits
+  // here added one RTT per file on the export hot-path.
+  const paths = ['scorm12.js', 'utils.js', 'styles.css', 'runtime.js', 'index.html', 'blocks/_registry.js'];
   for(const b of usedBlocks){
-    const rel = BLOCK_FILES[b]; if(!rel) continue;
-    files['blocks/' + rel] = await fetchTextRel('blocks/' + rel);
+    for(const rel of resolveBlockFiles(b)) paths.push('blocks/' + rel);
   }
+  const texts = await Promise.all(paths.map(p => fetchTextRel(p)));
+  const files = {};
+  paths.forEach((p, i) => { files[p] = texts[i]; });
   return files;
 }
 
@@ -181,7 +197,7 @@ async function buildZip(){
   const used = usedBlockTypes();
   const tmpl = await gatherTemplateFiles(used);
   const manifestTpl = await fetchTextRel('imsmanifest.xml');
-  const blockFiles = used.map(b => 'blocks/' + BLOCK_FILES[b]).filter(Boolean);
+  const blockFiles = used.flatMap(b => resolveBlockFiles(b).map(f => 'blocks/' + f));
 
   // Clean tasks (drop UI-only fields), then extract data-URLs into media/.
   const cleanedTasks = state.course.tasks.map(t => {
@@ -226,14 +242,19 @@ async function buildZip(){
   zip.file('imsmanifest.xml', manifestXml);
   zip.file('blocks/_registry.js', tmpl['blocks/_registry.js']);
   used.forEach(b => {
-    const rel = 'blocks/' + BLOCK_FILES[b];
-    zip.file(rel, tmpl[rel]);
+    for(const f of resolveBlockFiles(b)){
+      const rel = 'blocks/' + f;
+      zip.file(rel, tmpl[rel]);
+    }
   });
   await addKatexToZip(zip);
+  // Media files are already-compressed binaries (PNG / JPG / MP3 / MP4).
+  // Re-running DEFLATE wastes CPU and often grows the file. STORE keeps
+  // the bytes as-is.
   for(const [path, bytes] of mediaFiles){
-    zip.file(path, bytes);
+    zip.file(path, bytes, { compression: 'STORE' });
   }
-  if(logoFilename && logoBlob) zip.file(logoFilename, logoBlob);
+  if(logoFilename && logoBlob) zip.file(logoFilename, logoBlob, { compression: 'STORE' });
   return zip;
 }
 
@@ -519,7 +540,7 @@ export async function showPreview(){
     toast('Vorschau wird vorbereitet …');
     const used = usedBlockTypes();
     const tmpl = await gatherTemplateFiles(used);
-    const blockScripts = used.map(b => tmpl['blocks/' + BLOCK_FILES[b]]).join('\n;\n');
+    const blockScripts = used.flatMap(b => resolveBlockFiles(b).map(f => tmpl['blocks/' + f])).join('\n;\n');
     const tasksJson = JSON.stringify({
       courseTitle: state.course.courseTitle,
       courseSubtitle: state.course.courseSubtitle,

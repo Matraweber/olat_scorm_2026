@@ -79,7 +79,7 @@ export function validateBlock(block){
     try {
       const result = def.validate(cfg);
       if(Array.isArray(result)) result.forEach(w => warnings.push(String(w)));
-    } catch(e){}
+    } catch{}
   }
   return warnings;
 }
@@ -124,7 +124,7 @@ export function loadUserTemplates(){
     if(!raw) return [];
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr : [];
-  } catch(e){ return []; }
+  } catch{ return []; }
 }
 export function saveUserTemplates(){
   try { localStorage.setItem(USER_TEMPLATES_KEY, JSON.stringify(state.userTemplates)); }
@@ -139,7 +139,7 @@ export function loadUserBlockTemplates(){
     if(!raw) return [];
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr : [];
-  } catch(e){ return []; }
+  } catch{ return []; }
 }
 export function saveUserBlockTemplates(){
   try { localStorage.setItem(USER_BLOCK_TEMPLATES_KEY, JSON.stringify(state.userBlockTemplates || [])); }
@@ -153,11 +153,11 @@ export function loadBlockUsage(){
     if(!raw) return {};
     const obj = JSON.parse(raw);
     return (obj && typeof obj === 'object') ? obj : {};
-  } catch(e){ return {}; }
+  } catch{ return {}; }
 }
 export function saveBlockUsage(){
   try { localStorage.setItem(BLOCK_USAGE_KEY, JSON.stringify(state.blockUsage || {})); }
-  catch(e){}
+  catch{}
 }
 export function bumpBlockUsage(type){
   if(!type) return;

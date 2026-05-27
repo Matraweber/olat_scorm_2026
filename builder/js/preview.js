@@ -1,6 +1,5 @@
 // preview.js: Mount each block in a shadow DOM so the canvas matches the SCORM preview.
 // Falls back to def.preview() or a text summary when mount() isn't usable.
-import { el } from './util.js';
 import { state } from './state.js';
 import { blockSummary } from './canvas.js';
 
@@ -23,7 +22,7 @@ export function loadRuntimeStyles(){
 }
 
 // Preload once; re-render whatever's already mounted.
-loadRuntimeStyles().then(() => { try { renderCanvasAll(); } catch(e){} });
+loadRuntimeStyles().then(() => { try { renderCanvasAll(); } catch{} });
 
 export function renderCanvasAll(){
   document.querySelectorAll('.canvas-block-card').forEach(card => {
@@ -69,7 +68,7 @@ export function renderBlockPreview(host, block){
     try {
       def.builderMount(host, block, makeBuilderApi(block, host));
       return;
-    } catch(e){
+    } catch{
       host.innerHTML = '';
     }
   }
@@ -108,14 +107,14 @@ export function renderBlockPreview(host, block){
         window.BlockUtils.renderMath(mountHost);
       }
       return;
-    } catch(e){
+    } catch{
       host.innerHTML = '';
     }
   }
 
   if(def && typeof def.preview === 'function'){
     try { def.preview(host, block.config || {}); return; }
-    catch(e){}
+    catch{}
   }
   // Fallback: text summary
   const span = document.createElement('span');

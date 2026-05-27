@@ -93,7 +93,7 @@
         const varNames = Object.keys(vars);
         for(const id of idents) if(!varNames.includes(id)) return null;
         try { const fn = new Function(...varNames, '"use strict"; return !!(' + e + ');'); return !!fn(...varNames.map(n => !!vars[n])); }
-        catch(e){ return null; }
+        catch{ return null; }
       }
       function genTable(varNames){
         const N = 1 << varNames.length;
@@ -143,7 +143,8 @@
         fb.neutral('Tragen Sie für jede Zeile 0 oder 1 ein.');
       }
       function grade(){
-        let correctRows = 0, totalRows = current.rows.length, any = false;
+        const totalRows = current.rows.length;
+        let correctRows = 0, any = false;
         current.rows.forEach((vars, i) => {
           const expected = evalBool(current.expr, vars);
           const v = current.inputs[i].value;

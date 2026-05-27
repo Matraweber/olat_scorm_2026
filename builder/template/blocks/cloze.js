@@ -79,7 +79,7 @@
           const ph = document.createElement('option');
           ph.value = ''; ph.textContent = 'wählen…'; ph.disabled = true; ph.selected = true;
           sel.appendChild(ph);
-          let opts = p.options.slice();
+          const opts = p.options.slice();
           if(activeConfig.shuffleDropdown !== false) window.BlockUtils.shuffle(opts);
           opts.forEach(o => {
             const op = document.createElement('option');

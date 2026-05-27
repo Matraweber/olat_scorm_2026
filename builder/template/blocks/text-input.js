@@ -107,7 +107,7 @@
             const v = String(a.value || '');
             let found;
             if(a.mode === 'regex'){
-              try { found = new RegExp(v).test(got); } catch(e){ found = false; }
+              try { found = new RegExp(v).test(got); } catch{ found = false; }
             } else if(a.mode === 'exact'){
               found = got.indexOf(v) >= 0;
             } else {
@@ -127,7 +127,7 @@
         const ok = answers.some(a => {
           const v = String(a.value || '');
           if(a.mode === 'regex'){
-            try { return new RegExp('^(?:' + v + ')$').test(got); } catch(e){ return false; }
+            try { return new RegExp('^(?:' + v + ')$').test(got); } catch{ return false; }
           }
           if(a.mode === 'exact') return got === v;
           return got.trim().toLowerCase() === v.trim().toLowerCase();

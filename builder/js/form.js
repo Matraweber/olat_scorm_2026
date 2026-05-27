@@ -254,8 +254,13 @@ export function renderField(spec, getObj, setObj){
   }
 
   const wrap = el('div', {className: 'field' + (spec.help ? ' field-has-help' : '') + (spec.fullWidth ? ' field-full' : '')});
+  // Stable id pairs the <label for=""> with the input below, satisfying
+  // screen-reader form associations.
+  const fieldId = 'fld_' + (spec.key || 'x') + '_' + Math.random().toString(36).slice(2, 8);
+  let labelNode = null;
   if(spec.type !== 'boolean'){
-    wrap.appendChild(el('label', {text: spec.label || spec.key}));
+    labelNode = el('label', {text: spec.label || spec.key, attrs:{'for': fieldId}});
+    wrap.appendChild(labelNode);
   }
   if(spec.help) wrap.appendChild(el('div', {className:'field-help', text: spec.help}));
 
@@ -303,10 +308,19 @@ export function renderField(spec, getObj, setObj){
     input.value = cur != null ? String(cur) : ((spec.options && spec.options[0] && spec.options[0].value) || '');
     input.addEventListener('change', () => setObj(spec.key, input.value));
   } else if(spec.type === 'color'){
-    // Native swatch + hex input, kept in sync.
+    // Native swatch + hex input, kept in sync. Both share the field <label>
+    // via aria-label so screen readers announce them as "<spec.label>, Farbe".
     const cfWrap = el('div', {className:'color-field'});
-    const swatch = el('input', {className:'color-field-swatch', attrs:{type:'color'}});
-    const hexInp = el('input', {className:'color-field-hex', attrs:{type:'text', maxlength:'7', spellcheck:'false', placeholder:'#RRGGBB'}});
+    const ariaLabel = spec.label || spec.key;
+    const swatch = el('input', {
+      className:'color-field-swatch',
+      attrs:{type:'color', 'aria-label': ariaLabel + ' (Farbwähler)'}
+    });
+    const hexInp = el('input', {
+      className:'color-field-hex',
+      attrs:{type:'text', maxlength:'7', spellcheck:'false', placeholder:'#RRGGBB',
+             'aria-label': ariaLabel + ' (Hex-Code)'}
+    });
     const initial = (obj[spec.key] && /^#[0-9A-Fa-f]{6}$/.test(obj[spec.key])) ? obj[spec.key] : '#000000';
     swatch.value = initial;
     hexInp.value = initial;
@@ -350,6 +364,7 @@ export function renderField(spec, getObj, setObj){
       else setObj(spec.key, input.value);
     });
   }
+  if(input) input.id = fieldId;
   wrap.appendChild(input);
   return wrap;
 }
@@ -580,7 +595,6 @@ function renderFileField(spec, getObj, setObj, wrap){
 function renderMathTextarea(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
 
-  let activeMathCat = 0;
   const mathWrap = el('div', {className:'math-field'});
   const toolbar  = el('div', {className:'math-toolbar'});
   const pills    = el('div', {className:'math-cat-pills'});
@@ -605,7 +619,6 @@ function renderMathTextarea(spec, getObj, setObj, wrap){
   }
 
   function renderMathCat(idx){
-    activeMathCat = idx;
     pills.querySelectorAll('.math-cat-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
     symGrid.innerHTML = '';
     MATH_CATS[idx].items.forEach(item => {
@@ -643,7 +656,7 @@ function renderMathTextarea(spec, getObj, setObj, wrap){
           delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
           throwOnError: false
         });
-      } catch(e){}
+      } catch{}
     }
   }
 

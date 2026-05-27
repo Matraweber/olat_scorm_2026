@@ -73,7 +73,7 @@
       try {
         const result = Function('"use strict"; return (' + jsExpr + ');')();
         return Number.isFinite(result) ? result : null;
-      } catch(e) { return null; }
+      } catch { return null; }
     },
     nearlyEqual(a, b, tol){ return Math.abs(a - b) <= (tol == null ? 0.05 : tol); },
     // Reduced fraction a/b, or null if not a rational within maxDenom.
@@ -158,8 +158,6 @@
       let s = String(expr || '').replace(/,/g, '.');
       if(!s.trim()) return null;
       // Implicit "*": "2pi" -> "2*pi", but leave "sin(x)" alone.
-      const fnRe = new RegExp('^(?:' + allowedFns.join('|') + ')\\b');
-      function isFunctionStart(rest){ return fnRe.test(rest); }
       // Iterate until stable so neighbouring patterns chain ("2 pi r" -> "2*pi*r").
       let prev;
       do {
@@ -185,7 +183,7 @@
         const fn = new Function(...varNames, '"use strict"; return (' + body + ');');
         const r = fn(...varNames.map(v => vars[v]));
         return Number.isFinite(r) ? r : null;
-      } catch(e) { return null; }
+      } catch { return null; }
     },
     feedbackBox(host){
       const box = utils.el('div', {className: 'formula-box feedback-box'});
@@ -421,7 +419,7 @@
         throwOnError: false,
         ignoredTags: ['script','noscript','style','textarea','pre','code']
       });
-    } catch(e){}
+    } catch{}
   }
   utils.renderMath = function(root){
     if(!root) return;

@@ -115,7 +115,6 @@
       const max = (config.valueRange && config.valueRange.max) || 255;
       const sample = Math.floor((min + max) / 2);
       const fromStr = sample.toString(baseRadix[dir.from] || 10).toUpperCase();
-      const toStr   = sample.toString(baseRadix[dir.to]   || 10).toUpperCase();
       const ex = document.createElement('div');
       ex.style.cssText = 'font-family:"Courier New",monospace; padding:0.4rem 0.6rem; background:#f5f8fa; border:1px solid #d8e0e6; border-radius:6px; color:#0f2d44;';
       ex.innerHTML = '<strong>' + fromStr + '</strong> <span style="color:#5d6872">[' + (baseLabels[dir.from] || dir.from) + ']</span> &nbsp;→&nbsp; <span style="background:#fff8e6; padding:0 0.3rem; border-radius:3px;">?</span> <span style="color:#5d6872">[' + (baseLabels[dir.to] || dir.to) + ']</span>';

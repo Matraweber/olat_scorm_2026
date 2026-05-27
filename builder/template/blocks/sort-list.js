@@ -60,7 +60,7 @@
       const list = document.createElement('div');
       list.style.cssText = 'display:flex; flex-direction:column; gap:0.5rem; margin:0.6rem 0;';
       // currentOrder: array of indices into `correct`
-      let currentOrder = order.slice();
+      const currentOrder = order.slice();
 
       function rerender(){
         list.innerHTML = '';

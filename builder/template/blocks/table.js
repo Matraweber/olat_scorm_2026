@@ -191,7 +191,7 @@
         try {
           const r = u.safeMathExpr(String(formula || ''), varsObj);
           return typeof r === 'number' && Number.isFinite(r) ? r : null;
-        } catch(e){ return null; }
+        } catch{ return null; }
       }
 
       const topVars = (activeConfig.variables || []).filter(v => v && v.name);
@@ -434,7 +434,7 @@
             try {
               const v = window.BlockUtils.safeMathExpr(c.formula || '0', sr.sample);
               td.textContent = typeof v === 'number' ? (Number.isInteger(v) ? String(v) : Math.round(v*100)/100) : '?';
-            } catch(e){ td.textContent = '?'; }
+            } catch{ td.textContent = '?'; }
           }
           tr.appendChild(td);
         });

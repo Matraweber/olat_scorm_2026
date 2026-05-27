@@ -4,6 +4,9 @@ import { el, cssEscape } from './util.js';
 import { state, pushHistory, render } from './state.js';
 
 // Block-files registry, used for ZIP packaging and template loading.
+// Each value is either a single filename or an array of files loaded in order
+// (the last file is the one that calls Blocks.register; earlier files contain
+// helpers consumed by the registration file).
 export const BLOCK_FILES = {
   'heading':           'heading.js',
   'rich-text':         'rich-text.js',
@@ -32,7 +35,7 @@ export const BLOCK_FILES = {
   'table':             'table.js',
   'equation-system':   'equation-system.js',
   'function-sandbox':  'function-sandbox.js',
-  'composition':       'composition.js',
+  'composition':       ['composition-helpers.js', 'composition.js'],
   'complex-input':     'complex-input.js'
 };
 
@@ -193,7 +196,7 @@ export function findInsertIndex(listEl, y){
 export function blockSummary(block){
   const def = window.Blocks.get(block.type);
   if(def && typeof def.summary === 'function'){
-    try { return def.summary(block.config || {}); } catch(e){}
+    try { return def.summary(block.config || {}); } catch{}
   }
   return (def && def.label) || block.type;
 }

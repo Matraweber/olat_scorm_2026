@@ -150,7 +150,7 @@
 
       if(!previewMode){
         submit.addEventListener('click', () => {
-          try { api.persist({ answers: answers, ts: Date.now() }); } catch(e){}
+          try { api.persist({ answers: answers, ts: Date.now() }); } catch{}
           submit.disabled = true;
           submit.style.opacity = '0.55';
           submit.style.cursor = 'default';

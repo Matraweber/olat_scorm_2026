@@ -232,7 +232,7 @@ function toggleCheatsheet(){
   } else {
     m.classList.add('hidden');
     if(_cheatsheetPrevFocus && typeof _cheatsheetPrevFocus.focus === 'function'){
-      try { _cheatsheetPrevFocus.focus({ preventScroll: true }); } catch(e){}
+      try { _cheatsheetPrevFocus.focus({ preventScroll: true }); } catch{}
     }
   }
 }

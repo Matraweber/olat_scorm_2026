@@ -275,7 +275,6 @@ function setupWelcomeScrollSpy(chapters, railList){
   if(typeof window._welcomeScrollCleanup === 'function'){
     window._welcomeScrollCleanup();
   }
-  const railLinks = Array.from(railList.querySelectorAll('.welcome-rail-link'));
   let rafId = null;
   let activeIdx = -1;
 
@@ -374,7 +373,7 @@ function openBlockDetailModal(id, def){
       const schema = def.builderSchema();
       const optionCount = Array.isArray(schema) ? schema.filter(s => s && s.key).length : 0;
       if(optionCount) facts.push({ k:'Konfigurations-Optionen', v: String(optionCount) });
-    } catch(e){ /* ignore: schema may require runtime context */ }
+    } catch{ /* ignore: schema may require runtime context */ }
   }
   const factList = el('dl', {className:'welcome-block-modal-facts'});
   facts.forEach(f => {
@@ -408,7 +407,7 @@ function openBlockDetailModal(id, def){
     if(window.BlockUtils && window.BlockUtils.renderMath){
       window.BlockUtils.renderMath(previewHost);
     }
-  } catch(err){
+  } catch{
     previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'Vorschau konnte nicht gerendert werden.'}));
   }
 
@@ -481,9 +480,12 @@ function setupRevealAnimations(host){
   }, 250);
 }
 
-// Mockup helpers (HTML/CSS miniatures used in welcome page steps)
+// Mockup helpers (HTML/CSS miniatures used in welcome page steps).
+// Each mock is a decorative illustration of the builder UI; assistive
+// tech should skip it. The surrounding chapter text already explains
+// the feature in words.
 function mockSidebarAddTask(){
-  const wrap = el('div', {className:'welcome-mock welcome-mock-sidebar'});
+  const wrap = el('div', {className:'welcome-mock welcome-mock-sidebar', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
     '<div class="mm-head"><span>Aufgaben</span><span class="mm-btn mm-btn-primary mm-pulse">+ Aufgabe</span></div>' +
     '<div class="mm-task">Aufgabe 1<span class="mm-meta">2 Blöcke</span></div>' +
@@ -502,7 +504,7 @@ function mockChips(catLabel, chips, isQuestion){
   return head + '<div class="mm-row">' + row + '</div>';
 }
 function mockBlockPicker(){
-  const wrap = el('div', {className:'welcome-mock welcome-mock-picker'});
+  const wrap = el('div', {className:'welcome-mock welcome-mock-picker', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
     '<div class="mm-modal-head">Block hinzufügen</div>' +
     '<div class="mm-modal-body">' +
@@ -524,7 +526,7 @@ function mockBlockPicker(){
   return wrap;
 }
 function mockPresetDropdown(){
-  const wrap = el('div', {className:'welcome-mock welcome-mock-config'});
+  const wrap = el('div', {className:'welcome-mock welcome-mock-config', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
     '<div class="mm-field"><label>Überschrift</label><div class="mm-inp">Aufgabe</div></div>' +
     '<div class="mm-field"><label>Vorlage</label>' +
@@ -534,14 +536,14 @@ function mockPresetDropdown(){
   return wrap;
 }
 function mockTopbarBtn(label, kind){
-  const wrap = el('div', {className:'welcome-mock welcome-mock-topbar'});
+  const wrap = el('div', {className:'welcome-mock welcome-mock-topbar', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
     '<span class="mm-btn">JSON exportieren</span>' +
     '<span class="mm-btn ' + (kind === 'primary' ? 'mm-btn-primary' : '') + ' mm-pulse">' + label + '</span>';
   return wrap;
 }
 function mockBuilderLayout(){
-  const wrap = el('div', {className:'welcome-mock welcome-mock-layout'});
+  const wrap = el('div', {className:'welcome-mock welcome-mock-layout', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
     '<div class="mm-l-side">' +
       '<div class="mm-l-num">1</div>' +

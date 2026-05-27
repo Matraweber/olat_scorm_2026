@@ -217,7 +217,7 @@
       const r = parseExpr();
       if(pos !== s.length) return null;
       return r;
-    } catch(e){
+    } catch{
       return null;
     }
   }
@@ -240,12 +240,6 @@
     const absIm = Math.abs(im);
     const imPart = absIm === 1 ? 'i' : fmtN(absIm) + 'i';
     return fmtN(re) + ' ' + sign + ' ' + imPart;
-  }
-
-  // Same numbers as LaTeX, for the question text and feedback.
-  function formatComplexLatex(c){
-    const s = formatComplex(c);
-    return s.replace(/-/g, '-');  // -minus sign for KaTeX is fine
   }
 
   // Block registration
@@ -424,12 +418,11 @@
       return {};
     },
     preview(host, config){
-      const u = window.BlockUtils;
       // Static sample values so the picker preview is deterministic.
       const sample = { a: 3, b: 4, c: 2, d: 1 };
       let solution;
       try { solution = evalComplexExpr(config.formula || '(a+b*i)*(c-d*i)', sample); }
-      catch(e){ solution = null; }
+      catch{ solution = null; }
       const solStr = solution && C.isFinite(solution) ? formatComplex(solution) : '-';
 
       const card = document.createElement('div');

@@ -1,6 +1,6 @@
 // folder-browser.js: Header dropdown listing .zip files in a picked folder.
 // Chromium uses FS Access API; Firefox/Safari fall back to <input webkitdirectory>.
-import { el, toast, confirmDialog } from './util.js';
+import { el, toast } from './util.js';
 import { loadZipFile } from './io.js';
 
 // Tree node: { name, kind:'dir'|'file', handle?, file?, path, parent, children?, expanded? }
@@ -115,7 +115,7 @@ async function clearPersistedHandle(){
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onerror = () => { db.close(); resolve(); };
     });
-  } catch(e){ /* IDB unavailable, nothing to clear */ }
+  } catch{ /* IDB unavailable, nothing to clear */ }
 }
 
 // Silent restore on page load. Permission prompts need a user gesture,
@@ -123,14 +123,14 @@ async function clearPersistedHandle(){
 export async function tryRestoreFolder(){
   if(!SUPPORTS_FS_ACCESS) return false;
   let handle;
-  try { handle = await loadPersistedHandle(); } catch(e){ return false; }
+  try { handle = await loadPersistedHandle(); } catch{ return false; }
   if(!handle) return false;
   try {
     const perm = await handle.queryPermission({ mode: 'read' });
     if(perm !== 'granted') return false;
     root = await buildTreeFromHandle(handle, '', null);
     return true;
-  } catch(e){
+  } catch{
     await clearPersistedHandle();
     return false;
   }
@@ -158,7 +158,7 @@ export async function refresh(){
   const wasOpen = dropdownOpen;
   try {
     root = await buildTreeFromHandle(root.handle, '', null);
-  } catch(e){
+  } catch{
     return;
   }
   dropdownOpen = wasOpen;

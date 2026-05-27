@@ -1,7 +1,7 @@
 // modals.js: Block-type picker, task-create, save-template, preview modal.
 import { el, uid, toast, confirmDialog } from './util.js';
 import { state, pushHistory, render } from './state.js';
-import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates, captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
+import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates } from './tasks.js';
 
 // Task-create modal
 export function openTaskCreateModal(){

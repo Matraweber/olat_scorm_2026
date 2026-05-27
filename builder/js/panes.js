@@ -124,7 +124,7 @@ function installTaskDnD(list){
       e.preventDefault();
       const rect = li.getBoundingClientRect();
       const after = (e.clientY - rect.top) > rect.height / 2;
-      let toIdx = parseInt(li.dataset.taskIdx, 10) + (after ? 1 : 0);
+      const toIdx = parseInt(li.dataset.taskIdx, 10) + (after ? 1 : 0);
       moveTask(fromIdx, toIdx);
       fromIdx = null;
       clearMarkers();
@@ -236,9 +236,10 @@ function renderThemePane(host){
     { key:'logoUrl', label:'Logo-Pfad (Datei in template/, wird ins ZIP gepackt)', type:'text', placeholder:'default-logo.svg', help:'Datei mit diesem Namen muss in builder/template/ existieren.' }
   ].forEach(spec => host.appendChild(renderField(spec, get, set)));
   const logoField = el('div', {className:'field'});
-  logoField.appendChild(el('label', {text:'Logo per Upload (überschreibt Pfad)'}));
+  const logoInputId = 'fld_logoUpload';
+  logoField.appendChild(el('label', {text:'Logo per Upload (überschreibt Pfad)', attrs:{'for': logoInputId}}));
   logoField.appendChild(el('div', {className:'field-help', text:'Lädt das Bild als Data-URL ins JSON.'}));
-  const inp = el('input', {attrs:{type:'file', accept:'image/*'}});
+  const inp = el('input', {attrs:{type:'file', accept:'image/*', id: logoInputId}});
   inp.addEventListener('change', e => {
     const file = e.target.files && e.target.files[0]; if(!file) return;
     const r = new FileReader();

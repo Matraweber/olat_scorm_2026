@@ -74,8 +74,8 @@ olat_scorm_2026/
     │   ├── imsmanifest.xml   SCORM-1.2-Manifest-Template
     │   ├── scorm12.js        SCORM-API-Wrapper für die Lernplattform
     │   └── utils.js          Shared BlockUtils für Block-Runtimes
-    ├── templates.js          Vordefinierte Aufgaben-Vorlagen
-    └── lib/                  Externe Libs (KaTeX)
+    ├── task-templates.js     Vordefinierte Aufgaben-Vorlagen
+    └── lib/                  Externe Libs (KaTeX, JSZip)
 ```
 
 ### Builder-JS-Module
@@ -84,15 +84,18 @@ olat_scorm_2026/
 |---|---|
 | `main.js` | Bootstrap, globale Keyboard-Shortcuts, Autosave-Listener |
 | `state.js` | Zentraler State, Autosave, Theme |
-| `panes.js` | Welcome-Page, Sidebar, Kopfdaten-Pane, Theme-Pane |
+| `panes.js` | Sidebar, Kopfdaten-Pane, Theme-Pane |
+| `welcome-pane.js` | Welcome-Seite mit Kapitel-Rail und Block-Demos |
 | `task-pane.js` | Canvas-Editor-Container, Toolbar, Tabs |
 | `task-pane-canvas.js` | Drag/Resize/Snap auf der Canvas |
 | `task-pane-config.js` | Rechte Konfig-Pane, Multi-Select-Toolbar |
 | `task-pane-bulk.js` | Bulk-Operationen (align, distribute, duplicate, delete) |
 | `modals.js` | Block-Picker, Task-Create-Modal |
 | `form.js` | Schema-getriebener Form-Renderer |
+| `math-toolbar-data.js` | Symboltabelle der Mathe-Toolbar (Pi, Wurzel, etc.) |
 | `preview.js` | Block-Vorschau im Canvas + Welcome-Detail |
 | `io.js` | JSON-Im/Export, SCORM-ZIP-Generierung, Preview-Iframe |
+| `folder-browser.js` | Header-Dropdown mit Ordner-Tree für SCORM-ZIPs |
 | `canvas.js` | Snap-Algorithmus, Block-Summary, Auto-Fit-Höhen |
 | `tasks.js` | Task-Validierung, Block-Usage-Tracking, User-Templates |
 | `util.js` | DOM-Helper, Escape-Funktionen, Toast, ConfirmDialog |
@@ -122,13 +125,13 @@ Vom leeren Builder bis zum SCORM-Paket:
 
 ## Block-Kategorien
 
-26 Block-Typen in 4 Kategorien:
+29 Block-Typen in 4 Kategorien:
 
 | Kategorie | Anzahl | Beispiele |
 |---|---|---|
 | **Medien & Inhalt** | 11 | Audio, Bild, Video, Datei-Download, Fließtext, Überschrift, Trennlinie, Hinweisbox, Zusammenfassung, Code-Block, Umfrage |
-| **Frage** | 7 | Multiple Choice, Lückentext, Text-Eingabe, Numerische Eingabe, Zuordnung (Drag & Drop), Sortierliste, Hotzone |
-| **MINT** | 6 | Einheitenumrechnung, Funktion ablesen, Komplexe Zahl ablesen, Vektor 2D ablesen, Wahrheitstabelle, Zahlensysteme |
+| **Frage** | 6 | Multiple Choice, Lückentext, Text-Eingabe, Zuordnung (Drag & Drop), Sortierliste, Hotzone |
+| **MINT** | 10 | Numerische Eingabe, Einheitenumrechnung, Tabelle, Gleichungssystem, Funktion ablesen, Komplexe Zahl ablesen, Komplexe Eingabe, Vektor 2D ablesen, Wahrheitstabelle, Zahlensysteme |
 | **Visualisierung** | 2 | Komposition (Vektor-Editor), Funktionsplot-Sandbox |
 
 Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. Meistgenutzte zuerst. Die Häufigkeiten werden lokal in `localStorage` mitgezählt.
@@ -157,12 +160,12 @@ Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. 
 
 - Header-Button `Ordner` öffnet beim ersten Klick einen Dateipicker für ein Verzeichnis mit SCORM-ZIPs
 - Danach erscheint ein **Dropdown unterhalb der Schaltfläche** mit dem Ordnerbaum
-- Themen sind als Accordion organisiert nur ein Theme ist gleichzeitig aufgeklappt, hält das Dropdown kompakt
+- Themen sind als Accordion organisiert. Nur ein Theme ist gleichzeitig aufgeklappt, damit das Dropdown kompakt bleibt.
 - Klick auf eine `.zip` lädt sie in den Builder; das Dropdown bleibt offen, damit man direkt die nächste Datei wählen kann
-- Aktive Datei ist im Tree hervorgehoben schneller Wechsel zwischen mehreren Lerneinheiten
+- Aktive Datei ist im Tree hervorgehoben, was den Wechsel zwischen mehreren Lerneinheiten beschleunigt
 - Klick außerhalb des Dropdowns oder `ESC` schließt es; der Ordner bleibt im Hintergrund aktiv
 - `×` im Dropdown vergisst den Ordner ganz (entfernt den persistierten Handle)
-- **Persistierung über Reload:** der gewählte Ordner wird in IndexedDB gespeichert. Beim nächsten Builder-Start ist er noch verfügbar, solange der Browser die Berechtigung beibehält kein erneutes Auswählen nötig
+- **Persistierung über Reload:** der gewählte Ordner wird in IndexedDB gespeichert. Beim nächsten Builder-Start ist er noch verfügbar, solange der Browser die Berechtigung beibehält; kein erneutes Auswählen nötig
 - Funktioniert mit File System Access API in Chromium-Browsern (Chrome, Edge, Brave), Fallback via `webkitdirectory` in anderen Browsern (read-only, keine Persistierung)
 
 ### SCORM-ZIP
@@ -293,11 +296,30 @@ Block-Typen sind selbst-registrierende Module unter `builder/template/blocks/`. 
 
 ### Block einbinden
 
-Nach dem Erstellen der Datei muss sie in `builder/index.html` registriert werden:
+Damit der neue Block sowohl im Builder als auch im exportierten SCORM-ZIP funktioniert, sind zwei Stellen zu aktualisieren:
 
-```html
-<script src="template/blocks/my-block.js?v=N" defer></script>
-```
+1. **`builder/index.html`**: Script-Tag mit Cache-Buster ergänzen, damit der Builder die Datei lädt:
+
+   ```html
+   <script src="template/blocks/my-block.js?v=N" defer></script>
+   ```
+
+2. **`builder/js/canvas.js`**: Eintrag in `BLOCK_FILES` ergänzen, damit die Datei mit ins SCORM-ZIP kommt:
+
+   ```javascript
+   export const BLOCK_FILES = {
+     // ...
+     'my-block': 'my-block.js',
+   };
+   ```
+
+   Wenn der Block einen Helfer-File benötigt (so wie `composition`), als Array angeben:
+
+   ```javascript
+   'my-block': ['my-block-helpers.js', 'my-block.js'],
+   ```
+
+   Das Array wird in der angegebenen Reihenfolge geladen.
 
 Anschließend `./bump-version.sh` ausführen.
 

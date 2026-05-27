@@ -7,7 +7,6 @@
   const utils = window.BlockUtils;
   if(!utils) throw new Error('runtime.js: window.BlockUtils not loaded. Make sure utils.js is loaded before runtime.js.');
 
-  let theme = null;
   let courseConfig = null;
   let currentPageIdx = -1;
   // perTask[i] = { blockScores: { blockId: {points, max, completed} }, blockInstances: [] }
@@ -224,7 +223,7 @@
   function tearDownTask(idx){
     const t = perTask[idx];
     if(t && t.blockInstances){
-      t.blockInstances.forEach(inst => { try { inst && inst.destroy && inst.destroy(); } catch(e) {} });
+      t.blockInstances.forEach(inst => { try { inst && inst.destroy && inst.destroy(); } catch {} });
       t.blockInstances = [];
     }
   }
@@ -366,7 +365,7 @@
 
   function finishCourse(){
     pushScoreToLMS(true);
-    try { Scorm12.finish(); } catch(e) {}
+    try { Scorm12.finish(); } catch {}
     const pb = document.getElementById('progressBarWrap');
     if(pb) pb.classList.add('hidden');
     const container = document.getElementById('taskContainer');
@@ -387,7 +386,7 @@
   }
 
   function bootstrap(){
-    loadJson('__SCORM_THEME__', 'theme.json').then(t => { theme = t; applyTheme(t); }).catch(() => {});
+    loadJson('__SCORM_THEME__', 'theme.json').then(t => { applyTheme(t); }).catch(() => {});
     loadJson('__SCORM_TASKS__', 'tasks.json').then(cfg => {
       cfg.tasks = (cfg.tasks || []).map(migrateLegacyTask);
       courseConfig = cfg;
@@ -396,7 +395,7 @@
       document.getElementById('courseSubtitle').textContent = cfg.courseSubtitle || '';
       cfg.tasks.forEach(() => perTask.push({blockScores: {}, blockInstances: []}));
       buildNav();
-      try { window.Scorm12 && Scorm12.init(); } catch(e) {}
+      try { window.Scorm12 && Scorm12.init(); } catch {}
       // Show cumulative max-points immediately, without waiting for mount().
       updateScorePill();
       updateNavStates();

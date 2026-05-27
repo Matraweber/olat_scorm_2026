@@ -304,7 +304,7 @@
         try {
           solution = window.BlockUtils.safeMathExpr(activeConfig.formula, sample);
           if(typeof solution === 'number') solution = Math.round(solution * 100) / 100;
-        } catch(e){}
+        } catch{}
       }
       const card = document.createElement('div');
       card.className = 'bp-card';

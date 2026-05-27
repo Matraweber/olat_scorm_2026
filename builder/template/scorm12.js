@@ -21,12 +21,12 @@ window.Scorm12 = {
     try{
       this.initialized = (this.api.LMSInitialize("") === "true");
       return this.initialized;
-    }catch(e){
+    }catch{
       return false;
     }
   },
-  get(k){ if(!this.initialized||!this.api) return ""; try{ return this.api.LMSGetValue(k); }catch(e){ return ""; } },
-  set(k,v){ if(!this.initialized||!this.api) return false; try{ return (this.api.LMSSetValue(k,String(v)) === "true"); }catch(e){ return false; } },
-  commit(){ if(!this.initialized||!this.api) return false; try{ return (this.api.LMSCommit("") === "true"); }catch(e){ return false; } },
-  finish(){ if(!this.initialized||!this.api) return false; try{ const ok=(this.api.LMSFinish("") === "true"); this.initialized=false; return ok; }catch(e){ return false; } }
+  get(k){ if(!this.initialized||!this.api) return ""; try{ return this.api.LMSGetValue(k); }catch{ return ""; } },
+  set(k,v){ if(!this.initialized||!this.api) return false; try{ return (this.api.LMSSetValue(k,String(v)) === "true"); }catch{ return false; } },
+  commit(){ if(!this.initialized||!this.api) return false; try{ return (this.api.LMSCommit("") === "true"); }catch{ return false; } },
+  finish(){ if(!this.initialized||!this.api) return false; try{ const ok=(this.api.LMSFinish("") === "true"); this.initialized=false; return ok; }catch{ return false; } }
 };

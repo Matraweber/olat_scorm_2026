@@ -560,6 +560,6 @@
       fns.forEach(fn => { body = body.replace(new RegExp('\\b'+fn+'\\b','g'),'Math.'+fn); });
       const f = new Function('x','"use strict";return ('+body+');');
       const r = f(x); return Number.isFinite(r) ? r : null;
-    } catch(e){ return null; }
+    } catch{ return null; }
   }
 })();

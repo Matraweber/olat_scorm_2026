@@ -794,13 +794,14 @@ html.welcome-active {
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   font-weight: 700;
-  color: var(--muted);
-  opacity: 0.7;
-  transition: opacity 200ms ease, color 200ms ease;
+  /* Slightly darker than --muted so the small label keeps WCAG-AA contrast
+     without the opacity dim that was here before. */
+  color: #4d5862;
+  transition: color 200ms ease;
 }
 .welcome-rail-text { font-weight: 600; }
 .welcome-rail-link.is-active { color: var(--primary); transform: translateX(4px); }
-.welcome-rail-link.is-active .welcome-rail-num { color: var(--accent-dark); opacity: 1; }
+.welcome-rail-link.is-active .welcome-rail-num { color: #4f7d3a; }
 
 /* Chapters
    Anchor targets for rail clicks. scroll-margin-top clears the sticky header. */
@@ -824,7 +825,9 @@ html.welcome-active {
   font-family: "Courier New", monospace;
   font-size: 0.85rem;
   letter-spacing: 0.12em;
-  color: var(--accent-dark);
+  /* WCAG AA-safe darker variant of --accent-dark (#84bf66).
+     The bright accent fails 4.5:1 on white; this darker green passes. */
+  color: #4f7d3a;
   font-weight: 700;
   align-self: center;
 }
@@ -1169,7 +1172,9 @@ html.welcome-active {
 .welcome-mock-sidebar .mm-btn { background: #fff; border: 1px solid var(--line); padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.72rem; }
 .welcome-mock-sidebar .mm-btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .welcome-mock-sidebar .mm-task { background: var(--panel-soft); border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; font-weight: 700; color: var(--primary); margin-top: 0.35rem; display: flex; justify-content: space-between; align-items: center; }
-.welcome-mock-sidebar .mm-task-faint { opacity: 0.6; }
+/* "Faint" relies on a tinted background, not opacity, so the foreground
+   text keeps WCAG-AA contrast against white. */
+.welcome-mock-sidebar .mm-task-faint { background: #f4f7f9; border-color: #d8e0e6; }
 .welcome-mock-sidebar .mm-meta { font-size: 0.7rem; color: var(--muted); font-weight: normal; }
 
 .welcome-mock-picker .mm-modal-head { font-weight: 700; color: var(--primary); margin-bottom: 0.45rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--line); }

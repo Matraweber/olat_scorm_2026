@@ -29,7 +29,7 @@ export function loadPersistentTheme(){
   try {
     const raw = localStorage.getItem(THEME_STORAGE_KEY);
     return raw ? mergeTheme(JSON.parse(raw)) : defaultTheme();
-  } catch(e){
+  } catch{
     return defaultTheme();
   }
 }
@@ -38,14 +38,14 @@ export function savePersistentTheme(theme){
   try {
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(mergeTheme(theme)));
     return true;
-  } catch(e){
+  } catch{
     return false;
   }
 }
 
 export function clearPersistentTheme(){
   try { localStorage.removeItem(THEME_STORAGE_KEY); }
-  catch(e){}
+  catch{}
 }
 
 // Push theme colors onto :root so the builder UI updates live.
@@ -83,21 +83,21 @@ export function isAutosaveAvailable(){
     if(!raw) return false;
     const c = JSON.parse(raw);
     return courseHasContent(c);
-  } catch(e){ return false; }
+  } catch{ return false; }
 }
 
 export function loadAutosave(){
   try {
     const raw = localStorage.getItem(AUTOSAVE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch(e){ return null; }
+  } catch{ return null; }
 }
 
 export function loadAutosaveMeta(){
   try {
     const raw = localStorage.getItem(AUTOSAVE_META_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch(e){ return null; }
+  } catch{ return null; }
 }
 
 // Write through immediately. Caller decides timing.
@@ -115,20 +115,20 @@ export function saveAutosave(course){
       taskCount: Array.isArray(course.tasks) ? course.tasks.length : 0,
       courseTitle: course.courseTitle || ''
     }));
-    if(_onAutosave) try { _onAutosave({ ts }); } catch(e){}
-  } catch(e){
+    if(_onAutosave) try { _onAutosave({ ts }); } catch{}
+  } catch{
     // Quota exceeded / private mode: ignore. Manual ZIP export still works.
   }
 }
 
 export function clearAutosave(){
-  try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_META_KEY); } catch(e){}
+  try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_META_KEY); } catch{}
 }
 
 // Debounced: 800 ms idle = one write. Main.js flushes on unload.
 export function scheduleAutosave(){
   if(!_autosaveTimer && _onAutosavePending){
-    try { _onAutosavePending(); } catch(e){}
+    try { _onAutosavePending(); } catch{}
   }
   if(_autosaveTimer) clearTimeout(_autosaveTimer);
   _autosaveTimer = setTimeout(() => { _autosaveTimer = null; saveAutosave(state.course); }, 800);
@@ -215,10 +215,10 @@ export function redo(){
 
 // Clipboard for blocks, persisted via localStorage.
 const CLIPBOARD_KEY = 'scorm-builder-clipboard';
-function clipboardPut(payload){ try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(payload)); } catch(e){} }
+function clipboardPut(payload){ try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(payload)); } catch{} }
 function clipboardGet(){
   try { const raw = localStorage.getItem(CLIPBOARD_KEY); return raw ? JSON.parse(raw) : null; }
-  catch(e){ return null; }
+  catch{ return null; }
 }
 
 export function copySelectedBlocks(){
