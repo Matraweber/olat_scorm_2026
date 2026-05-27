@@ -267,6 +267,10 @@ textarea:focus-visible,
 .json-status.error { color: var(--danger); }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 2rem; z-index: 100; }
 .modal.hidden { display: none; }
+/* Lock the background while any modal is visible so wheel / touch only scrolls
+   the modal's own content. Matches dynamic modals (added without .hidden) and
+   static modals once their .hidden class is removed. */
+body:has(.modal:not(.hidden)) { overflow: hidden; }
 .modal-card { background: var(--panel); border-radius: var(--radius); padding: 1.4rem 1.6rem; max-width: 720px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
 .modal-card h2 { margin-top: 0; color: var(--primary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
@@ -923,7 +927,7 @@ html.welcome-active {
 .welcome-step-body p { margin: 0; line-height: 1.55; color: #2a4053; font-size: 0.92rem; }
 .welcome-step .welcome-mock { grid-column: 1 / -1; margin-top: 0.7rem; }
 
-/* Oberfläche legend */
+/* UI legend */
 .welcome-legend { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: 0.4rem; }
 .welcome-legend li {
   padding: 0.65rem 0.85rem;

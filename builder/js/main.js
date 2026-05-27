@@ -38,6 +38,10 @@ function init(){
     applyThemeToBuilder(state.theme);
     state.selected = {kind:'course'};
     render();
+    // The header title lives outside the pane-render tree, so refresh it.
+    if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
+      window.scormBuilderSyncHeaderTitle();
+    }
   });
   document.getElementById('btnAddTask').addEventListener('click', openTaskCreateModal);
   document.getElementById('btnDownload').addEventListener('click', downloadZip);
@@ -98,6 +102,16 @@ function init(){
   }
   syncHeaderTitle();
   window.scormBuilderSyncHeaderTitle = syncHeaderTitle;
+
+  // Disable mouse-wheel value-stepping on number inputs. Blurring the field
+  // lets the wheel event fall through to the page scroller, so the user can
+  // scroll past a number input without accidentally changing its value.
+  document.addEventListener('wheel', (e) => {
+    const ae = document.activeElement;
+    if(ae && ae.tagName === 'INPUT' && ae.type === 'number' && ae === e.target){
+      ae.blur();
+    }
+  }, { passive: true });
 
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {

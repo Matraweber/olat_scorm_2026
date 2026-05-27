@@ -256,8 +256,8 @@
   // along with the reference points needed to draw a guide line.
   function makeElementSnap(shapes, excludeSet){
     if(!Array.isArray(shapes)) return null;
-    const xCands = []; // { x, y, idx } - vertical alignment candidates
-    const yCands = []; // { x, y, idx } - horizontal alignment candidates
+    const xCands = []; // { x, y, idx } for vertical alignment
+    const yCands = []; // { x, y, idx } for horizontal alignment
     for(let i = 0; i < shapes.length; i++){
       if(excludeSet && excludeSet.has(i)) continue;
       const sh = shapes[i];
@@ -288,7 +288,7 @@
       return {
         x: newX, y: newY,
         dx: newX - svgX, dy: newY - svgY,
-        // Guide line endpoints - drawn from the moving point to the reference.
+        // Guide line endpoints from the moving point to the reference shape.
         vGuide: bestX ? { x: newX, fromY: bestX.y, toY: svgY } : null,
         hGuide: bestY ? { y: newY, fromX: bestY.x, toX: svgX } : null
       };
@@ -867,10 +867,15 @@
     svg.style.width = '100%';
     svg.style.aspectRatio = w + ' / ' + h;
     if(opts && opts.fullHeight){ svg.style.height = h + 'px'; svg.style.maxHeight = 'none'; svg.style.aspectRatio = ''; }
-    // capViewport: only in runtime/preview, never in the builder canvas.
+    // capViewport: runtime/preview only. Cap width and height by the same
+    // viewport ceiling so the aspect ratio stays correct on wide cards.
+    // Reservation of 200 px leaves room for the SCORM header / nav while
+    // giving the figure most of the viewport so it stays readable.
     if(opts && opts.capViewport){
-      // Cap to viewport minus SCORM chrome (~420 px), minimum 240 px.
-      svg.style.maxHeight = 'max(240px, calc(100vh - 420px))';
+      const aspect = w / h;
+      const maxH = 'max(420px, calc(100vh - 200px))';
+      svg.style.width  = 'min(100%, calc(' + maxH + ' * ' + aspect + '))';
+      svg.style.maxHeight = maxH;
       svg.style.aspectRatio = w + ' / ' + h;
     }
     const defs = document.createElementNS(NS, 'defs');
@@ -1765,6 +1770,10 @@
             } else {
               applyTemplate(tpl, 'replace');
               pop.remove();
+              // commit() re-renders the editor + pushes the new config to the
+              // canvas. Without it the editor stays stuck on the empty state
+              // until the user nudges something else.
+              commit();
             }
           });
           grid.appendChild(card);
@@ -2776,7 +2785,7 @@
         const start = svgPoint(svg, e.clientX, e.clientY);
         let moved = false;
 
-        // Snap stack - element alignment first (so dragging a label onto
+        // Snap stack: element alignment first (so dragging a label onto
         // another label's edge produces a visible guide line), then grid as
         // a secondary fallback. Works regardless of whether a coordinate
         // system is present. Hold Alt to bypass all snapping.

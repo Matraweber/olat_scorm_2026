@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  // Einheitenregister
+  // Unit registry
   // Conversion: baseValue = value * factor + (off || 0)
   //             result    = (baseValue - (off || 0)) / factor
   // Temperature: base unit is Kelvin; `off` compensates for the zero-point offset.
@@ -119,7 +119,7 @@
     'TiB': { label:'TiB',          cat:'Datenmenge',       factor:1099511627776 },
   };
 
-  // Hilfsfunktionen
+  // Helpers
   function convertUnits(value, fromId, toId){
     const from = UREG[fromId], to = UREG[toId];
     if(!from || !to || from.cat !== to.cat) return null;
@@ -244,8 +244,8 @@
     'ex-density': {
       questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
       variants: [
-        // Material-Dichten in der Größenordnung üblicher Stoffe:
-        // Wasser 1, Aluminium 2.7, Eisen 7.87, Blei 11.3 g/cm³.
+        // Material densities in the typical range:
+        // water 1, aluminium 2.7, iron 7.87, lead 11.3 g/cm³.
         { fromUnit:'g/cm³', toUnit:'kg/m³', valueMin:1,    valueMax:12,    integer:false },
         { fromUnit:'kg/m³', toUnit:'g/cm³', valueMin:500,  valueMax:11000, integer:true  },
         { fromUnit:'g/cm³', toUnit:'kg/L',  valueMin:1,    valueMax:10,    integer:false },
@@ -278,7 +278,7 @@
     return Object.assign({}, config, ex);
   }
 
-  // Block-Registrierung
+  // Block registration
   Blocks.register('unit-convert', {
     label: 'Einheitenumrechnung',
     description: 'Physikalische Einheiten umrechnen mit zufälligen Werten.',

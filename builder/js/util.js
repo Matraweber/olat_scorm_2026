@@ -27,8 +27,16 @@ export function uid(prefix){
   return (prefix || 'id_') + Math.random().toString(36).slice(2, 8);
 }
 
+// German umlaut transliteration (ä -> ae, ö -> oe, ü -> ue, ß -> ss).
+// Filesystems and ZIP tools handle these ASCII names predictably across
+// OSes, which the raw UTF-8 form does not.
+const UMLAUT_MAP = {
+  'ä':'ae', 'ö':'oe', 'ü':'ue', 'ß':'ss',
+  'Ä':'AE', 'Ö':'OE', 'Ü':'UE'
+};
 export function sanitizeFilename(s){
-  return String(s).replace(/[^a-zA-Z0-9_\-]+/g, '_').slice(0, 80) || 'scorm';
+  const transliterated = String(s).replace(/[äöüßÄÖÜ]/g, c => UMLAUT_MAP[c] || c);
+  return transliterated.replace(/[^a-zA-Z0-9_\-]+/g, '_').slice(0, 80) || 'scorm';
 }
 
 export function stripHtmlText(html){

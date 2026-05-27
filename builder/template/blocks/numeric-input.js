@@ -23,6 +23,7 @@
         formula: '',
         tolerance: 0.01,
         unit: '',
+        simplifyFractions: true,
         maxPoints: 1
       };
     },
@@ -124,6 +125,8 @@
           help:'Abweichung, die noch als korrekt gilt. 0 = exakt.' },
         { key:'unit', label:'Antwort-Einheit (optional)', type:'text', placeholder:'z. B. m/s oder kg',
           help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehört in den Fragetext.' },
+        { key:'simplifyFractions', label:'Term vereinfachen', type:'boolean',
+          help:'Aktiv: Studierende müssen den gekürzten Bruch eingeben. „10/20" wird als falsch gewertet, „1/2" ist korrekt. Aus: alle äquivalenten Eingaben werden akzeptiert.' },
         // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
@@ -154,18 +157,60 @@
         return vars;
       }
       function fillTemplate(tpl, vars){
-        function formatValue(v){
-          return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+        // Render a numeric value. Clean small-denominator fractions show as
+        // "num/den" with the sign in front; everything else falls back to a
+        // rounded decimal. (The simplifyFractions toggle only changes how
+        // the solution is reported, not the question display.)
+        function formatValue(v, wrapNeg){
+          let s;
+          const frac = u.asFraction(v);
+          // den <= 20 keeps fractions readable (1/2, 3/7) and avoids ugly
+          // artefacts like 43/100 that come from 2-decimal rounding.
+          if(frac && Math.abs(frac.den) > 1 && Math.abs(frac.den) <= 20){
+            const absNum = Math.abs(frac.num);
+            s = (frac.num < 0 ? '-' : '') + absNum + '/' + frac.den;
+          } else if(Number.isInteger(v)){
+            s = String(v);
+          } else {
+            s = String(Math.round(v * 100) / 100);
+          }
+          // After a multiplicative, divisive or power operator a negative
+          // value is wrapped so the sign stays glued to the number:
+          // a · (-3/7) instead of the confusing a · -3/7.
+          if(wrapNeg && v < 0) s = '(' + s + ')';
+          return s;
         }
-        // Inside $...$ (KaTeX), keep {} as argument groups; outside, strip them.
-        return String(tpl || '').replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName) => {
+        // True when the placeholder follows a binary operator (so a negative
+        // substitution should appear inside parentheses).
+        function shouldWrap(fullStr, placeholderOffset){
+          let i = placeholderOffset - 1;
+          while(i >= 0 && /\s/.test(fullStr[i])) i--;
+          if(i < 0) return false;
+          const c = fullStr[i];
+          if(/[+\-*/:·×÷^]/.test(c)) return true;
+          // LaTeX multiplicative ops: \cdot \times \div end in t/s/v.
+          if(/[tsv]/.test(c) && /\\(cdot|times|div)$/.test(fullStr.slice(0, i + 1))) return true;
+          return false;
+        }
+        const tplStr = String(tpl || '');
+        return tplStr.replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName, offset) => {
           if(match.startsWith('$')){
-            return match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
-              if(name in vars) return '{' + formatValue(vars[name]) + '}';
+            // Inside $...$ KaTeX preserves {} as argument grouping. Decide
+            // wrapping based on the character before each placeholder inside
+            // the math expression. innerOffset is relative to `match`, which
+            // begins at `offset` in the full template, so the absolute index
+            // of each {x} is offset + innerOffset.
+            return match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name, innerOffset) => {
+              if(name in vars){
+                const wrap = shouldWrap(tplStr, offset + innerOffset);
+                return '{' + formatValue(vars[name], wrap) + '}';
+              }
               return m;
             });
           }
-          if(plainName && plainName in vars) return formatValue(vars[plainName]);
+          if(plainName && plainName in vars){
+            return formatValue(vars[plainName], shouldWrap(tplStr, offset));
+          }
           return match;
         });
       }
@@ -210,6 +255,16 @@
         if(current.expected == null){ fb.bad('Lösung konnte nicht berechnet werden (Formel prüfen).'); return; }
         const got = u.parseNum(inp.value);
         if(got == null){ fb.bad('Bitte eine gültige Zahl oder Bruch (z. B. 3/4) eingeben.'); return; }
+        // simplifyFractions: when on, an unsimplified fraction like "10/20"
+        // is rejected even though its numeric value matches the expected one.
+        if(activeConfig.simplifyFractions !== false){
+          const fracParts = parseFractionInput(inp.value);
+          if(fracParts && !isFractionSimplified(fracParts.num, fracParts.den)){
+            fb.bad('Bitte gekürzten Bruch eingeben (z. B. 1/2 statt 2/4).');
+            api.reportScore(0);
+            return;
+          }
+        }
         if(u.nearlyEqual(got, current.expected, Number(activeConfig.tolerance) || 0.01)){
           fb.ok('Korrekt. (Lösung: ' + u.formatSolution(current.expected) + (activeConfig.unit ? ' ' + activeConfig.unit : '') + ')');
           api.reportScore(activeConfig.maxPoints || 1);
@@ -287,6 +342,24 @@
     }
   });
 
+  // Detect fraction-form input ("a/b" or "-a/b") with INTEGER parts only.
+  // Decimals like "1.5/2" and mixed numbers like "1 3/4" return null because
+  // their "simplified" form is ambiguous; only plain integer fractions are
+  // candidates for the cancellation check.
+  function parseFractionInput(value){
+    const s = String(value == null ? '' : value).trim().replace(',', '.');
+    const m = s.match(/^(-?\d+)\s*\/\s*(-?\d+)$/);
+    if(!m) return null;
+    const num = Number(m[1]), den = Number(m[2]);
+    if(!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return null;
+    return { num, den };
+  }
+  function isFractionSimplified(num, den){
+    let a = Math.abs(num), b = Math.abs(den);
+    while(b){ const t = b; b = a % b; a = t; }
+    return a === 1;
+  }
+
   // Question template -> JS formula. Prefers $...$, translates LaTeX constructs to ASCII.
   function deriveFormula(template){
     if(!template) return '';
@@ -294,12 +367,14 @@
     // Prefer the contents between $...$.
     const dollarMatch = s.match(/\$([^$]+)\$/);
     if(dollarMatch) s = dollarMatch[1];
-    // LaTeX -> ASCII: \frac{X}{Y}->(X)/(Y), \sqrt{X}->sqrt(X), \cdot->*, {X}^{Y}->(X)^(Y).
+    // LaTeX -> ASCII: \frac{X}{Y}->((X)/(Y)), \sqrt{X}->sqrt(X), \cdot->*.
     function unwrapBraces(str){
       return str.replace(/\{([^{}]*)\}/g, '($1)');
     }
-    // First handle \frac, \sqrt etc. with their {...} args.
-    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)');
+    // \frac gets EXTRA outer parens so a fraction can be divided by another
+    // fraction without left-associativity corrupting the math:
+    //   \frac{a}{b} \div \frac{c}{d}  ->  ((a)/(b)) / ((c)/(d))  ->  (a/b)/(c/d)
+    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))');
     s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
     s = s.replace(/\\cdot/g, '*');
     s = s.replace(/\\times/g, '*');
@@ -308,13 +383,28 @@
     s = s.replace(/\\left|\\right/g, '');
     // After LaTeX-replacements, convert remaining {x} placeholders to plain x.
     s = unwrapBraces(s);
-    // Normalize math symbols.
+    // Normalize multiplicative / additive symbols and √. Colon is handled
+    // separately below so we can group its operands.
     s = s.replace(/[·×∙]/g, '*')
-         .replace(/÷|:/g, '/')
+         .replace(/÷/g, '/')
          .replace(/−/g, '-')
          .replace(/√/g, 'sqrt');
     // Strip German connector words.
     s = s.replace(/\b(Berechnen Sie|Berechne|Was ist|Wie viel ist|Wieviel ist|Bestimmen Sie|Bestimme|Gib an|Bestimme den Wert von|Geben Sie an)\b/gi, ' ');
+    // Colon as "outer division": when both sides contain math, group each
+    // segment in parens before joining with /. Plain-text templates like
+    // "{a}/{b} : {c}/{d}" then auto-derive to ((a)/(b))/((c)/(d)).
+    // A trailing sentence period (templates often end the prose with ".")
+    // is stripped before wrapping so the final group stays valid.
+    if(s.includes(':')){
+      const parts = s.split(':').map(p => p.trim().replace(/^[.,;:!?]+|[.,;:!?]+$/g, '').trim());
+      const allMathy = parts.length >= 2 && parts.every(p => /[A-Za-z0-9]/.test(p));
+      if(allMathy){
+        s = parts.map(p => '(' + p + ')').join(' / ');
+      } else {
+        s = s.replace(/:/g, '/');
+      }
+    }
     // Find the longest contiguous math-allowed substring around variables.
     const allowed = /[A-Za-z_0-9+\-*/^().,\s]/;
     let best = '';

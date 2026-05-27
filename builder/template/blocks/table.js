@@ -11,6 +11,7 @@
       return {
         blockTitle: '', preset: 'custom',
         question: '',
+        variables: [],
         columns: [],
         rowCount: 4,
         shuffleRows: false,
@@ -59,12 +60,44 @@
         { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom,
           help:'KaTeX wird gerendert. Beispiel: $f(x) = 2x + 1$.' },
 
+        // Top-level variables are generated once per row and shared across
+        // every column's formula. Keeps min/max in one place when the same
+        // value (e.g. a numerator and denominator) feeds several columns.
+        { type:'section', label:'Variablen', key:'_sec_vars', showIf: isCustom },
+        { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
+          showIf: isCustom,
+          itemSummary: item => {
+            if(!item || !item.name) return '...';
+            const range = (item.min ?? '') + ' bis ' + (item.max ?? '');
+            return item.name + ': ' + range + (item.integer === false ? '' : ' (ganz)');
+          },
+          itemSchema:[
+            { key:'name', label:'Name', type:'text', placeholder:'z. B. n oder d',
+              help:'Nur Buchstaben/Ziffern. Wird in Formeln referenziert.' },
+            { key:'min', label:'Min', type:'number', step:1 },
+            { key:'max', label:'Max', type:'number', step:1 },
+            { key:'integer', label:'Ganzzahlig', type:'boolean' }
+          ] },
+
         { type:'section', label:'Spalten', key:'_sec_cols', showIf: isCustom },
         { key:'columns', label:'Spalten', type:'list', itemLabel:'Spalte',
           showIf: isCustom,
           itemSummary: item => (item.label || '...') + ' (' + (item.type || 'text') + ')',
           itemSchema:[
-            { key:'label', label:'Spaltenkopf', type:'text', placeholder:'z. B. x' },
+            { key:'label', label:'Spaltenkopf', type:'text', placeholder:'z. B. f(x) = 2*x + 1',
+              help:'Bei „Name = Term" wird die Formel automatisch übernommen (z. B. „f(x) = 2*x + 1").',
+              onChange: (val, item, set) => {
+                if(item.type !== 'expr' && item.type !== 'answer') return;
+                const derived = deriveFormulaFromLabel(val);
+                if(!derived) return;
+                const previous = item._derivedFormula || '';
+                const userTouched = item.formula && item.formula !== previous;
+                if(userTouched) return;
+                set('formula', derived);
+                set('_derivedFormula', derived);
+                const fld = document.querySelector('[data-formula-field-key="formula"]');
+                if(fld) fld.dispatchEvent(new CustomEvent('formula-field-set', { detail: { value: derived } }));
+              } },
             { key:'key',   label:'Variable (interner Schlüssel)', type:'text', placeholder:'z. B. x',
               help:'Wird in Formeln referenziert. Nur Buchstaben/Ziffern.' },
             { key:'type',  label:'Typ', type:'select', options:[
@@ -80,6 +113,9 @@
             { key:'max',     label:'Max', type:'number', step:1,
               showIf: it => it.type === 'var' },
             { key:'integer', label:'Ganzzahlig', type:'boolean',
+              showIf: it => it.type === 'var' },
+            { key:'step', label:'Schrittweite (optional)', type:'number', step:'any',
+              help:'Wenn gesetzt, sequenzielle Werte ab Min in dieser Schrittweite (z. B. Min=0, Schritt=5 → 0, 5, 10, …). Leer/0 = Zufallswert.',
               showIf: it => it.type === 'var' },
             // Text-only
             { key:'text',    label:'Text', type:'text',
@@ -134,17 +170,62 @@
         } catch(e){ return null; }
       }
 
+      const topVars = (activeConfig.variables || []).filter(v => v && v.name);
+
+      // Roll one set of top-level variable values (used per row so each row
+      // gets its own random numerator / denominator / …).
+      function genTopVars(){
+        const out = {};
+        topVars.forEach(v => {
+          const lo = Number(v.min); const hi = Number(v.max);
+          const a = isNaN(lo) ? 1 : lo;
+          const b = isNaN(hi) ? 10 : hi;
+          let val = a + Math.random() * (b - a);
+          if(v.integer !== false) val = Math.round(val);
+          else val = Math.round(val * 100) / 100;
+          out[v.name] = val;
+        });
+        return out;
+      }
+
       function generate(){
         rows = [];
+        // Each var-column with a step >= 0 gets a fresh random offset so
+        // sequences like "0, 5, 10..." can start at a different multiple
+        // ("10, 15, 20...") on each generation.
+        const seqOffset = {};
+        cols.forEach(c => {
+          if(c.type === 'var'){
+            const step = Number(c.step);
+            if(!isFinite(step) || step <= 0) return;
+            const lo = Number(c.min);
+            const hi = Number(c.max);
+            if(!isFinite(lo) || !isFinite(hi) || hi <= lo){ seqOffset[c.key] = 0; return; }
+            // How many full steps fit in [lo, hi] before the sequence falls off the end?
+            const slack = Math.max(0, Math.floor((hi - lo) / step) - (rowCount - 1));
+            seqOffset[c.key] = slack > 0 ? Math.floor(Math.random() * (slack + 1)) * step : 0;
+          }
+        });
         for(let r = 0; r < rowCount; r++){
-          const row = {};
+          // Top-level variables roll fresh per row so a column like "n/d"
+          // gets a different pair each row.
+          const rowVars = genTopVars();
+          const row = Object.assign({}, rowVars);
           // Pass 1: variable + text columns.
           cols.forEach(c => {
             if(c.type === 'var'){
               const min = Number(c.min); const max = Number(c.max);
               const lo = isNaN(min) ? 1 : min;
               const hi = isNaN(max) ? 10 : max;
-              let v = lo + Math.random() * (hi - lo);
+              const step = Number(c.step);
+              let v;
+              if(isFinite(step) && step > 0){
+                // Sequential mode: row r gets lo + offset + r*step.
+                v = lo + (seqOffset[c.key] || 0) + r * step;
+                if(v > hi) v = hi; // clamp if the sequence overruns the range
+              } else {
+                v = lo + Math.random() * (hi - lo);
+              }
               if(c.integer !== false) v = Math.round(v);
               else v = Math.round(v * 100) / 100;
               row[c.key] = v;
@@ -152,7 +233,8 @@
               row[c.key] = String(c.text || '');
             }
           });
-          // Pass 2: computed + answer-target columns.
+          // Pass 2: computed + answer-target columns. Formula context sees
+          // top-level variables, var-columns, and any earlier expr columns.
           cols.forEach(c => {
             if(c.type === 'expr' || c.type === 'answer'){
               const v = evalExpr(c.formula, row);
@@ -365,5 +447,26 @@
       });
     }
     return config;
+  }
+
+  // Column-header to formula: "f(x) = 2*x + 1" -> "2*x + 1". Returns null
+  // when there is no "=" so plain headers like "x" or "f(x)" never overwrite
+  // a real formula. Mirrors deriveFormula() in numeric-input for consistency.
+  function deriveFormulaFromLabel(label){
+    if(!label || typeof label !== 'string') return null;
+    const eq = label.indexOf('=');
+    if(eq < 0) return null;
+    let s = label.slice(eq + 1);
+    // LaTeX -> ASCII
+    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))');
+    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
+    s = s.replace(/\\cdot/g, '*').replace(/\\times/g, '*').replace(/\\div/g, '/');
+    s = s.replace(/\\pi/g, 'pi').replace(/\\left|\\right/g, '');
+    s = s.replace(/\{([^{}]*)\}/g, '($1)');
+    s = s.replace(/[·×∙]/g, '*').replace(/÷|:/g, '/').replace(/−/g, '-').replace(/√/g, 'sqrt');
+    s = s.replace(/\$/g, '').trim();
+    // Strip trailing punctuation that came from a sentence-final label.
+    s = s.replace(/[\s.,;:!?]+$/g, '');
+    return s || null;
   }
 })();
