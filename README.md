@@ -91,7 +91,10 @@ olat_scorm_2026/
 | `task-pane-config.js` | Rechte Konfig-Pane, Multi-Select-Toolbar |
 | `task-pane-bulk.js` | Bulk-Operationen (align, distribute, duplicate, delete) |
 | `modals.js` | Block-Picker, Task-Create-Modal |
-| `form.js` | Schema-getriebener Form-Renderer |
+| `form.js` | Schema-getriebener Form-Renderer (Dispatcher + einfache Felder) |
+| `form-media.js` | Upload-Felder (Bild, Audio, Video, Datei) |
+| `form-math.js` | Math-Textarea + Formel-Eingabe mit KaTeX-Toolbar |
+| `form-specialized.js` | Block-spezifische Felder (zone-editor, unit-pair, unit-from-to) |
 | `math-toolbar-data.js` | Symboltabelle der Mathe-Toolbar (Pi, Wurzel, etc.) |
 | `preview.js` | Block-Vorschau im Canvas + Welcome-Detail |
 | `io.js` | JSON-Im/Export, SCORM-ZIP-Generierung, Preview-Iframe |
