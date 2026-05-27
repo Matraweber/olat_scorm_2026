@@ -243,16 +243,18 @@ function sortChildren(node){
 // Load a zip entry into the builder.
 async function openFileEntry(entry){
   try {
-    let file;
-    if(entry.file){
-      file = entry.file;
-    } else if(entry.handle){
+    let file, handle = null;
+    if(entry.handle){
+      handle = entry.handle;
       file = await entry.handle.getFile();
+    } else if(entry.file){
+      file = entry.file;
     } else {
       toast('Datei konnte nicht gelesen werden.', 'error');
       return;
     }
-    await loadZipFile(file);
+    // Pass the handle along so Ctrl+S can overwrite this file later.
+    await loadZipFile(file, handle);
     markActive(entry.path);
     // Keep open so author can switch between sibling ZIPs.
   } catch(e){

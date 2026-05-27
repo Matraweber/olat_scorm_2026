@@ -3863,30 +3863,60 @@
       if(currentBlanks.length === 0){ ui.fb.neutral('Keine Luecken definiert.'); api.reportScore(0); return; }
       checked = true;
       checkBtn.disabled = true;
-      let correctCount = 0;
+      // Collect what the student actually typed in each numbered slot. Used
+      // for follow-through grading: a later slot whose formula references
+      // {N*} is re-evaluated against the student's slot N, not the correct
+      // one, so a propagated mistake still earns half points.
+      const studentSlotValues = {};
+      currentBlanks.forEach(b => {
+        if(b.slotN > 0){
+          const g = u.parseNum(b.input.value);
+          if(g != null) studentSlotValues['s' + b.slotN] = g;
+        }
+      });
+      let scoreSum = 0;
+      let strictCount = 0;
+      let partialCount = 0;
       currentBlanks.forEach(b => {
         const given = String(b.input.value || '').trim();
-        let ok = false;
+        const tol = b.expected.tolerance != null ? b.expected.tolerance : 0.01;
+        let mark = 'wrong';
         if(b.expected.value != null){
           const gotNum = u.parseNum(given);
-          const tol = b.expected.tolerance != null ? b.expected.tolerance : 0.01;
-          if(gotNum != null && u.nearlyEqual(gotNum, b.expected.value, tol)) ok = true;
-        } else {
-          ok = given.toLowerCase() === b.expected.asString.toLowerCase() && b.expected.asString !== '';
+          if(gotNum != null && u.nearlyEqual(gotNum, b.expected.value, tol)){
+            mark = 'correct';
+          } else if(gotNum != null && b.expected.formula){
+            // Re-evaluate the slot's formula with the student's earlier
+            // answers. If their value is consistent (Folgefehler), give half.
+            const ftVars = Object.assign({}, currentVars, studentSlotValues);
+            const ftVal = evalFormula(b.expected.formula, ftVars);
+            if(ftVal != null && u.nearlyEqual(gotNum, ftVal, tol)){
+              mark = 'partial';
+            }
+          }
+        } else if(given.toLowerCase() === b.expected.asString.toLowerCase() && b.expected.asString !== ''){
+          mark = 'correct';
         }
         b.input.disabled = true;
-        b.input.classList.add(ok ? 'comp-blank-ok' : 'comp-blank-bad');
-        if(!ok && b.expected.asString){
+        b.input.classList.add(
+          mark === 'correct' ? 'comp-blank-ok'
+            : mark === 'partial' ? 'comp-blank-partial'
+              : 'comp-blank-bad');
+        if(mark !== 'correct' && b.expected.asString){
           b.input.title = 'Lösung: ' + b.expected.asString;
         }
-        if(ok) correctCount++;
+        if(mark === 'correct'){ scoreSum += 1; strictCount++; }
+        else if(mark === 'partial'){ scoreSum += 0.5; partialCount++; }
       });
-      const pts = Math.round((correctCount / currentBlanks.length) * maxPoints * 100) / 100;
+      const pts = Math.round((scoreSum / currentBlanks.length) * maxPoints * 100) / 100;
       api.reportScore(pts);
-      const msg = correctCount + ' / ' + currentBlanks.length + ' Luecken korrekt -> ' + pts + ' / ' + maxPoints + ' Punkte.';
-      if(correctCount === currentBlanks.length) ui.fb.ok(msg);
-      else if(correctCount > 0)                 ui.fb.neutral(msg);
-      else                                      ui.fb.bad(msg);
+      const fullCount = strictCount;
+      let msg = fullCount + ' / ' + currentBlanks.length + ' Luecken korrekt';
+      if(partialCount > 0) msg += ', ' + partialCount + ' Folgefehler (halbe Punkte)';
+      msg += ' -> ' + pts + ' / ' + maxPoints + ' Punkte.';
+      if(fullCount === currentBlanks.length) ui.fb.ok(msg);
+      else if(scoreSum > 0)                  ui.fb.neutral(msg);
+      else                                   ui.fb.bad(msg);
     });
     ui.buttons.appendChild(checkBtn);
 

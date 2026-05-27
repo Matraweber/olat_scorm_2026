@@ -28,6 +28,12 @@ async function fetchBinary(absPath){
   return await r.blob();
 }
 
+// Remembered FileSystemFileHandle of the most recently loaded / saved SCORM
+// ZIP. Ctrl+S overwrites this handle without prompting again.
+let _loadedFileHandle = null;
+export function setLoadedHandle(h){ _loadedFileHandle = h || null; }
+export function getLoadedHandle(){ return _loadedFileHandle; }
+
 // KaTeX bundle: shipped inside the SCORM ZIP for offline math rendering.
 const KATEX_FONTS = [
   'KaTeX_AMS-Regular.woff2','KaTeX_Caligraphic-Bold.woff2','KaTeX_Caligraphic-Regular.woff2',
@@ -306,6 +312,8 @@ export async function downloadZip(){
       const stream = await fileHandle.createWritable();
       await stream.write(blob);
       await stream.close();
+      // Bind subsequent Ctrl+S saves to this fresh target.
+      _loadedFileHandle = fileHandle;
       toast('Gespeichert: ' + fileHandle.name);
       // Refresh folder browser so the new ZIP shows up immediately.
       const folderMod = await import('./folder-browser.js').catch(() => null);
@@ -396,7 +404,36 @@ async function reembedMediaInTasks(tasks, zip){
   return out;
 }
 
-export async function loadZipFile(file){
+// Overwrite the loaded SCORM ZIP at its original handle (Ctrl+S path).
+// Returns true when the file was written.
+export async function saveToLoadedHandle(){
+  if(!_loadedFileHandle){ return false; }
+  try {
+    const opts = { mode: 'readwrite' };
+    if(typeof _loadedFileHandle.queryPermission === 'function'){
+      let perm = await _loadedFileHandle.queryPermission(opts);
+      if(perm !== 'granted'){
+        perm = await _loadedFileHandle.requestPermission(opts);
+        if(perm !== 'granted'){ toast('Schreibrecht nicht gewährt.', 'error'); return false; }
+      }
+    }
+    toast('Paket wird gespeichert …');
+    const zip = await buildZip();
+    if(!zip) return false;
+    const blob = await zip.generateAsync({ type:'blob' });
+    const stream = await _loadedFileHandle.createWritable();
+    await stream.write(blob);
+    await stream.close();
+    toast('Gespeichert: ' + _loadedFileHandle.name);
+    return true;
+  } catch(err){
+    if(err && err.name === 'AbortError') return false;
+    toast('Fehler beim Speichern: ' + err.message, 'error');
+    return false;
+  }
+}
+
+export async function loadZipFile(file, sourceHandle){
   if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return; }
   // Parsing a multi-MB ZIP takes a moment; confirm the click registered.
   toast('Paket wird gelesen …');
@@ -435,6 +472,9 @@ export async function loadZipFile(file){
       state.theme = Object.assign(defaultTheme(), JSON.parse(themeTxt));
     }
     state.selected = {kind:'course'};
+    // Remember the source handle (if provided by the folder browser) so
+    // Ctrl+S can overwrite the original file later.
+    _loadedFileHandle = sourceHandle || null;
     render();
     if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
       window.scormBuilderSyncHeaderTitle();
@@ -463,6 +503,8 @@ export async function loadJsonFile(file){
     if(parsed.course){ state.course = parsed.course; state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
     if(parsed.theme) state.theme = Object.assign(defaultTheme(), parsed.theme);
     state.selected = {kind:'course'};
+    // JSON load isn't tied to a ZIP file; clear any prior ZIP handle.
+    _loadedFileHandle = null;
     render();
     if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
       window.scormBuilderSyncHeaderTitle();

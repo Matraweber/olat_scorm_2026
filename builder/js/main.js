@@ -42,6 +42,8 @@ function init(){
     if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
       window.scormBuilderSyncHeaderTitle();
     }
+    // Drop any previous-file association so Ctrl+S won't overwrite the old course.
+    import('./io.js').then(io => io.setLoadedHandle && io.setLoadedHandle(null));
   });
   document.getElementById('btnAddTask').addEventListener('click', openTaskCreateModal);
   document.getElementById('btnDownload').addEventListener('click', downloadZip);
@@ -135,12 +137,18 @@ function init(){
       downloadZip();
       return;
     }
-    // Cmd/Ctrl + S: flush autosave + toast.
+    // Cmd/Ctrl + S: overwrite the loaded SCORM ZIP if we remember its handle; otherwise fall back to autosave.
     if(mod && !e.shiftKey && (key === 's' || key === 'S')){
       if(inField) return;
       e.preventDefault();
-      flushAutosave();
-      toast('Lerneinheit gespeichert.');
+      import('./io.js').then(io => {
+        if(io.getLoadedHandle && io.getLoadedHandle()){
+          io.saveToLoadedHandle();
+        } else {
+          flushAutosave();
+          toast('Lerneinheit gespeichert.');
+        }
+      });
       return;
     }
 

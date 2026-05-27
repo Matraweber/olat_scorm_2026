@@ -212,5 +212,11 @@ table.truth-table th { background: var(--panel-soft); color: var(--primary); }
   background: rgba(180,35,24,0.1) !important;
   border-color: var(--danger) !important;
 }
+/* Folgefehler: numerically consistent with the student's earlier (wrong)
+   answer. Amber tint to set it apart from green/red. */
+.comp-blank-input.comp-blank-partial {
+  background: rgba(212,167,42,0.18) !important;
+  border-color: #d4a72a !important;
+}
 
 @media (max-width: 900px) { .hero-card, .content-grid { grid-template-columns: 1fr; } .square-plot-wrap { width: min(100%, 440px); } .brand-block { flex-direction: column; } .match-grid { grid-template-columns: 1fr; } }
