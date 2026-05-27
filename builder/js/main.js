@@ -361,6 +361,9 @@ function maybeOfferRecovery(){
     state.selected = state.course.tasks.length > 0 ? { kind: 'task', idx: 0 } : { kind: 'course' };
     overlay.remove();
     render();
+    if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
+      window.scormBuilderSyncHeaderTitle();
+    }
     scheduleAutosave();
   });
   overlay.querySelector('#autosaveDiscard').addEventListener('click', () => {

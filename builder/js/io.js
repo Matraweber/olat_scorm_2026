@@ -436,6 +436,9 @@ export async function loadZipFile(file){
     }
     state.selected = {kind:'course'};
     render();
+    if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
+      window.scormBuilderSyncHeaderTitle();
+    }
     scheduleAutosave();
     toast('SCORM-Paket geladen.');
   } catch(err){ console.error(err); toast('ZIP-Fehler: ' + err.message, 'error'); }
@@ -461,6 +464,9 @@ export async function loadJsonFile(file){
     if(parsed.theme) state.theme = Object.assign(defaultTheme(), parsed.theme);
     state.selected = {kind:'course'};
     render();
+    if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
+      window.scormBuilderSyncHeaderTitle();
+    }
     scheduleAutosave();
     toast('JSON-Konfiguration geladen.');
   } catch(err){ toast('Fehler: ' + err.message, 'error'); }
@@ -525,6 +531,9 @@ export function applyJsonEditor(){
     scheduleAutosave();
     // Don't call render(); it would replace the textarea. Refresh the task list only.
     import('./panes.js').then(m => m.renderTaskList());
+    if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
+      window.scormBuilderSyncHeaderTitle();
+    }
   } catch(err){
     const s = document.getElementById('jsonStatus'); s.textContent = 'Fehler: ' + err.message; s.className = 'json-status error';
   }

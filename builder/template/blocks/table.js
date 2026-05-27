@@ -89,7 +89,7 @@
             return (item.label || '...') + '  ·  ' + typeLabel;
           },
           itemSchema:[
-            // Header + key on one line so they're easy to scan.
+            // Header + key share a row.
             { key:'label', label:'Spaltenkopf', type:'text', placeholder:'z. B. f(x) = 2*x + 1',
               help:'Schreibe „Name = Term", damit die Formel automatisch übernommen wird.',
               onChange: (val, item, set) => {
@@ -126,7 +126,7 @@
             { key:'integer', label:'Ganzzahlig', type:'boolean',
               showIf: it => it.type === 'var' },
             { key:'formula', label:'Formel (optional)', type:'text', placeholder:'z. B. 5 * k',
-              help:'Wenn gesetzt, ersetzt sie den Zufallswert. Greift auf Top-Level-Variablen zu - z. B. Variable k = 0..72 ganz, Formel „5 * k" liefert zufällige Vielfache von 5 zwischen 0 und 360.',
+              help:'Wenn gesetzt, ersetzt sie den Zufallswert. Greift auf Top-Level-Variablen zu. Beispiel: Variable k = 0..72 ganz, Formel „5 * k" liefert zufällige Vielfache von 5 zwischen 0 und 360.',
               showIf: it => it.type === 'var' },
 
             // Static-text field gets its own row.
@@ -147,7 +147,9 @@
 
             // Unit is always optional and shown last.
             { type:'section', label:'Anzeige', key:'_col_display' },
-            { key:'unit', label:'Einheit (optional)', type:'text', placeholder:'z. B. cm' }
+            { key:'unit', label:'Einheit (optional)', type:'text', placeholder:'z. B. cm' },
+            { key:'fraction', label:'Als Bruch anzeigen', type:'boolean',
+              help:'Dezimalwerte wie 4.5 werden als Bruch (\\frac{9}{2}) gerendert. Ohne Effekt bei ganzzahligen Werten.' }
           ]},
 
         { type:'section', label:'Zeilen', key:'_sec_rows', showIf: isCustom },
@@ -294,10 +296,24 @@
               if(/[\\$]/.test(text)) td.innerHTML = text;
               else td.textContent = text;
             } else {
-              // var or expr: display numeric value
+              // var or expr: numeric value. Render as KaTeX fraction when
+              // the column opts in and the value has a clean small-denom
+              // fraction representation. Integers stay as plain digits.
               const v = row[c.key];
               if(typeof v === 'number'){
-                td.textContent = Number.isInteger(v) ? String(v) : String(Math.round(v * 1000) / 1000);
+                let shown = null;
+                if(c.fraction && !Number.isInteger(v)){
+                  const frac = u.asFraction(v);
+                  if(frac && Math.abs(frac.den) > 1 && Math.abs(frac.den) <= 100){
+                    const sign = frac.num < 0 ? '-' : '';
+                    shown = '$' + sign + '\\frac{' + Math.abs(frac.num) + '}{' + frac.den + '}$';
+                  }
+                }
+                if(shown != null){
+                  td.innerHTML = shown;
+                } else {
+                  td.textContent = Number.isInteger(v) ? String(v) : String(Math.round(v * 1000) / 1000);
+                }
               } else {
                 td.textContent = String(v != null ? v : '');
               }
@@ -309,7 +325,7 @@
         });
         tbl.appendChild(tbody);
         tableHost.appendChild(tbl);
-        // Render KaTeX in headers + text cells. Safe to call repeatedly.
+        // Typeset any LaTeX in headers + text cells.
         if(u.renderMath) u.renderMath(tbl);
       }
 
