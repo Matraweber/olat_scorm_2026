@@ -104,6 +104,25 @@
       const rounded = Math.round(value * 1000) / 1000;
       return String(rounded);
     },
+    // Round to N decimal places. Used for score reporting (2 decimals)
+    // and value display (typically 2 or 3).
+    roundTo(value, decimals){
+      const m = Math.pow(10, decimals);
+      return Math.round(value * m) / m;
+    },
+    // LaTeX -> ASCII conversion for formula derivation. Handles \frac, \sqrt,
+    // \cdot, \times, \div, \pi, \left/\right. \frac wraps in outer parens so
+    // fraction-division compositions evaluate correctly.
+    latexToAscii(str){
+      return String(str || '')
+        .replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))')
+        .replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)')
+        .replace(/\\cdot/g, '*')
+        .replace(/\\times/g, '*')
+        .replace(/\\div/g, '/')
+        .replace(/\\pi/g, 'pi')
+        .replace(/\\left|\\right/g, '');
+    },
     // "15/4 (= 3.75)" for non-integer rationals, plain decimal otherwise.
     formatSolution(value){
       if(!Number.isFinite(value)) return String(value);

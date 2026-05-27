@@ -33,6 +33,18 @@
       const w = [];
       if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push('Frage-Vorlage fehlt.');
       if(!cfg.formula || !String(cfg.formula).trim()) w.push('Lösungsformel fehlt.');
+      // Variable names must be ASCII identifiers. The substitution regex
+      // and the math evaluator both reject non-ASCII names, so reject early.
+      (cfg.variables || []).forEach((v, i) => {
+        if(!v || !v.name) return;
+        if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(v.name)){
+          w.push('Variable ' + (i + 1) + ' („' + v.name + '"): Name darf nur Buchstaben (a-z, A-Z), Ziffern und Unterstrich enthalten.');
+        }
+        const lo = Number(v.min), hi = Number(v.max);
+        if(isFinite(lo) && isFinite(hi) && lo > hi){
+          w.push('Variable „' + v.name + '": Min (' + lo + ') ist größer als Max (' + hi + ').');
+        }
+      });
       // Monte Carlo check: catches 0 under a fraction bar, sqrt(-x), log(0) before export.
       if(cfg.formula && (cfg.variables || []).length > 0 && window.BlockUtils){
         const SAMPLES = 200;
@@ -367,21 +379,15 @@
     // Prefer the contents between $...$.
     const dollarMatch = s.match(/\$([^$]+)\$/);
     if(dollarMatch) s = dollarMatch[1];
-    // LaTeX -> ASCII: \frac{X}{Y}->((X)/(Y)), \sqrt{X}->sqrt(X), \cdot->*.
+    // LaTeX -> ASCII via shared helper. \frac is wrapped in outer parens
+    // so fraction-division compositions evaluate correctly:
+    //   \frac{a}{b} \div \frac{c}{d}  ->  ((a)/(b)) / ((c)/(d))  ->  (a/b)/(c/d)
+    const utilsRef = (typeof window !== 'undefined' && window.BlockUtils) || null;
+    s = utilsRef && utilsRef.latexToAscii ? utilsRef.latexToAscii(s) : s;
+    // After LaTeX-replacements, convert remaining {x} placeholders to plain x.
     function unwrapBraces(str){
       return str.replace(/\{([^{}]*)\}/g, '($1)');
     }
-    // \frac gets EXTRA outer parens so a fraction can be divided by another
-    // fraction without left-associativity corrupting the math:
-    //   \frac{a}{b} \div \frac{c}{d}  ->  ((a)/(b)) / ((c)/(d))  ->  (a/b)/(c/d)
-    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))');
-    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
-    s = s.replace(/\\cdot/g, '*');
-    s = s.replace(/\\times/g, '*');
-    s = s.replace(/\\div/g, '/');
-    s = s.replace(/\\pi/g, 'pi');
-    s = s.replace(/\\left|\\right/g, '');
-    // After LaTeX-replacements, convert remaining {x} placeholders to plain x.
     s = unwrapBraces(s);
     // Normalize multiplicative / additive symbols and √. Colon is handled
     // separately below so we can group its operands.

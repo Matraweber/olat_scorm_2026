@@ -62,7 +62,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .text-input { width: 100%; border: 1px solid #c6d1d8; border-radius: 12px; padding: 0.8rem 0.9rem; font: inherit; color: var(--text); background: #fff; }
 .text-input:focus { outline: 2px solid rgba(0,59,92,0.18); border-color: var(--primary); }
 .value-row { display: flex; justify-content: space-between; margin-top: 0.45rem; color: var(--muted); }
-.formula-text { font-family: "Courier New", Courier, monospace; color: #0f2d44; line-height: 1.45; }
+.formula-text { font-family: "Courier New", Courier, monospace; color: #0f2d44; line-height: 1.45; overflow-wrap: anywhere; word-break: break-word; }
 /* KaTeX inside the question box needs more vertical room so fractions
  * don't collide with surrounding text. Font size + bar thickness stay
  * at KaTeX defaults so the fraction bar binds correctly to the width

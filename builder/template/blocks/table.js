@@ -497,11 +497,9 @@
     const eq = label.indexOf('=');
     if(eq < 0) return null;
     let s = label.slice(eq + 1);
-    // LaTeX -> ASCII
-    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))');
-    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
-    s = s.replace(/\\cdot/g, '*').replace(/\\times/g, '*').replace(/\\div/g, '/');
-    s = s.replace(/\\pi/g, 'pi').replace(/\\left|\\right/g, '');
+    // LaTeX -> ASCII via the shared utils helper.
+    const u = (typeof window !== 'undefined' && window.BlockUtils) || null;
+    if(u && u.latexToAscii) s = u.latexToAscii(s);
     s = s.replace(/\{([^{}]*)\}/g, '($1)');
     s = s.replace(/[·×∙]/g, '*').replace(/÷|:/g, '/').replace(/−/g, '-').replace(/√/g, 'sqrt');
     s = s.replace(/\$/g, '').trim();

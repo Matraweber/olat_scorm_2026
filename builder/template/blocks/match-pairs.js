@@ -325,6 +325,11 @@
       const fb = api.utils.feedbackBox(card);
 
       checkBtn.addEventListener('click', () => {
+        if(lefts.length === 0){
+          fb.neutral('Keine Paare definiert.');
+          api.reportScore(0);
+          return;
+        }
         let correct = 0;
         lefts.forEach(L => {
           const rid = currentMap[L.id];
@@ -334,7 +339,7 @@
           leftEls[L.id].classList.toggle('incorrect', !ok && !!rid);
           if(ok) correct++;
         });
-        const ratio = correct / Math.max(1, lefts.length);
+        const ratio = correct / lefts.length;
         api.reportScore(Math.round(ratio * (activeConfig.maxPoints || 1) * 100) / 100);
         if(correct === lefts.length) fb.ok('Alle Zuordnungen korrekt.');
         else fb.bad(correct + ' von ' + lefts.length + ' korrekt.');
