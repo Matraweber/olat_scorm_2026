@@ -66,14 +66,16 @@
         { type:'section', label:'Variablen', key:'_sec_vars', showIf: isCustom },
         { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
           showIf: isCustom,
+          help:'Pro Zeile neu gewürfelt. Werden über ihren Namen in Spalten-Formeln referenziert.',
           itemSummary: item => {
             if(!item || !item.name) return '...';
-            const range = (item.min ?? '') + ' bis ' + (item.max ?? '');
-            return item.name + ': ' + range + (item.integer === false ? '' : ' (ganz)');
+            const range = (item.min ?? '?') + ' bis ' + (item.max ?? '?');
+            return item.name + '  ·  ' + range + (item.integer === false ? '' : '  (ganz)');
           },
           itemSchema:[
-            { key:'name', label:'Name', type:'text', placeholder:'z. B. n oder d',
-              help:'Nur Buchstaben/Ziffern. Wird in Formeln referenziert.' },
+            { key:'name', label:'Name', type:'text', placeholder:'z. B. n',
+              help:'Nur Buchstaben/Ziffern.' },
+            { type:'section', label:'Bereich', key:'_var_range' },
             { key:'min', label:'Min', type:'number', step:1 },
             { key:'max', label:'Max', type:'number', step:1 },
             { key:'integer', label:'Ganzzahlig', type:'boolean' }
@@ -82,10 +84,14 @@
         { type:'section', label:'Spalten', key:'_sec_cols', showIf: isCustom },
         { key:'columns', label:'Spalten', type:'list', itemLabel:'Spalte',
           showIf: isCustom,
-          itemSummary: item => (item.label || '...') + ' (' + (item.type || 'text') + ')',
+          itemSummary: item => {
+            const typeLabel = { var:'Zufallswert', answer:'Antwortfeld', expr:'Berechnet', text:'Text' }[item.type] || 'Text';
+            return (item.label || '...') + '  ·  ' + typeLabel;
+          },
           itemSchema:[
+            // Header + key on one line so they're easy to scan.
             { key:'label', label:'Spaltenkopf', type:'text', placeholder:'z. B. f(x) = 2*x + 1',
-              help:'Bei „Name = Term" wird die Formel automatisch übernommen (z. B. „f(x) = 2*x + 1").',
+              help:'Schreibe „Name = Term", damit die Formel automatisch übernommen wird.',
               onChange: (val, item, set) => {
                 if(item.type !== 'expr' && item.type !== 'answer') return;
                 const derived = deriveFormulaFromLabel(val);
@@ -98,34 +104,50 @@
                 const fld = document.querySelector('[data-formula-field-key="formula"]');
                 if(fld) fld.dispatchEvent(new CustomEvent('formula-field-set', { detail: { value: derived } }));
               } },
-            { key:'key',   label:'Variable (interner Schlüssel)', type:'text', placeholder:'z. B. x',
-              help:'Wird in Formeln referenziert. Nur Buchstaben/Ziffern.' },
-            { key:'type',  label:'Typ', type:'select', options:[
+            { key:'key', label:'Schlüssel', type:'text', placeholder:'z. B. x',
+              help:'Interner Name für Formeln. Nur Buchstaben/Ziffern.' },
+
+            // Type selector on its own row so the long option labels fit.
+            { type:'section', label:'Quelle', key:'_col_src' },
+            { key:'type', label:'Typ', type:'select', options:[
               {value:'var',    label:'Zufallswert'},
-              {value:'answer', label:'Antwortfeld (Student fuellt aus)'},
+              {value:'answer', label:'Antwortfeld (Studierende füllen aus)'},
               {value:'expr',   label:'Berechnet (automatisch)'},
               {value:'text',   label:'Statischer Text'}
             ]},
-            { key:'unit',    label:'Einheit (optional)',  type:'text', placeholder:'z. B. cm' },
-            // Variable-only fields (random source)
-            { key:'min',     label:'Min', type:'number', step:1,
+
+            // Random-value fields. Min/Max sit together, integer + formula below.
+            { type:'section', label:'Bereich', key:'_col_var_range',
               showIf: it => it.type === 'var' },
-            { key:'max',     label:'Max', type:'number', step:1,
+            { key:'min', label:'Min', type:'number', step:1, showIf: it => it.type === 'var' },
+            { key:'max', label:'Max', type:'number', step:1, showIf: it => it.type === 'var' },
+            { type:'section', key:'_col_var_extras',
               showIf: it => it.type === 'var' },
             { key:'integer', label:'Ganzzahlig', type:'boolean',
               showIf: it => it.type === 'var' },
-            { key:'step', label:'Schrittweite (optional)', type:'number', step:'any',
-              help:'Wenn gesetzt, sequenzielle Werte ab Min in dieser Schrittweite (z. B. Min=0, Schritt=5 → 0, 5, 10, …). Leer/0 = Zufallswert.',
+            { key:'formula', label:'Formel (optional)', type:'text', placeholder:'z. B. 5 * k',
+              help:'Wenn gesetzt, ersetzt sie den Zufallswert. Greift auf Top-Level-Variablen zu - z. B. Variable k = 0..72 ganz, Formel „5 * k" liefert zufällige Vielfache von 5 zwischen 0 und 360.',
               showIf: it => it.type === 'var' },
-            // Text-only
-            { key:'text',    label:'Text', type:'text',
+
+            // Static-text field gets its own row.
+            { type:'section', key:'_col_text',
               showIf: it => it.type === 'text' },
-            // Formula columns (expr + answer)
+            { key:'text', label:'Text', type:'text',
+              showIf: it => it.type === 'text' },
+
+            // Formula + tolerance only show for computed / answer columns.
+            { type:'section', label:'Formel', key:'_col_formula',
+              showIf: it => it.type === 'expr' || it.type === 'answer' },
             { key:'formula', label:'Formel', type:'text', placeholder:'z. B. 2*x + 1',
-              help:'Andere Spalten-Schlüssel als Variablen verwenden.',
+              help:'Verwendet andere Spalten-Schlüssel und Variablen.',
               showIf: it => it.type === 'expr' || it.type === 'answer' },
             { key:'tolerance', label:'Toleranz', type:'number', step:0.01, default:0.01,
-              showIf: it => it.type === 'answer' }
+              help:'Erlaubte Abweichung der Studierenden-Antwort.',
+              showIf: it => it.type === 'answer' },
+
+            // Unit is always optional and shown last.
+            { type:'section', label:'Anzeige', key:'_col_display' },
+            { key:'unit', label:'Einheit (optional)', type:'text', placeholder:'z. B. cm' }
           ]},
 
         { type:'section', label:'Zeilen', key:'_sec_rows', showIf: isCustom },
@@ -190,40 +212,31 @@
 
       function generate(){
         rows = [];
-        // Each var-column with a step >= 0 gets a fresh random offset so
-        // sequences like "0, 5, 10..." can start at a different multiple
-        // ("10, 15, 20...") on each generation.
-        const seqOffset = {};
-        cols.forEach(c => {
-          if(c.type === 'var'){
-            const step = Number(c.step);
-            if(!isFinite(step) || step <= 0) return;
-            const lo = Number(c.min);
-            const hi = Number(c.max);
-            if(!isFinite(lo) || !isFinite(hi) || hi <= lo){ seqOffset[c.key] = 0; return; }
-            // How many full steps fit in [lo, hi] before the sequence falls off the end?
-            const slack = Math.max(0, Math.floor((hi - lo) / step) - (rowCount - 1));
-            seqOffset[c.key] = slack > 0 ? Math.floor(Math.random() * (slack + 1)) * step : 0;
-          }
-        });
         for(let r = 0; r < rowCount; r++){
           // Top-level variables roll fresh per row so a column like "n/d"
           // gets a different pair each row.
           const rowVars = genTopVars();
           const row = Object.assign({}, rowVars);
-          // Pass 1: variable + text columns.
+          // Pass 1: variable + text columns. A var column with a formula
+          // computes its value from top-level variables instead of rolling
+          // a random number in [min, max].
           cols.forEach(c => {
             if(c.type === 'var'){
-              const min = Number(c.min); const max = Number(c.max);
-              const lo = isNaN(min) ? 1 : min;
-              const hi = isNaN(max) ? 10 : max;
-              const step = Number(c.step);
               let v;
-              if(isFinite(step) && step > 0){
-                // Sequential mode: row r gets lo + offset + r*step.
-                v = lo + (seqOffset[c.key] || 0) + r * step;
-                if(v > hi) v = hi; // clamp if the sequence overruns the range
+              if(c.formula && String(c.formula).trim()){
+                v = evalExpr(c.formula, row);
+                if(v == null){
+                  // Bad formula: fall back to the random base so the row
+                  // still has a numeric value instead of NaN.
+                  const min = Number(c.min); const max = Number(c.max);
+                  const lo = isNaN(min) ? 1 : min;
+                  const hi = isNaN(max) ? 10 : max;
+                  v = lo + Math.random() * (hi - lo);
+                }
               } else {
+                const min = Number(c.min); const max = Number(c.max);
+                const lo = isNaN(min) ? 1 : min;
+                const hi = isNaN(max) ? 10 : max;
                 v = lo + Math.random() * (hi - lo);
               }
               if(c.integer !== false) v = Math.round(v);
@@ -254,7 +267,10 @@
         const trh = document.createElement('tr');
         cols.forEach(c => {
           const th = document.createElement('th');
-          th.textContent = (c.label || c.key) + (c.unit ? ' [' + c.unit + ']' : '');
+          // innerHTML so headers can carry LaTeX ($\frac{1}{2}$, \sqrt{x}…),
+          // KaTeX picks it up below via renderMath().
+          const headLabel = (c.label || c.key) + (c.unit ? ' [' + c.unit + ']' : '');
+          th.innerHTML = headLabel;
           trh.appendChild(th);
         });
         thead.appendChild(trh);
@@ -273,7 +289,10 @@
               td.appendChild(inp);
               inputs[c.key] = inp;
             } else if(c.type === 'text'){
-              td.textContent = String(row[c.key] != null ? row[c.key] : '');
+              // Static text cells may contain LaTeX too.
+              const text = String(row[c.key] != null ? row[c.key] : '');
+              if(/[\\$]/.test(text)) td.innerHTML = text;
+              else td.textContent = text;
             } else {
               // var or expr: display numeric value
               const v = row[c.key];
@@ -290,6 +309,8 @@
         });
         tbl.appendChild(tbody);
         tableHost.appendChild(tbl);
+        // Render KaTeX in headers + text cells. Safe to call repeatedly.
+        if(u.renderMath) u.renderMath(tbl);
       }
 
       const checkBtn = document.createElement('button');
@@ -332,6 +353,9 @@
       newBtn.addEventListener('click', () => { generate(); fb.neutral('Neue Werte generiert.'); });
 
       generate();
+      // Render KaTeX over the whole card so the question text + any LaTeX
+      // in headers/text cells are typeset (works for $...$, \(...\), \[...\]).
+      if(u.renderMath) u.renderMath(ui.card);
       api.initScore(Number(activeConfig.maxPoints) || 1);
       return {};
     },

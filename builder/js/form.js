@@ -159,9 +159,9 @@ export function renderField(spec, getObj, setObj){
         card.appendChild(ihead);
 
         const conditionals = [];
-        function evalConditionals(){
+        let evalConditionals = () => {
           conditionals.forEach(c => { c.el.style.display = c.showIf(item) ? '' : 'none'; });
-        }
+        };
 
         // Group by section dividers (works around Safari grid-column:-1 bug).
         const groups = [];
@@ -173,11 +173,21 @@ export function renderField(spec, getObj, setObj){
         groups.push(cur);
 
         const itemBody = el('div');
+        // Track each section so its label / divider can be hidden when every
+        // child field is currently filtered out by a showIf rule.
+        const sectionVisibility = [];
         groups.forEach(group => {
-          if(group.label != null)
-            itemBody.appendChild(el('div', {className:'field-section-label', text: group.label}));
-          if(!group.fields.length) return;
+          let labelEl = null;
+          if(group.label != null){
+            labelEl = el('div', {className:'field-section-label', text: group.label});
+            itemBody.appendChild(labelEl);
+          }
+          if(!group.fields.length){
+            if(labelEl) sectionVisibility.push({ labelEl, fields: [] });
+            return;
+          }
           const groupRow = el('div', {className:'field-row'});
+          const groupFields = [];
           group.fields.forEach(sub => {
             const fieldEl = renderField(sub, () => item, (k, v) => {
               item[k] = v;
@@ -186,10 +196,24 @@ export function renderField(spec, getObj, setObj){
               if(summarySpan) summarySpan.textContent = spec.itemSummary(item) || '';
             });
             groupRow.appendChild(fieldEl);
+            groupFields.push({ el: fieldEl, showIf: sub.showIf || null });
             if(sub.showIf) conditionals.push({ el: fieldEl, showIf: sub.showIf });
           });
           itemBody.appendChild(groupRow);
+          sectionVisibility.push({ labelEl, groupRow, fields: groupFields });
         });
+        // Hide a section's label + row when every field in it is hidden.
+        function syncSectionVisibility(){
+          sectionVisibility.forEach(sec => {
+            const anyVisible = sec.fields.length === 0
+              ? false
+              : sec.fields.some(f => !f.showIf || f.showIf(item));
+            if(sec.labelEl) sec.labelEl.style.display = anyVisible ? '' : 'none';
+            if(sec.groupRow) sec.groupRow.style.display = anyVisible ? '' : 'none';
+          });
+        }
+        const origEval = evalConditionals;
+        evalConditionals = () => { origEval(); syncSectionVisibility(); };
         evalConditionals();
         card.appendChild(itemBody);
         body.appendChild(card);
