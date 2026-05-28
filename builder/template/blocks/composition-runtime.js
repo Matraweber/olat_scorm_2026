@@ -402,7 +402,7 @@
 
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-    checkBtn.textContent = 'Prüfen';
+    checkBtn.textContent = 'Korrektur';
     checkBtn.addEventListener('click', () => {
       if(checked) return;
       if(currentBlanks.length === 0){ ui.fb.neutral('Keine Luecken definiert.'); api.reportScore(0); return; }
@@ -581,7 +581,7 @@
     let locked = false;
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-    checkBtn.textContent = 'Prüfen';
+    checkBtn.textContent = 'Korrektur';
     checkBtn.addEventListener('click', () => {
       if(locked) return;
       locked = true;

@@ -137,12 +137,15 @@
 
       // Builder preview lacks api.persist(); disable the submit button so
       // it reads as "live preview, no submit".
+      // Standard button styling (btn btn-primary) so the survey matches the
+      // graded blocks' Korrektur button. The cream card background stays as
+      // the non-graded signal. .btn:disabled handles the preview/sent state.
       const submit = document.createElement('button');
       submit.type = 'button';
+      submit.className = 'btn btn-primary';
       submit.textContent = 'Absenden';
       const previewMode = !(api && typeof api.persist === 'function');
       submit.disabled = previewMode;
-      submit.style.cssText = 'margin-top:0.4rem; padding:0.55rem 1.2rem; background:var(--primary, #003b5c); color:#fff; border:none; border-radius:8px; font-weight:700; cursor:' + (previewMode ? 'default' : 'pointer') + '; opacity:' + (previewMode ? '0.55' : '1') + '; align-self:flex-start;';
 
       const ack = document.createElement('div');
       ack.style.cssText = 'display:none; color:#2c7a3f; font-weight:700; font-size:0.92rem;';
@@ -152,14 +155,17 @@
         submit.addEventListener('click', () => {
           try { api.persist({ answers: answers, ts: Date.now() }); } catch{}
           submit.disabled = true;
-          submit.style.opacity = '0.55';
-          submit.style.cursor = 'default';
           submit.textContent = 'Gesendet';
           ack.style.display = 'block';
         });
       }
 
-      form.appendChild(submit);
+      // Wrap in a button-cluster so the button hugs its content (like the
+      // Korrektur pill) instead of stretching across the form grid.
+      const btnRow = document.createElement('div');
+      btnRow.className = 'button-cluster';
+      btnRow.appendChild(submit);
+      form.appendChild(btnRow);
       form.appendChild(ack);
       wrap.appendChild(form);
       host.appendChild(wrap);

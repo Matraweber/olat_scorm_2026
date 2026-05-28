@@ -264,7 +264,7 @@
         if(showMsg) fb.neutral('Neue Aufgabe generiert.');
       }
       function grade(){
-        if(current.expected == null){ fb.bad('Lösung konnte nicht berechnet werden (Formel prüfen).'); return; }
+        if(!current || current.expected == null){ fb.bad('Lösung konnte nicht berechnet werden (Formel prüfen).'); return; }
         const got = u.parseNum(inp.value);
         if(got == null){ fb.bad('Bitte eine gültige Zahl oder Bruch (z. B. 3/4) eingeben.'); return; }
         // simplifyFractions: when on, an unsimplified fraction like "10/20"

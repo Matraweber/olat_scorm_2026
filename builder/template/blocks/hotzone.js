@@ -139,6 +139,8 @@
       function grade(){
         const zones = config.zones || [];
         if(zones.length === 0){ fb.neutral('Keine Hotzonen konfiguriert.'); return; }
+        // No mark placed yet: prompt instead of recording a 0.
+        if(clicks.length === 0){ fb.bad('Bitte mindestens eine Stelle im Bild markieren.'); return; }
         const found = zones.map(z => clicks.some(c => pointInZone(c, z)));
         const correct = found.filter(Boolean).length;
         const misclicks = clicks.filter(c => !zones.some(z => pointInZone(c, z))).length;

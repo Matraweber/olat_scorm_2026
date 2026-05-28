@@ -114,6 +114,11 @@
 
       function check(){
         if(gaps.length === 0){ fb.neutral('Keine Lücken im Text.'); return; }
+        // No gap filled at all: prompt instead of recording a 0.
+        if(gaps.every(g => String(g.el.value || '').trim() === '')){
+          fb.bad('Bitte mindestens eine Lücke ausfüllen.');
+          return;
+        }
         let correct = 0;
         const cmpText = activeConfig.ignoreCase ? (a,b) => a.trim().toLowerCase() === b.trim().toLowerCase() : (a,b) => a.trim() === b.trim();
         gaps.forEach(g => {

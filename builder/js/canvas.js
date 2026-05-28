@@ -35,7 +35,7 @@ export const BLOCK_FILES = {
   'table':             'table.js',
   'equation-system':   'equation-system.js',
   'function-sandbox':  'function-sandbox.js',
-  'composition':       ['composition-helpers.js', 'composition-runtime.js', 'composition-toolbar.js', 'composition-canvas.js', 'composition.js'],
+  'composition':       ['composition-helpers.js', 'composition-runtime.js', 'composition-toolbar-popovers.js', 'composition-toolbar.js', 'composition-canvas.js', 'composition.js'],
   'complex-input':     'complex-input.js'
 };
 

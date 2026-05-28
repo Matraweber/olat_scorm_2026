@@ -25,6 +25,42 @@
       if(opts.children) opts.children.forEach(c => c && e.appendChild(c));
       return e;
     },
+    // Escape a string for safe interpolation into an innerHTML template.
+    // Use this for any author-supplied value that ends up inside an HTML
+    // string rather than being assigned via textContent.
+    escapeHtml(value){
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    },
+    // Sanitize an HTML string for blocks that intentionally render authored
+    // markup (rich-text). Parsing happens inside a <template>, whose content
+    // is inert: img/script never load or execute during sanitization. We then
+    // drop active elements and any on*/javascript:/data:text\/html vectors,
+    // keeping ordinary formatting (p, strong, em, ul, li, code, a, br, ...).
+    sanitizeHtml(html){
+      const tpl = document.createElement('template');
+      tpl.innerHTML = String(html == null ? '' : html);
+      const DANGER_TAGS = new Set(['script','style','iframe','object','embed','link','meta','base','form','input','button','textarea','select','svg','math']);
+      const badUrl = v => /^\s*(javascript|vbscript):/i.test(v) || /^\s*data:text\/html/i.test(v);
+      const walk = root => {
+        Array.from(root.children || []).forEach(el => {
+          if(DANGER_TAGS.has(el.tagName.toLowerCase())){ el.remove(); return; }
+          Array.from(el.attributes).forEach(attr => {
+            const name = attr.name.toLowerCase();
+            if(name.startsWith('on')){ el.removeAttribute(attr.name); return; }
+            if((name === 'href' || name === 'src' || name === 'xlink:href') && badUrl(attr.value)){ el.removeAttribute(attr.name); return; }
+            if(name === 'style' && /expression\s*\(|javascript:/i.test(attr.value)){ el.removeAttribute(attr.name); }
+          });
+          walk(el);
+        });
+      };
+      walk(tpl.content);
+      return tpl.innerHTML;
+    },
     sanitizeZero(value, eps){
       eps = eps == null ? 5e-3 : eps;
       return Math.abs(value) < eps ? 0 : value;

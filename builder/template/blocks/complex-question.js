@@ -88,7 +88,7 @@
 
       const grid = document.createElement('section'); grid.className = 'content-grid';
       const plotCard = document.createElement('article'); plotCard.className = 'section-card plot-card';
-      plotCard.innerHTML = '<div class="card-header"><h3>' + (config.blockTitle || 'Aufgabenplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>z</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
+      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(config.blockTitle || 'Aufgabenplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>z</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
       controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Eingabe'}));
       const stack = document.createElement('div'); stack.className = 'input-stack';
@@ -154,6 +154,13 @@
         renderPlot();
       }
       function grade(){
+        // No input at all: prompt instead of recording a 0 (consistent with
+        // the text/numeric blocks).
+        const activeKeys = ['real','imag','abs','arg'].filter(k => fields[k]);
+        if(activeKeys.every(k => String(inputs[k].value || '').trim() === '')){
+          fb.bad('Bitte mindestens ein Feld ausfüllen.');
+          return;
+        }
         const parts = []; let okCount = 0, totalActive = 0;
         function check(key, parser, expected, tolerance, label){
           if(!fields[key]) return;

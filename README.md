@@ -16,6 +16,7 @@ Entwickelt am Umwelt-Campus Birkenfeld, Hochschule Trier.
 - [Tastaturkürzel](#tastaturkürzel)
 - [Cache-Buster bumpen](#cache-buster-bumpen)
 - [Eigene Block-Typen entwickeln](#eigene-block-typen-entwickeln)
+- [Architektur und Entwickler-Dokumentation](#architektur-und-entwickler-dokumentation)
 - [Branding / Theme](#branding--theme)
 - [Browser-Anforderungen](#browser-anforderungen)
 
@@ -348,6 +349,29 @@ Anschließend `./bump-version.sh` ausführen.
 | `builderSchema()` | ja | rechte Konfig-Pane |
 | `mount(host, cfg, api)` | ja | SCORM-Runtime und Vorschau-Modal |
 | `preview(host, cfg)` | optional | Builder-Canvas-Vorschau (sonst `mount`) |
+
+---
+
+## Architektur und Entwickler-Dokumentation
+
+Für tiefer gehende Informationen zum Code-Aufbau, den vier Ebenen (UI-Shell, State, Render-Dispatcher, Blocks), den Datenflüssen beim Speichern und Abspielen sowie häufigen Fallstricken siehe [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+### Tests und Benchmark
+
+Optional, nicht zwingend für Anwender. Voraussetzung: Node 18+.
+
+```bash
+npm install               # einmalig
+npm test                  # gesamte Test-Suite (~1 Minute)
+npm run lint              # ESLint
+npm run bench             # SCORM-ZIP-Build- und Block-Mount-Performance
+npm run test:visual       # visuelle Regression aller Blöcke (Pixel-Diff)
+npm run test:visual:update  # Baselines nach gewollter visueller Änderung neu erzeugen
+```
+
+Der Benchmark druckt min/median/p95 für realistische Kurs-Größen aus. Vor und nach einer Performance-Änderung laufen lassen und die Tabellen vergleichen.
+
+Die visuelle Regression rendert jeden Block im Runtime-Stil und vergleicht ihn pixelgenau mit einer Baseline in `test/visual/baselines/`. Bei einer Abweichung landet ein Diff-Bild in `test/visual/diffs/`. Nach einer beabsichtigten optischen Änderung die Baselines mit `npm run test:visual:update` neu erzeugen. Baselines sind maschinenspezifisch (Antialiasing) und werden lokal gehalten.
 
 ---
 

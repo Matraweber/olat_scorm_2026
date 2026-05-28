@@ -63,11 +63,13 @@ export function renderTaskPane(host, idx){
         });
         if(!ok) return;
       }
+      // Snapshot before the structural change so a single Ctrl+Z reverts it.
+      pushHistory();
       disableTabsOn(task);
     } else {
+      pushHistory();
       enableTabsOn(task);
     }
-    pushHistory();
     renderActivePane();
   });
   toolbar.appendChild(addBtn); toolbar.appendChild(saveTplBtn); toolbar.appendChild(tabsBtn);

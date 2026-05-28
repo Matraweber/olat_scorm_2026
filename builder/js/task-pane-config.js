@@ -1,10 +1,81 @@
 // task-pane-config.js: Right-hand config pane: empty | multi-select | single-block form.
 import { el } from './util.js';
-import { pushHistoryDebounced } from './state.js';
+import { pushHistoryDebounced, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
 import { renderField } from './form.js';
 import { validateBlock } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { bulkAlign, bulkDistribute, bulkDuplicate, bulkDelete } from './task-pane-bulk.js';
+import { BLOCK_HELP } from './block-help.js';
+
+const HELP_COLLAPSED_KEY = 'scorm-builder-block-help-collapsed';
+
+function isHelpCollapsed(blockType){
+  try {
+    const raw = localStorage.getItem(HELP_COLLAPSED_KEY);
+    if(!raw) return false;
+    const set = JSON.parse(raw);
+    return Array.isArray(set) && set.includes(blockType);
+  } catch{ return false; }
+}
+function setHelpCollapsed(blockType, collapsed){
+  try {
+    const raw = localStorage.getItem(HELP_COLLAPSED_KEY);
+    let set = [];
+    if(raw){ try { set = JSON.parse(raw); } catch{} }
+    if(!Array.isArray(set)) set = [];
+    const i = set.indexOf(blockType);
+    if(collapsed && i < 0) set.push(blockType);
+    if(!collapsed && i >= 0) set.splice(i, 1);
+    localStorage.setItem(HELP_COLLAPSED_KEY, JSON.stringify(set));
+  } catch{}
+}
+
+function renderBlockHelp(blockType){
+  const help = BLOCK_HELP[blockType];
+  if(!help) return null;
+  const collapsed = isHelpCollapsed(blockType);
+  const box = el('section', { className: 'block-help' + (collapsed ? ' is-collapsed' : '') });
+
+  const toggle = el('button', {
+    className: 'block-help-toggle',
+    attrs: { type: 'button', 'aria-expanded': String(!collapsed) },
+    html: '<span class="block-help-caret" aria-hidden="true"></span>Was ist das?'
+  });
+  box.appendChild(toggle);
+
+  const body = el('div', { className: 'block-help-body' });
+  body.appendChild(el('p', { className: 'block-help-summary', text: help.summary }));
+
+  if(help.steps && help.steps.length){
+    body.appendChild(el('div', { className: 'block-help-head', text: 'Schritte' }));
+    const ol = el('ol', { className: 'block-help-list' });
+    help.steps.forEach(s => {
+      const li = document.createElement('li');
+      li.innerHTML = s;
+      ol.appendChild(li);
+    });
+    body.appendChild(ol);
+  }
+  if(help.tips && help.tips.length){
+    body.appendChild(el('div', { className: 'block-help-head', text: 'Tipps' }));
+    const ul = el('ul', { className: 'block-help-list' });
+    help.tips.forEach(t => {
+      const li = document.createElement('li');
+      li.innerHTML = t;
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+  }
+  box.appendChild(body);
+
+  toggle.addEventListener('click', () => {
+    const nowCollapsed = !box.classList.contains('is-collapsed');
+    box.classList.toggle('is-collapsed', nowCollapsed);
+    toggle.setAttribute('aria-expanded', String(!nowCollapsed));
+    setHelpCollapsed(blockType, nowCollapsed);
+  });
+  return box;
+}
 
 export function posLabel(b){
   return 'Position ' + Math.round(b.pos.x) + ', ' + Math.round(b.pos.y) +
@@ -96,6 +167,9 @@ function renderSingleBlockPane(ctx, sel){
 
   if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
 
+  const helpBox = renderBlockHelp(sel.type);
+  if(helpBox) configHost.appendChild(helpBox);
+
   // Actions from `type:'action'` buttons in builderSchema():
   //   reset             : restore defaultConfig()
   //   add-shape:<type>  : push def.newShape(type) into sel.config.shapes
@@ -105,8 +179,9 @@ function renderSingleBlockPane(ctx, sel){
     const action = e.detail && e.detail.action;
     if(!action) return;
     if(action === 'reset'){
-      sel.config = def.defaultConfig ? def.defaultConfig() : {};
+      // Snapshot before the mutation so a single Ctrl+Z reverts it.
       pushHistoryDebounced();
+      sel.config = def.defaultConfig ? def.defaultConfig() : {};
       ctx.scheduleBlockPreviewRefresh(sel);
       renderTaskList();
       renderConfigPane(ctx);
@@ -115,19 +190,23 @@ function renderSingleBlockPane(ctx, sel){
     if(action.indexOf('add-shape:') === 0 && typeof def.newShape === 'function'){
       const shapeType = action.slice('add-shape:'.length);
       sel.config.shapes = Array.isArray(sel.config.shapes) ? sel.config.shapes : [];
-      sel.config.shapes.push(def.newShape(shapeType));
       pushHistoryDebounced();
+      sel.config.shapes.push(def.newShape(shapeType));
       ctx.scheduleBlockPreviewRefresh(sel);
       renderConfigPane(ctx);
       return;
     }
     // Block-defined custom action; def.applyAction(action, cfg) -> bool.
+    // Snapshot before; commit only if the action actually mutated.
     if(typeof def.applyAction === 'function'){
+      takeHistorySnap();
       const handled = def.applyAction(action, sel.config);
       if(handled){
-        pushHistoryDebounced();
+        commitHistorySnap();
         ctx.scheduleBlockPreviewRefresh(sel);
         renderConfigPane(ctx);
+      } else {
+        discardHistorySnap();
       }
     }
   };

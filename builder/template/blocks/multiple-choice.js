@@ -98,7 +98,9 @@
         inp.type = activeConfig.multi ? 'checkbox' : 'radio';
         inp.id = id; inp.name = groupName;
         lbl.appendChild(inp);
-        const span = document.createElement('span'); span.innerHTML = c.text || '';
+        // textContent (not innerHTML) so authored choice text cannot inject
+        // markup. Math still renders via the cell-level renderMath in runtime.js.
+        const span = document.createElement('span'); span.textContent = c.text || '';
         lbl.appendChild(span);
         list.appendChild(lbl);
         inputs.push({input: inp, correct: !!c.correct});
@@ -155,7 +157,14 @@
       h3.textContent = 'Frage';
       card.appendChild(h3);
       const q = document.createElement('p');
-      q.innerHTML = activeConfig.question || '<em style="color:#888">(Frage leer)</em>';
+      if(activeConfig.question && String(activeConfig.question).trim()){
+        q.textContent = activeConfig.question;
+      } else {
+        const em = document.createElement('em');
+        em.style.color = '#888';
+        em.textContent = '(Frage leer)';
+        q.appendChild(em);
+      }
       card.appendChild(q);
       const isMulti = !!activeConfig.multi;
       const list = document.createElement('div');
@@ -167,7 +176,7 @@
         m.className = 'bp-choice-marker' + (c.correct ? ' is-correct' : '');
         m.textContent = c.correct ? (isMulti ? '☑' : '◉') : (isMulti ? '☐' : '○');
         li.appendChild(m);
-        const t = document.createElement('span'); t.innerHTML = c.text || '';
+        const t = document.createElement('span'); t.textContent = c.text || '';
         li.appendChild(t);
         list.appendChild(li);
       });

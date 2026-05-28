@@ -643,6 +643,69 @@ body:has(.modal:not(.hidden)) { overflow: hidden; }
 .block-config-meta { color: var(--muted); font-size: 0.78rem; font-family: "Courier New", monospace; }
 .block-config-empty { color: var(--muted); padding: 1rem 0.4rem; text-align: center; }
 
+/* Inline help box at the top of each block's config pane. Collapsible per
+   block type; the collapsed-state is persisted in localStorage. */
+.block-help {
+  border: 1px solid var(--line);
+  background: #f5f8fa;
+  border-radius: 8px;
+  margin: 0 0 0.9rem;
+  overflow: hidden;
+}
+.block-help-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--primary);
+  cursor: pointer;
+}
+.block-help-toggle:hover { background: rgba(15, 86, 125, 0.06); }
+.block-help-toggle:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: -2px; }
+.block-help-caret {
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--primary);
+  transition: transform 0.15s ease;
+}
+.block-help.is-collapsed .block-help-caret { transform: rotate(-90deg); }
+.block-help.is-collapsed .block-help-body { display: none; }
+.block-help-body {
+  padding: 0.1rem 0.85rem 0.7rem;
+  font-size: 0.85rem;
+  color: #2a3a47;
+  line-height: 1.45;
+}
+.block-help-summary { margin: 0 0 0.4rem; }
+.block-help-head {
+  display: block;
+  margin: 0.5rem 0 0.2rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.block-help-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.block-help-list li { margin: 0.15rem 0; }
+.block-help-list code {
+  font-family: "Courier New", monospace;
+  background: #e8eef2;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
 /* Old block-edit-list styles still used by template-related code (kept for safety) */
 .block-edit-list { display: flex; flex-direction: column; gap: 0.7rem; margin: 0.8rem 0 1rem; min-height: 120px; padding: 0.4rem; border: 1px dashed transparent; border-radius: 12px; transition: border-color 0.2s ease, background 0.2s ease; }
 .block-edit-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); overflow: hidden; transition: box-shadow 0.15s ease; position: relative; }

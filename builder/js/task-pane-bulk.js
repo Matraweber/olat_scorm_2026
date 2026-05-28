@@ -1,9 +1,11 @@
 // task-pane-bulk.js: Bulk ops on multi-selected canvas blocks. Take ctx from task-pane.js.
 import { uid, confirmDialog } from './util.js';
 import { renderTaskList } from './panes.js';
+import { pushHistory } from './state.js';
 
 export function bulkAlign(ctx, edge){
   const sel = ctx.selectedBlocks(); if(sel.length < 2) return;
+  pushHistory();
   let target;
   if(edge === 'left')   target = Math.min(...sel.map(b => b.pos.x));
   if(edge === 'right')  target = Math.max(...sel.map(b => b.pos.x + b.pos.w));
@@ -24,6 +26,7 @@ export function bulkAlign(ctx, edge){
 
 export function bulkDistribute(ctx, axis){
   const sel = ctx.selectedBlocks(); if(sel.length < 3) return;
+  pushHistory();
   if(axis === 'h'){
     sel.sort((a,b) => a.pos.x - b.pos.x);
     const first = sel[0], last = sel[sel.length-1];
@@ -46,6 +49,7 @@ export function bulkDistribute(ctx, axis){
 
 export function bulkDuplicate(ctx){
   const sel = ctx.selectedBlocks(); if(sel.length === 0) return;
+  pushHistory();
   const newIds = [];
   sel.forEach(b => {
     const copy = JSON.parse(JSON.stringify(b));
@@ -71,6 +75,7 @@ export async function bulkDelete(ctx){
     danger: true
   });
   if(!ok) return;
+  pushHistory();
   const ids = sel.map(b => b.id);
   // In-place splice preserves the task.blocks alias when tabs are on.
   for(let bi = ctx.task.blocks.length - 1; bi >= 0; bi--){

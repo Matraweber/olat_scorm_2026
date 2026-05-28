@@ -340,6 +340,12 @@
       checkBtn.addEventListener('click', () => {
         const totalCells = rowCount * answerCols.length;
         if(totalCells === 0){ fb.bad('Keine Antwort-Zellen.'); return; }
+        // No cell filled at all: prompt instead of recording a 0.
+        const anyFilled = rows.some((row, rIdx) => answerCols.some(c => {
+          const inp = inputsByRowAndKey[rIdx][c.key];
+          return inp && String(inp.value || '').trim() !== '';
+        }));
+        if(!anyFilled){ fb.bad('Bitte mindestens eine Zelle ausfüllen.'); return; }
         let correct = 0;
         rows.forEach((row, rIdx) => {
           answerCols.forEach(c => {

@@ -87,7 +87,7 @@
 
       const grid = document.createElement('section'); grid.className = 'content-grid';
       const plotCard = document.createElement('article'); plotCard.className = 'section-card plot-card';
-      plotCard.innerHTML = '<div class="card-header"><h3>' + (config.blockTitle || 'Funktionsplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>f(x)</span></div></div><div class="plot-host-wrap wide-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
+      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(config.blockTitle || 'Funktionsplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>f(x)</span></div></div><div class="plot-host-wrap wide-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
       controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Antwort'}));
       // Dynamic answer area: re-built per question so the number of input fields
@@ -209,7 +209,18 @@
         fb.neutral('Neue Aufgabe generiert.');
         renderPlot();
       }
+      function hasAnyInput(){
+        // Custom mode uses a free-text field even though _expected is empty.
+        if(current._mode === 'custom') return !!(answerInputs[0] && String(answerInputs[0].v.value || '').trim() !== '');
+        // Auto modes with no solution in range: the answer is the "keine" checkbox.
+        if(current._expected.length === 0) return !!(noneCheckbox && noneCheckbox.checked);
+        return answerInputs.some(p => p.v
+          ? String(p.v.value || '').trim() !== ''
+          : (String(p.x.value || '').trim() !== '' || String(p.y.value || '').trim() !== ''));
+      }
       function grade(){
+        // No input at all: prompt instead of recording a 0.
+        if(!hasAnyInput()){ fb.bad('Bitte eine Antwort eingeben.'); return; }
         const result = gradeFunctionAnswer(current, readAnswerText(), u);
         if(result.ok){ fb.ok(result.message); api.reportScore(config.maxPoints || 1); }
         else { fb.bad(result.message); api.reportScore(0); }

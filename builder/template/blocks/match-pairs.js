@@ -330,6 +330,11 @@
           api.reportScore(0);
           return;
         }
+        // Nothing assigned yet: prompt instead of recording a 0.
+        if(Object.keys(currentMap).length === 0){
+          fb.bad('Bitte mindestens eine Zuordnung vornehmen.');
+          return;
+        }
         let correct = 0;
         lefts.forEach(L => {
           const rid = currentMap[L.id];
@@ -671,6 +676,11 @@
     host.appendChild(card);
 
     checkBtn.addEventListener('click', () => {
+      // Nothing assigned to a category yet: prompt instead of recording a 0.
+      if(assigned.every(a => a == null)){
+        fb.bad('Bitte mindestens einen Begriff zuordnen.');
+        return;
+      }
       let correct = 0;
       chips.forEach((chip, idx) => {
         const expected = items[idx].categoryId;

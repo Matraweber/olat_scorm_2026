@@ -100,8 +100,11 @@
       }
 
       function render(){
-        const xMin = Number(config.xMin), xMax = Number(config.xMax);
-        const yMin = Number(config.yMin), yMax = Number(config.yMax);
+        // Fall back to a sane range so an empty/partial config (e.g. a
+        // corrupt import) can never feed NaN bounds into the SVG plot.
+        const numOr = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+        const xMin = numOr(config.xMin, -6.28), xMax = numOr(config.xMax, 6.28);
+        const yMin = numOr(config.yMin, -3), yMax = numOr(config.yMax, 3);
         const N = 400, points = [];
         for(let i = 0; i <= N; i++){
           const x = xMin + (xMax - xMin) * (i/N);

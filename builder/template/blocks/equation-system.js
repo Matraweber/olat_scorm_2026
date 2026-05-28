@@ -460,6 +460,11 @@
 
       checkBtn.addEventListener('click', () => {
         if(!inputs.length) return;
+        // No variable entered at all: prompt instead of recording a 0.
+        if(inputs.every(inp => String(inp.value || '').trim() === '')){
+          fb.bad('Bitte mindestens eine Variable eingeben.');
+          return;
+        }
         let correct = 0;
         inputs.forEach((inp, i) => {
           const got = u.parseNum(inp.value);
