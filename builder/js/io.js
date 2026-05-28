@@ -2,7 +2,7 @@
 import {
   escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
 } from './util.js';
-import { state, render, defaultTheme, scheduleAutosave } from './state.js';
+import { state, render, defaultTheme, scheduleAutosave, markCourseSavedToFile } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
 
@@ -335,6 +335,7 @@ export async function downloadZip(){
       await stream.close();
       // Bind subsequent Ctrl+S saves to this fresh target.
       _loadedFileHandle = fileHandle;
+      markCourseSavedToFile();
       toast('Gespeichert: ' + fileHandle.name);
       // Refresh folder browser so the new ZIP shows up immediately.
       const folderMod = await import('./folder-browser.js').catch(() => null);
@@ -445,6 +446,7 @@ export async function saveToLoadedHandle(){
     const stream = await _loadedFileHandle.createWritable();
     await stream.write(blob);
     await stream.close();
+    markCourseSavedToFile();
     toast('Gespeichert: ' + _loadedFileHandle.name);
     return true;
   } catch(err){
@@ -501,6 +503,8 @@ export async function loadZipFile(file, sourceHandle){
       window.scormBuilderSyncHeaderTitle();
     }
     scheduleAutosave();
+    // The freshly loaded course matches its file on disk: not dirty yet.
+    markCourseSavedToFile();
     toast('SCORM-Paket geladen.');
   } catch(err){ console.error(err); toast('ZIP-Fehler: ' + err.message, 'error'); }
 }

@@ -67,6 +67,13 @@ let _onAutosavePending = null;
 export function setAutosaveListener(fn){ _onAutosave = typeof fn === 'function' ? fn : null; }
 export function setAutosavePendingListener(fn){ _onAutosavePending = typeof fn === 'function' ? fn : null; }
 
+// "Dirty relative to the loaded SCORM file": set on any edit, cleared when the
+// file is written back (Ctrl+S, export to handle, auto-save-on-switch) or when
+// a file is freshly loaded. localStorage autosave is separate and always on.
+let _fileDirty = false;
+export function isCourseDirty(){ return _fileDirty; }
+export function markCourseSavedToFile(){ _fileDirty = false; }
+
 // True if the course has any task or a non-default title.
 function courseHasContent(c){
   if(!c) return false;
@@ -127,6 +134,7 @@ export function clearAutosave(){
 
 // Debounced: 800 ms idle = one write. Main.js flushes on unload.
 export function scheduleAutosave(){
+  _fileDirty = true;
   if(!_autosaveTimer && _onAutosavePending){
     try { _onAutosavePending(); } catch{}
   }

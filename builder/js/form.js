@@ -86,6 +86,17 @@ export function makeUploadStatus(){
   };
 }
 
+// Gray out + disable a rendered field. Used for fields that no longer have
+// any effect under the current item state (e.g. a var column's min/max once
+// a formula overrides the random value).
+function setFieldDisabled(fieldEl, disabled, hint){
+  if(!fieldEl) return;
+  fieldEl.classList.toggle('field-disabled', disabled);
+  fieldEl.querySelectorAll('input, select, textarea, button').forEach(ctrl => { ctrl.disabled = disabled; });
+  if(disabled && hint) fieldEl.title = hint;
+  else fieldEl.removeAttribute('title');
+}
+
 export function renderField(spec, getObj, setObj){
   const obj = getObj() || {};
 
@@ -166,8 +177,10 @@ export function renderField(spec, getObj, setObj){
         card.appendChild(ihead);
 
         const conditionals = [];
+        const disablers = [];
         let evalConditionals = () => {
           conditionals.forEach(c => { c.el.style.display = c.showIf(item) ? '' : 'none'; });
+          disablers.forEach(d => setFieldDisabled(d.el, !!d.disabledIf(item), d.hint));
         };
 
         // Group by section dividers (works around Safari grid-column:-1 bug).
@@ -205,6 +218,7 @@ export function renderField(spec, getObj, setObj){
             groupRow.appendChild(fieldEl);
             groupFields.push({ el: fieldEl, showIf: sub.showIf || null });
             if(sub.showIf) conditionals.push({ el: fieldEl, showIf: sub.showIf });
+            if(sub.disabledIf) disablers.push({ el: fieldEl, disabledIf: sub.disabledIf, hint: sub.disabledHint });
           });
           itemBody.appendChild(groupRow);
           sectionVisibility.push({ labelEl, groupRow, fields: groupFields });

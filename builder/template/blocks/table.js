@@ -119,8 +119,12 @@
             // Random-value fields. Min/Max sit together, integer + formula below.
             { type:'section', label:'Bereich', key:'_col_var_range',
               showIf: it => it.type === 'var' },
-            { key:'min', label:'Min', type:'number', step:1, showIf: it => it.type === 'var' },
-            { key:'max', label:'Max', type:'number', step:1, showIf: it => it.type === 'var' },
+            { key:'min', label:'Min', type:'number', step:1, showIf: it => it.type === 'var',
+              disabledIf: it => !!(it.formula && String(it.formula).trim()),
+              disabledHint: 'Ohne Effekt: die Formel ersetzt den Zufallswert.' },
+            { key:'max', label:'Max', type:'number', step:1, showIf: it => it.type === 'var',
+              disabledIf: it => !!(it.formula && String(it.formula).trim()),
+              disabledHint: 'Ohne Effekt: die Formel ersetzt den Zufallswert.' },
             { type:'section', key:'_col_var_extras',
               showIf: it => it.type === 'var' },
             { key:'integer', label:'Ganzzahlig', type:'boolean',
@@ -241,8 +245,16 @@
                 const hi = isNaN(max) ? 10 : max;
                 v = lo + Math.random() * (hi - lo);
               }
-              if(c.integer !== false) v = Math.round(v);
-              else v = Math.round(v * 100) / 100;
+              const hasFormula = !!(c.formula && String(c.formula).trim());
+              if(c.integer !== false){
+                v = Math.round(v);
+              } else if(!hasFormula){
+                // Tidy a random non-integer to 2 decimals. A formula result
+                // keeps full precision so a clean fraction (2/7) can be
+                // recovered for display instead of a rounding artefact
+                // (0.29 -> 29/100).
+                v = Math.round(v * 100) / 100;
+              }
               row[c.key] = v;
             } else if(c.type === 'text'){
               row[c.key] = String(c.text || '');

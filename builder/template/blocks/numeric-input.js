@@ -212,13 +212,16 @@
             // the math expression. innerOffset is relative to `match`, which
             // begins at `offset` in the full template, so the absolute index
             // of each {x} is offset + innerOffset.
-            return match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name, innerOffset) => {
+            const filled = match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name, innerOffset) => {
               if(name in vars){
                 const wrap = shouldWrap(tplStr, offset + innerOffset);
                 return '{' + formatValue(vars[name], wrap) + '}';
               }
               return m;
             });
+            // A negative value in a fraction numerator reads better with the
+            // sign in front of the bar: \frac{-3}{7} -> -\frac{3}{7}.
+            return fracMinusOut(filled);
           }
           if(plainName && plainName in vars){
             return formatValue(vars[plainName], shouldWrap(tplStr, offset));
@@ -425,6 +428,63 @@
     // Collapse multiple whitespace runs into a single space.
     best = best.replace(/\s+/g, ' ');
     return best;
+  }
+
+  // Read the balanced {...} group whose opening brace is at index i.
+  // Returns { content, end } where end is the index of the matching '}'.
+  function readBraceGroup(s, i){
+    let depth = 0;
+    for(let k = i; k < s.length; k++){
+      if(s[k] === '{') depth++;
+      else if(s[k] === '}'){ depth--; if(depth === 0) return { content: s.slice(i + 1, k), end: k }; }
+    }
+    return null;
+  }
+  // Normalize the sign of a fraction so it sits in front of the bar:
+  //   \frac{-3}{7} -> -\frac{3}{7}      (negative numerator)
+  //   \frac{3}{-7} -> -\frac{3}{7}      (negative denominator)
+  //   \frac{-3}{-7} -> \frac{3}{7}      (both negative cancel; never "--")
+  // Only plain negative numbers/fractions are pulled; compound parts like
+  // \frac{a-b}{c} are left untouched (the sign is not just a unary minus).
+  function fracMinusOut(tex){
+    let out = '', i = 0;
+    while(i < tex.length){
+      if(tex.startsWith('\\frac', i)){
+        let j = i + 5;
+        while(j < tex.length && tex[j] === ' ') j++;
+        if(tex[j] === '{'){
+          const num = readBraceGroup(tex, j);
+          if(num){
+            let k = num.end + 1;
+            while(k < tex.length && tex[k] === ' ') k++;
+            if(tex[k] === '{'){
+              const den = readBraceGroup(tex, k);
+              if(den){
+                const NUMRE = /^-?(\d+(\.\d+)?|\d+\/\d+)$/; // signed plain number/fraction
+                const numBare = num.content.replace(/[{}\s]/g, '');
+                const denBare = den.content.replace(/[{}\s]/g, '');
+                const numIsNum = NUMRE.test(numBare);
+                const denIsNum = NUMRE.test(denBare);
+                const numNeg = numIsNum && numBare[0] === '-';
+                const denNeg = denIsNum && denBare[0] === '-';
+                if(numNeg || denNeg){
+                  const newNum = numIsNum ? numBare.replace('-', '') : num.content;
+                  const newDen = denIsNum ? denBare.replace('-', '') : den.content;
+                  // One side negative -> minus in front; both negative cancel
+                  // to a positive fraction (avoids a leading "--").
+                  const sign = (numNeg !== denNeg) ? '-' : '';
+                  out += sign + '\\frac{' + newNum + '}{' + newDen + '}';
+                  i = den.end + 1;
+                  continue;
+                }
+              }
+            }
+          }
+        }
+      }
+      out += tex[i++];
+    }
+    return out;
   }
 
   function numericPresetConfig(config){

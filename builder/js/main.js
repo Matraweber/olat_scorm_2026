@@ -138,9 +138,10 @@ function init(){
       return;
     }
     // Cmd/Ctrl + S: overwrite the loaded SCORM ZIP if we remember its handle; otherwise fall back to autosave.
+    // Works while editing a field too: blur first so the typed value is committed, then save the whole unit.
     if(mod && !e.shiftKey && (key === 's' || key === 'S')){
-      if(inField) return;
       e.preventDefault();
+      if(inField && ae && typeof ae.blur === 'function') ae.blur();
       import('./io.js').then(io => {
         if(io.getLoadedHandle && io.getLoadedHandle()){
           io.saveToLoadedHandle();
