@@ -27,7 +27,9 @@ export async function pickFolder(){
   // FS Access API on Chromium enables live folder syncing.
   if(SUPPORTS_FS_ACCESS){
     try {
-      const handle = await window.showDirectoryPicker({ mode: 'read' });
+      // read-write so Ctrl+S / auto-save-on-switch can write a loaded ZIP back
+      // to its file in this folder without a second permission round-trip.
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
       root = await buildTreeFromHandle(handle, '', null);
       await persistHandle(handle).catch(() => {});
       dropdownOpen = true;
@@ -127,7 +129,7 @@ export async function tryRestoreFolder(){
   try { handle = await loadPersistedHandle(); } catch{ return false; }
   if(!handle) return false;
   try {
-    const perm = await handle.queryPermission({ mode: 'read' });
+    const perm = await handle.queryPermission({ mode: 'readwrite' });
     if(perm !== 'granted') return false;
     root = await buildTreeFromHandle(handle, '', null);
     return true;
@@ -263,6 +265,8 @@ async function openFileEntry(entry){
     }
     // Pass the handle along so Ctrl+S can overwrite this file later.
     await loadZipFile(file, handle);
+    // Re-scan so renames/deletions in the folder are reflected on open.
+    await refresh();
     markActive(entry.path);
     // Keep open so author can switch between sibling ZIPs.
   } catch(e){

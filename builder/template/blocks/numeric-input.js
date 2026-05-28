@@ -473,7 +473,20 @@
                   // One side negative -> minus in front; both negative cancel
                   // to a positive fraction (avoids a leading "--").
                   const sign = (numNeg !== denNeg) ? '-' : '';
-                  out += sign + '\\frac{' + newNum + '}{' + newDen + '}';
+                  const frac = '\\frac{' + newNum + '}{' + newDen + '}';
+                  // Wrap a negative fraction in parens when it sits next to a
+                  // binary operator on EITHER side, so it reads "a + (-3/7)" and
+                  // "(-3/7) + a" instead of the confusing "a + -3/7" / "-3/7 + a"
+                  // (mirrors how a plain negative value is wrapped to "(-3)").
+                  const before = out.replace(/\s+$/, '');
+                  const rest = tex.slice(den.end + 1).replace(/^\s+/, '');
+                  const precededByOp = /[+\-*/:·×÷^]$/.test(before) || /\\(cdot|times|div)$/.test(before);
+                  const followedByOp = /^[+\-*/:·×÷^]/.test(rest) || /^\\(cdot|times|div)\b/.test(rest);
+                  if(sign === '-' && (precededByOp || followedByOp)){
+                    out += '\\left(-' + frac + '\\right)';
+                  } else {
+                    out += sign + frac;
+                  }
                   i = den.end + 1;
                   continue;
                 }

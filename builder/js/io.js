@@ -448,6 +448,9 @@ export async function saveToLoadedHandle(){
     await stream.close();
     markCourseSavedToFile();
     toast('Gespeichert: ' + _loadedFileHandle.name);
+    // Re-scan the folder view so renames/deletions in the folder are reflected.
+    const folderMod = await import('./folder-browser.js').catch(() => null);
+    if(folderMod && typeof folderMod.refresh === 'function') folderMod.refresh().catch(() => {});
     return true;
   } catch(err){
     if(err && err.name === 'AbortError') return false;
