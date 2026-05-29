@@ -246,7 +246,10 @@ textarea:focus-visible,
 .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid rgba(0,59,92,0.18); border-color: var(--primary); }
 .field-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-start; }
 .field-row > .field { flex: 1 1 140px; min-width: 0; }
-.field-has-help { flex: 1 1 220px; }
+/* Help-bearing fields claim more width, but only inside a horizontal field-row.
+   In the vertical #formPane (course/theme panes) a flex-basis would become the
+   item HEIGHT and blow the field up to 220px tall, so scope it to rows. */
+.field-row > .field-has-help { flex: 1 1 220px; }
 .field-full { flex: 1 1 100%; }
 /* A field with no effect under the current settings (e.g. a var column's
    min/max once a formula overrides the random value): dimmed + locked. */
@@ -264,7 +267,16 @@ textarea:focus-visible,
 .field-section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 0.55rem 0 0.15rem; border-top: 1px solid var(--line); margin-top: 0.25rem; }
 .field-section-label:first-child { border-top: none; margin-top: 0; padding-top: 0; }
 .checkbox-field { display:flex; align-items:center; gap: 0.5rem; }
-.checkbox-field input { accent-color: var(--primary); }
+/* The checkbox label is a <label> directly inside .field, so the generic
+   ".field > label" rule (block, bold, margin) would override the flex layout
+   and glue the box to the text. Re-assert the checkbox styling at higher
+   specificity. */
+.field > label.checkbox-field { display:flex; font-weight: 600; margin-bottom: 0; cursor: pointer; }
+.checkbox-field input { accent-color: var(--primary); width: 15px; height: 15px; flex: none; }
+/* Help line tied to a checkbox sits beneath it, indented past the box. */
+.field-help-checkbox { margin: 0.2rem 0 0 1.55rem; }
+/* Short descriptive note under a field-section-label (not tied to one field). */
+.field-section-note { color: var(--muted); font-size: 0.82rem; margin: 0.1rem 0 0.55rem; }
 .json-editor { width: 100%; min-height: 60vh; font-family: "Courier New", Courier, monospace; font-size: 0.88rem; padding: 0.8rem; border: 1px solid var(--line); border-radius: 10px; background: #fdfdfd; color: #0f2d44; }
 .json-status { font-size: 0.85rem; padding: 0.4rem 0; }
 .json-status.ok { color: var(--accent-dark); }

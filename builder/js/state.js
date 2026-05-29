@@ -3,7 +3,8 @@
 import { toast } from './util.js';
 
 export function defaultCourse(){
-  return { courseTitle: 'Neue SCORM-Lerneinheit', courseSubtitle: '', passThreshold: 0.5, tasks: [] };
+  return { courseTitle: 'Neue SCORM-Lerneinheit', courseSubtitle: '', passThreshold: 0.5,
+    regenLockAfterCheck: false, regenNoRegenerate: false, tasks: [] };
 }
 export function defaultTheme(){
   return {

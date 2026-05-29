@@ -124,7 +124,8 @@
           help:'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Begriffen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.' },
         // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
@@ -363,6 +364,7 @@
           buildRound();
           fb.neutral('Neue Aufgabe generiert.');
         });
+        window.BlockUtils.regenPolicy(newBtn, activeConfig, api);
       }
 
       host.appendChild(card);
@@ -704,6 +706,7 @@
         buildRound();
         fb.neutral('Neue Aufgabe generiert.');
       });
+      window.BlockUtils.regenPolicy(newBtn, cfg, api);
     }
 
     buildRound();

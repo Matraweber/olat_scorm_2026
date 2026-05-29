@@ -319,6 +319,57 @@
       host.appendChild(card);
       return { card, qText, content, buttons, fb };
     },
+    // Two builder-schema fields for the "Neu generieren" policy, shared by all
+    // random-pool blocks. Each is tri-state: "" inherits the course default
+    // (set in Kopfdaten), "on"/"off" override it for this block. The inherit
+    // label shows the current course default so the resolved state is visible.
+    // Pass an optional showIf to gate both fields (e.g. composition fillblanks).
+    regenSchemaFields(showIf){
+      const cd = (typeof window !== 'undefined' && window.state && window.state.course) || {};
+      const opts = on => [
+        { value: '',    label: 'Wie Lerneinheit (' + (on ? 'An' : 'Aus') + ')' },
+        { value: 'on',  label: 'An' },
+        { value: 'off', label: 'Aus' }
+      ];
+      const f = (key, label, on, help) => {
+        const spec = { key, label, type: 'select', options: opts(on), help };
+        if(showIf) spec.showIf = showIf;
+        return spec;
+      };
+      return [
+        f('lockAfterCheck', 'Nach Korrektur sperren', !!cd.regenLockAfterCheck,
+          'Nach dem ersten Prüfen kann keine neue Aufgabe mehr generiert werden. „Wie Lerneinheit" folgt der Einstellung in den Kopfdaten.'),
+        f('noRegenerate', 'Neu-Generieren ausblenden', !!cd.regenNoRegenerate,
+          'Kein „Neu generieren"-Knopf; die erste Zufallsaufgabe muss gelöst werden. „Wie Lerneinheit" folgt den Kopfdaten.')
+      ];
+    },
+    // Apply the resolved "Neu generieren" policy to a block's button.
+    // Per-block value wins; "" / undefined inherits the course default passed
+    // in via api.regenDefaults ({ lockAfterCheck, noRegenerate }).
+    //   noRegenerate   -> hide the button (first random task must be solved)
+    //   lockAfterCheck -> lock the button once the task has been graded
+    //                     (wraps api.reportScore so the first real check locks it)
+    regenPolicy(newBtn, config, api){
+      const cfg = config || {};
+      const def = (api && api.regenDefaults) || {};
+      const resolve = (v, courseVal) => {
+        if(v === 'on' || v === true) return true;
+        if(v === 'off') return false;
+        return !!courseVal; // "", undefined, "inherit", false -> follow course
+      };
+      const noRegen = resolve(cfg.noRegenerate, def.noRegenerate);
+      const lock    = resolve(cfg.lockAfterCheck, def.lockAfterCheck);
+      if(newBtn && noRegen){ newBtn.style.display = 'none'; }
+      if(newBtn && lock && !noRegen && api && typeof api.reportScore === 'function'){
+        const orig = api.reportScore;
+        api.reportScore = function(){
+          const r = orig.apply(api, arguments);
+          newBtn.disabled = true;
+          newBtn.title = 'Nach der Korrektur gesperrt';
+          return r;
+        };
+      }
+    },
     // Padded preview wrapper with optional icon+label tag. opts: { icon?, label?, fillHeight? }.
     tagPreview(host, opts){
       opts = opts || {};

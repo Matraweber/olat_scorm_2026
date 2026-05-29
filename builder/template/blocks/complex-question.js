@@ -77,7 +77,8 @@
         // Display & scoring
         { type:'section', label:'Darstellung & Bewertung', key:'_sec_score' },
         { key:'plotRange', label:'Plot-Bereich (±)', type:'number', step:'any' },
-        { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
@@ -189,6 +190,7 @@
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);
+      window.BlockUtils.regenPolicy(newBtn, config, api);
       chooseNew();
       api.initScore(config.maxPoints || 1);
       return {};

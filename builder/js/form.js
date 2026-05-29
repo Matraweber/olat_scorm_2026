@@ -283,7 +283,9 @@ export function renderField(spec, getObj, setObj){
     labelNode = el('label', {text: spec.label || spec.key, attrs:{'for': fieldId}});
     wrap.appendChild(labelNode);
   }
-  if(spec.help) wrap.appendChild(el('div', {className:'field-help', text: spec.help}));
+  // For checkboxes the help reads better BELOW the box+label (appended in the
+  // boolean branch); every other field type keeps it above the input.
+  if(spec.help && spec.type !== 'boolean') wrap.appendChild(el('div', {className:'field-help', text: spec.help}));
 
   let input;
   if(spec.type === 'textarea'){
@@ -318,6 +320,7 @@ export function renderField(spec, getObj, setObj){
     lbl.appendChild(el('span', {text: spec.label || spec.key}));
     cb.addEventListener('change', () => setObj(spec.key, cb.checked));
     wrap.appendChild(lbl);
+    if(spec.help) wrap.appendChild(el('div', {className:'field-help field-help-checkbox', text: spec.help}));
     return wrap;
   } else if(spec.type === 'select'){
     input = el('select');

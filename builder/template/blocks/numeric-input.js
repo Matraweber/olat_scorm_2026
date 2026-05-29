@@ -141,7 +141,8 @@
           help:'Aktiv: Studierende müssen den gekürzten Bruch eingeben. „10/20" wird als falsch gewertet, „1/2" ist korrekt. Aus: alle äquivalenten Eingaben werden akzeptiert.' },
         // Scoring
         { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
@@ -290,6 +291,7 @@
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', () => chooseNew(true));
+      u.regenPolicy(newBtn, activeConfig, api);
 
       chooseNew(false);
       api.initScore(activeConfig.maxPoints || 1);

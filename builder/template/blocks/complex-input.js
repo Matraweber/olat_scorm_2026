@@ -336,7 +336,8 @@
         { key:'tolerance', label:'Toleranz  (|Δ|)', type:'number', step:'any',
           help:'Akzeptierter Abstand zwischen Antwort und Lösung in der komplexen Ebene.' },
         { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte', type:'number', min:1, max:100, step:1 }
+        { key:'maxPoints', label:'Punkte', type:'number', min:1, max:100, step:1 },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
@@ -412,6 +413,7 @@
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', () => chooseNew(true));
+      window.BlockUtils.regenPolicy(newBtn, config, api);
 
       chooseNew(false);
       api.initScore(config.maxPoints || 1);

@@ -210,6 +210,8 @@ async function buildZip(){
     courseTitle: state.course.courseTitle,
     courseSubtitle: state.course.courseSubtitle,
     passThreshold: state.course.passThreshold,
+    regenLockAfterCheck: !!state.course.regenLockAfterCheck,
+    regenNoRegenerate: !!state.course.regenNoRegenerate,
     tasks: tasksWithPaths
   }, null, 2);
   const themeJson = JSON.stringify(state.theme, null, 2);
@@ -490,6 +492,8 @@ export async function loadZipFile(file, sourceHandle){
         courseTitle: cfg.courseTitle || '',
         courseSubtitle: cfg.courseSubtitle || '',
         passThreshold: cfg.passThreshold != null ? cfg.passThreshold : 0.5,
+        regenLockAfterCheck: !!cfg.regenLockAfterCheck,
+        regenNoRegenerate: !!cfg.regenNoRegenerate,
         tasks
       };
     }
@@ -552,6 +556,8 @@ export async function showPreview(){
       courseTitle: state.course.courseTitle,
       courseSubtitle: state.course.courseSubtitle,
       passThreshold: state.course.passThreshold,
+      regenLockAfterCheck: !!state.course.regenLockAfterCheck,
+      regenNoRegenerate: !!state.course.regenNoRegenerate,
       tasks: state.course.tasks.map(t => {
         const clean = cleanTaskForExport(t);
         return { id:t.id, title:t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };

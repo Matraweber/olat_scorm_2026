@@ -397,6 +397,7 @@
         { key:'prompt',    label:'Aufgabentext (optional)', type:'textarea', rows:2, showIf: isGraded,
           help:'Wird oberhalb der Komposition angezeigt.' },
         { key:'maxPoints', label:'Maximalpunkte', type:'number', min:1, max:100, step:1, showIf: isGraded },
+        ...window.BlockUtils.regenSchemaFields(c => c.gradingMode === 'fillblanks'),
         { key:'tolerance', label:'Toleranz', type:'number', step:'any', min:0,
           showIf: c => c.gradingMode === 'fillblanks',
           help:'Zulässige Abweichung der Antwort vom berechneten Wert. 0.01 bedeutet ±0,01. Wird auf alle Lösungsfelder angewendet, die keine eigene Toleranz haben.' },

@@ -40,6 +40,12 @@ function makeStubApi(block){
   return {
     utils: window.BlockUtils,
     blockId: 'preview_' + String(block.id || '').replace(/[^A-Za-z0-9_]/g, ''),
+    // Mirror the course-wide regenerate defaults so the in-builder preview
+    // matches the SCORM runtime; blocks still override per-config.
+    regenDefaults: {
+      lockAfterCheck: !!(state.course && state.course.regenLockAfterCheck),
+      noRegenerate: !!(state.course && state.course.regenNoRegenerate)
+    },
     initScore(){},
     reportScore(){}
   };

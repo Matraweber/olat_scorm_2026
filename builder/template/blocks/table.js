@@ -161,7 +161,8 @@
 
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1,
-          help:'Wird gleichmaessig auf alle Antwort-Zellen verteilt.' }
+          help:'Wird gleichmaessig auf alle Antwort-Zellen verteilt.' },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
@@ -385,6 +386,7 @@
         api.reportScore(pts);
       });
       newBtn.addEventListener('click', () => { generate(); fb.neutral('Neue Werte generiert.'); });
+      window.BlockUtils.regenPolicy(newBtn, config, api);
 
       generate();
       // Render KaTeX over the whole card so the question text + any LaTeX

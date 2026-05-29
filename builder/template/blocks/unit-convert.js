@@ -368,7 +368,8 @@
         { key:'tolerance', label:'Toleranz  (±, relativ)', type:'number', step:'any',
           help:'Abweichung, die noch als korrekt gilt. 0.01 = ±1 %.' },
         { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
 
@@ -490,6 +491,7 @@
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', () => chooseNew(true));
+      window.BlockUtils.regenPolicy(newBtn, config, api);
 
       chooseNew(false);
       api.initScore(ac.maxPoints || 1);

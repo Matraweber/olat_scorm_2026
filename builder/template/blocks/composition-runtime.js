@@ -471,6 +471,7 @@
       newBtn.textContent = 'Neu generieren';
       newBtn.addEventListener('click', regenerate);
       ui.buttons.appendChild(newBtn);
+      window.BlockUtils.regenPolicy(newBtn, config, api);
     }
     return {};
   }

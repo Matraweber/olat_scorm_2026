@@ -1,7 +1,7 @@
 // panes.js: Sidebar task list + course/theme settings panes.
 // renderActivePaneImpl dispatches to course/theme/task panes; task editor in task-pane.js.
 import { el, toast, confirmDialog } from './util.js';
-import { state, pushHistory, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder } from './state.js';
+import { state, pushHistory, scheduleAutosave, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder } from './state.js';
 import { renderField } from './form.js';
 import { renderTaskPane } from './task-pane.js';
 import { renderWelcomePane } from './welcome-pane.js';
@@ -188,11 +188,26 @@ function renderCoursePane(host){
       renderTaskList();
       if(typeof window.scormBuilderSyncHeaderTitle === 'function') window.scormBuilderSyncHeaderTitle();
     }
+    // Persist Kopfdaten edits (title, threshold, the question-block defaults)
+    // to the local autosave; otherwise they only survived a tab-close flush.
+    scheduleAutosave();
   };
   [
     { key:'courseTitle', label:'Kurstitel', type:'text', placeholder:'z. B. Maschinendynamik: Komplexe Zahlen' },
     { key:'courseSubtitle', label:'Untertitel', type:'text' },
     { key:'passThreshold', label:'Bestehensschwelle (0 bis 1)', type:'number', step:'any', min:0, max:1 }
+  ].forEach(spec => host.appendChild(renderField(spec, get, set)));
+
+  // Course-wide defaults for the random-pool question blocks. Per-block
+  // settings can still override these individually.
+  host.appendChild(el('div', {className:'field-section-label', text:'Frageblöcke (Standard für die ganze Lerneinheit)'}));
+  host.appendChild(el('div', {className:'field-section-note',
+    text:'Gilt für alle Frageblöcke mit Zufallspool. Einzelne Aufgaben können das überschreiben.'}));
+  [
+    { key:'regenLockAfterCheck', label:'Nach Korrektur sperren', type:'boolean',
+      help:'Nach dem ersten Prüfen kann keine neue Aufgabe mehr generiert werden.' },
+    { key:'regenNoRegenerate', label:'Neu-Generieren ausblenden', type:'boolean',
+      help:'Kein „Neu generieren"-Knopf; die erste Zufallsaufgabe muss gelöst werden.' }
   ].forEach(spec => host.appendChild(renderField(spec, get, set)));
 }
 

@@ -316,6 +316,11 @@
       const blockApi = {
         utils,
         blockId: 'bl_' + idx + '_' + bIdx + '_' + (block.id || bIdx).toString().replace(/[^A-Za-z0-9_]/g, ''),
+        // Course-wide "Neu generieren" defaults; blocks override per-config.
+        regenDefaults: {
+          lockAfterCheck: !!courseConfig.regenLockAfterCheck,
+          noRegenerate: !!courseConfig.regenNoRegenerate
+        },
         initScore(max){
           const existing = slot.blockScores[block.id];
           if(!existing) slot.blockScores[block.id] = {points: 0, max: Math.max(1, max), completed: false};

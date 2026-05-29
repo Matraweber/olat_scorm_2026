@@ -289,7 +289,8 @@
 
         { type:'section', label:'Bewertung', key:'_sec_score' },
         { key:'tolerance', label:'Toleranz pro Variable', type:'number', step:0.01 },
-        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
+        ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
@@ -490,6 +491,7 @@
         const ok = generate();
         if(ok) fb.neutral('Neues System generiert.');
       });
+      window.BlockUtils.regenPolicy(newBtn, config, api);
 
       generate();
       api.initScore(Number(config.maxPoints) || 1);
