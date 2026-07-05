@@ -283,6 +283,11 @@ const en = {
       ctaPrimary: 'Create the first task',
       ctaSecondary: 'Go to course info'
     },
+    video: {
+      title: 'Video: the steps in one minute',
+      lead: 'The short tutorial walks through the whole flow from an empty course to the SCORM export.',
+      missing: 'The tutorial video was not found (tutorial/scorm-builder-tutorial.webm).'
+    },
     quickstart: {
       title: 'From zero to SCORM package in 5 steps',
       lead: 'From an empty builder to a finished ZIP file.',

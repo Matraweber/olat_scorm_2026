@@ -7,6 +7,7 @@
 # Used by start.bat (Windows) and start.sh (macOS/Linux).
 import http.server
 import os
+import re
 import socketserver
 import sys
 
@@ -18,11 +19,65 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')
+        self.send_header('Accept-Ranges', 'bytes')
         super().end_headers()
 
     def log_message(self, fmt, *args):
         # Suppress per-request noise; errors still reach stderr.
         pass
+
+    # Byte-range support so <video> seeking works (the tutorial embed on the
+    # welcome page). SimpleHTTPRequestHandler ignores Range headers, which
+    # makes Chromium restart media from 0 on every seek.
+    def do_GET(self):
+        range_header = self.headers.get('Range')
+        if not range_header:
+            return super().do_GET()
+        path = self.translate_path(self.path)
+        if os.path.isdir(path):
+            return super().do_GET()
+        m = re.match(r'bytes=(\d*)-(\d*)$', range_header.strip())
+        if not m:
+            return super().do_GET()
+        try:
+            f = open(path, 'rb')
+        except OSError:
+            self.send_error(404, 'File not found')
+            return
+        with f:
+            size = os.fstat(f.fileno()).st_size
+            start_s, end_s = m.group(1), m.group(2)
+            if start_s == '' and end_s == '':
+                return super().do_GET()
+            if start_s == '':
+                # Suffix range: last N bytes.
+                length = min(int(end_s), size)
+                start = size - length
+                end = size - 1
+            else:
+                start = int(start_s)
+                end = min(int(end_s), size - 1) if end_s else size - 1
+            if start >= size or start > end:
+                self.send_response(416)
+                self.send_header('Content-Range', 'bytes */%d' % size)
+                self.end_headers()
+                return
+            self.send_response(206)
+            self.send_header('Content-Type', self.guess_type(path))
+            self.send_header('Content-Range', 'bytes %d-%d/%d' % (start, end, size))
+            self.send_header('Content-Length', str(end - start + 1))
+            self.end_headers()
+            f.seek(start)
+            remaining = end - start + 1
+            while remaining > 0:
+                chunk = f.read(min(65536, remaining))
+                if not chunk:
+                    break
+                try:
+                    self.wfile.write(chunk)
+                except (ConnectionAbortedError, BrokenPipeError):
+                    break
+                remaining -= len(chunk)
 
 
 if __name__ == '__main__':

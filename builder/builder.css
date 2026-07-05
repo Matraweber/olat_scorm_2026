@@ -2349,6 +2349,24 @@ select.comp-formula-btn { font-size: 0.78rem; }
 /* Help button styled like the sidebar-toggle */
 .header-help-btn { margin-right: 0.15rem; }
 
+/* Welcome page: embedded tutorial video */
+.welcome-video-wrap {
+  max-width: 920px;
+  margin: 0.4rem 0 0;
+}
+.welcome-video {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line, #d8e0e6);
+  box-shadow: 0 12px 34px rgba(0, 30, 48, 0.18);
+  background: #00304d;
+  display: block;
+}
+.welcome-video-missing {
+  color: var(--muted, #5d6872);
+  font-style: italic;
+}
+
 /* Editor-locale toggle in the block-config pane (multi-language content). */
 .editor-locale-toggle {
   display: inline-flex;

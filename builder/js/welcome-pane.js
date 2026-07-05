@@ -121,7 +121,30 @@ function renderWelcomePane(host){
   });
   quick.appendChild(steps);
 
-  // 02 The interface (annotated mockup)
+  // 02 Video tutorial: the five steps as a one-minute screen recording.
+  // The file lives at the project root (tutorial/); the builder page is
+  // served from /builder/, hence the relative parent path.
+  const video = chapter(t('welcome.video.title'));
+  video.appendChild(el('p', {className:'welcome-lead', text: t('welcome.video.lead')}));
+  const videoWrap = el('div', {className:'welcome-video-wrap'});
+  const videoEl = el('video', {
+    className: 'welcome-video',
+    attrs: {
+      controls: '',
+      preload: 'metadata',
+      src: '../tutorial/scorm-builder-tutorial.webm'
+    }
+  });
+  // Hide the whole section body gracefully when the file is missing
+  // (e.g. a checkout without the tutorial folder).
+  videoEl.addEventListener('error', () => {
+    videoWrap.innerHTML = '';
+    videoWrap.appendChild(el('p', {className:'welcome-video-missing', text: t('welcome.video.missing')}));
+  });
+  videoWrap.appendChild(videoEl);
+  video.appendChild(videoWrap);
+
+  // 03 The interface (annotated mockup)
   const oberflaeche = chapter(t('welcome.interface.title'));
   oberflaeche.appendChild(el('p', {className:'welcome-lead', text: t('welcome.interface.lead')}));
   oberflaeche.appendChild(mockBuilderLayout());

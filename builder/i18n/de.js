@@ -284,6 +284,11 @@ const de = {
       ctaPrimary: 'Erste Aufgabe erstellen',
       ctaSecondary: 'Zu Kopfdaten'
     },
+    video: {
+      title: 'Video: Die Schritte in einer Minute',
+      lead: 'Das kurze Tutorial zeigt den kompletten Ablauf vom leeren Kurs bis zum SCORM-Export.',
+      missing: 'Das Tutorial-Video wurde nicht gefunden (tutorial/scorm-builder-tutorial.webm).'
+    },
     quickstart: {
       title: 'In 5 Schritten zum SCORM-Paket',
       lead: 'Vom leeren Builder bis zur fertigen ZIP-Datei.',
