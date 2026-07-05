@@ -1,10 +1,37 @@
 // panes.js: Sidebar task list + course/theme settings panes.
 // renderActivePaneImpl dispatches to course/theme/task panes; task editor in task-pane.js.
 import { el, toast, confirmDialog } from './util.js';
-import { state, pushHistory, scheduleAutosave, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder } from './state.js';
+import { state, pushHistory, scheduleAutosave, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder, getEditorLocale, setEditorLocale } from './state.js';
 import { renderField } from './form.js';
 import { renderTaskPane } from './task-pane.js';
 import { renderWelcomePane } from './welcome-pane.js';
+import { t, availableLocales, localeMeta, l } from './i18n.js';
+
+// Small editor-locale switcher shown at the top of the course pane so the
+// author can enter English course info next to the German one. Mirrors the
+// version in task-pane-config.js.
+function renderEditorLocaleToggleForCourse(){
+  const codes = availableLocales();
+  if(codes.length < 2) return el('span');
+  const wrap = el('div', { className: 'editor-locale-toggle' });
+  wrap.appendChild(el('span', { className: 'editor-locale-toggle-label', text: t('taskPane.config.editorLocale.label') }));
+  const cur = getEditorLocale();
+  codes.forEach(code => {
+    const meta = localeMeta(code);
+    const btn = el('button', {
+      className: 'editor-locale-btn' + (code === cur ? ' active' : ''),
+      attrs: { type: 'button', title: meta.name || code },
+      text: meta.label || code.toUpperCase()
+    });
+    btn.addEventListener('click', () => {
+      if(code === getEditorLocale()) return;
+      setEditorLocale(code);
+      renderActivePane();
+    });
+    wrap.appendChild(btn);
+  });
+  return wrap;
+}
 
 export function renderTaskList(){
   const list = document.getElementById('taskList');
@@ -20,12 +47,12 @@ export function renderTaskList(){
         '<rect x="10" y="20" width="40" height="10" rx="2" opacity="0.7"/>' +
         '<rect x="14" y="34" width="40" height="10" rx="2"/>' +
       '</svg>' +
-      '<p class="task-empty-title">Noch keine Aufgaben</p>' +
-      '<p class="task-empty-body">Die erste Aufgabe anlegen, um Lerninhalte hinzuzufügen.</p>';
+      '<p class="task-empty-title">' + t('taskList.emptyTitle') + '</p>' +
+      '<p class="task-empty-body">' + t('taskList.emptyBody') + '</p>';
     const cta = el('button', {
       className: 'btn btn-primary btn-sm task-empty-cta',
       attrs: { type: 'button' },
-      text: '+ Erste Aufgabe'
+      text: t('taskList.firstTask')
     });
     cta.addEventListener('click', () => {
       const btn = document.getElementById('btnAddTask');
@@ -42,27 +69,28 @@ export function renderTaskList(){
     const li = el('li', { attrs: { draggable: 'true' } });
     li.dataset.taskIdx = String(idx);
     const btn = el('button', {className: 'task-btn' + (state.selected.kind === 'task' && state.selected.idx === idx ? ' active' : ''), attrs:{type:'button'}});
-    const titleSpan = el('span', {text: task.title || 'Aufgabe ' + (idx+1)});
+    const titleSpan = el('span', {text: l(task.title) || t('taskList.fallbackTitle', {n: idx+1})});
     btn.appendChild(titleSpan);
     const blockCount = (task.tabs && task.tabs.length)
-      ? task.tabs.reduce((n, t) => n + (t.blocks || []).length, 0)
+      ? task.tabs.reduce((n, tab) => n + (tab.blocks || []).length, 0)
       : (task.blocks || []).length;
-    const tabSuffix = (task.tabs && task.tabs.length) ? ' · ' + task.tabs.length + ' Tabs' : '';
-    btn.appendChild(el('span', {className:'task-meta', text: blockCount + ' ' + (blockCount === 1 ? 'Block' : 'Blöcke') + tabSuffix}));
+    const tabSuffix = (task.tabs && task.tabs.length) ? t('taskList.tabsSuffix', {n: task.tabs.length}) : '';
+    const blocksLabel = blockCount === 1 ? t('taskList.blocksSingular', {n: blockCount}) : t('taskList.blocksPlural', {n: blockCount});
+    btn.appendChild(el('span', {className:'task-meta', text: blocksLabel + tabSuffix}));
     btn.addEventListener('click', () => { state.selected = {kind:'task', idx}; render(); });
     li.appendChild(btn);
     const ctrls = el('div', {className:'task-controls'});
-    const up = el('button', {className:'icon-btn', attrs:{type:'button', title:'Hoch'}, text:'▲'});
-    const dn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Runter'}, text:'▼'});
-    const rm = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Löschen'}, text:'✕'});
+    const up = el('button', {className:'icon-btn', attrs:{type:'button', title:t('common.up')}, text:'▲'});
+    const dn = el('button', {className:'icon-btn', attrs:{type:'button', title:t('common.down')}, text:'▼'});
+    const rm = el('button', {className:'icon-btn danger', attrs:{type:'button', title:t('common.delete')}, text:'✕'});
     up.disabled = idx === 0; dn.disabled = idx === state.course.tasks.length - 1;
     up.addEventListener('click', () => swapTasks(idx, idx-1));
     dn.addEventListener('click', () => swapTasks(idx, idx+1));
     rm.addEventListener('click', async () => {
       if(!await confirmDialog({
-        title: 'Aufgabe löschen?',
-        message: '„' + (task.title || 'Aufgabe ' + (idx + 1)) + '" wird mit allen darin enthaltenen Blöcken gelöscht. Diese Aktion kann mit Strg + Z rückgängig gemacht werden.',
-        confirmLabel: 'Löschen',
+        title: t('panes.taskDelete.title'),
+        message: t('panes.taskDelete.message', {name: l(task.title) || t('taskList.fallbackTitle', {n: idx + 1})}),
+        confirmLabel: t('common.delete'),
         danger: true
       })) return;
       pushHistory();
@@ -178,8 +206,10 @@ export function renderActivePaneImpl(){
 
 
 function renderCoursePane(host){
-  host.appendChild(el('h2', {text:'Kopfdaten der Lerneinheit'}));
-  host.appendChild(el('p', {className:'hint', text:'Diese Angaben erscheinen im SCORM-Header und im OLAT-Lernpfad.'}));
+  host.appendChild(el('h2', {text:t('panes.course.heading')}));
+  host.appendChild(el('p', {className:'hint', text:t('panes.course.hint')}));
+  // Content-language toggle so authors can add EN course info alongside DE.
+  host.appendChild(renderEditorLocaleToggleForCourse());
   const c = state.course;
   const get = () => c;
   const set = (k, v) => {
@@ -193,84 +223,84 @@ function renderCoursePane(host){
     scheduleAutosave();
   };
   [
-    { key:'courseTitle', label:'Kurstitel', type:'text', placeholder:'z. B. Maschinendynamik: Komplexe Zahlen' },
-    { key:'courseSubtitle', label:'Untertitel', type:'text' },
-    { key:'passThreshold', label:'Bestehensschwelle (0 bis 1)', type:'number', step:'any', min:0, max:1 }
+    { key:'courseTitle', label:t('panes.course.fields.title'), type:'text', placeholder:t('panes.course.fields.titlePlaceholder') },
+    { key:'courseSubtitle', label:t('panes.course.fields.subtitle'), type:'text' },
+    { key:'passThreshold', label:t('panes.course.fields.passThreshold'), type:'number', step:'any', min:0, max:1 }
   ].forEach(spec => host.appendChild(renderField(spec, get, set)));
 
   // Course-wide defaults for the random-pool question blocks. Per-block
   // settings can still override these individually.
-  host.appendChild(el('div', {className:'field-section-label', text:'Frageblöcke (Standard für die ganze Lerneinheit)'}));
+  host.appendChild(el('div', {className:'field-section-label', text:t('panes.course.questionBlocks.heading')}));
   host.appendChild(el('div', {className:'field-section-note',
-    text:'Gilt für alle Frageblöcke mit Zufallspool. Einzelne Aufgaben können das überschreiben.'}));
+    text:t('panes.course.questionBlocks.note')}));
   [
-    { key:'regenLockAfterCheck', label:'Nach Korrektur sperren', type:'boolean',
-      help:'Nach dem ersten Prüfen kann keine neue Aufgabe mehr generiert werden.' },
-    { key:'regenNoRegenerate', label:'Neu-Generieren ausblenden', type:'boolean',
-      help:'Kein „Neu generieren"-Knopf; die erste Zufallsaufgabe muss gelöst werden.' }
+    { key:'regenLockAfterCheck', label:t('panes.course.questionBlocks.lockAfterCheck.label'), type:'boolean',
+      help:t('panes.course.questionBlocks.lockAfterCheck.help') },
+    { key:'regenNoRegenerate', label:t('panes.course.questionBlocks.hideRegenerate.label'), type:'boolean',
+      help:t('panes.course.questionBlocks.hideRegenerate.help') }
   ].forEach(spec => host.appendChild(renderField(spec, get, set)));
 }
 
 function renderThemePane(host){
-  host.appendChild(el('h2', {text:'Branding / Theme'}));
-  host.appendChild(el('p', {className:'hint', text:'Standardmäßig im UCB-Stil. Farben und Footer hier anpassen.'}));
-  const t = state.theme;
+  host.appendChild(el('h2', {text:t('panes.theme.heading')}));
+  host.appendChild(el('p', {className:'hint', text:t('panes.theme.hint')}));
+  const theme = state.theme;
   const actions = el('div', {className:'button-cluster', style:{marginBottom:'1rem'}});
-  const resetBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text:'Standard-Branding wiederherstellen'});
+  const resetBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text:t('panes.theme.reset.button')});
   resetBtn.addEventListener('click', async () => {
     if(!await confirmDialog({
-      title: 'Branding zurücksetzen?',
-      message: 'Farben, Logo und Footer-Einstellungen werden auf die ursprünglichen UCB-Standardwerte zurückgesetzt.',
-      confirmLabel: 'Zurücksetzen'
+      title: t('panes.theme.reset.title'),
+      message: t('panes.theme.reset.message'),
+      confirmLabel: t('panes.theme.reset.confirmLabel')
     })) return;
     pushHistory();
     clearPersistentTheme();
     state.theme = defaultTheme();
     applyThemeToBuilder(state.theme);
     renderActivePane();
-    toast('Standard-Branding wiederhergestellt.');
+    toast(t('panes.theme.reset.toast'));
   });
   actions.appendChild(resetBtn);
   host.appendChild(actions);
 
   const persistTheme = () => {
-    if(!savePersistentTheme(state.theme)) toast('Branding konnte nicht dauerhaft gespeichert werden.', 'error');
+    if(!savePersistentTheme(state.theme)) toast(t('panes.theme.persistError'), 'error');
   };
   // Apply to :root for live theme preview.
-  const get = () => t;
-  const set = (k, v) => { t[k] = v; persistTheme(); applyThemeToBuilder(state.theme); };
+  const get = () => theme;
+  const set = (k, v) => { theme[k] = v; persistTheme(); applyThemeToBuilder(state.theme); };
   [
-    { key:'kicker', label:'Kicker (Badge oben links)', type:'text' },
-    { key:'fontFamily', label:'Schriftart (CSS font-family)', type:'text' },
-    { key:'primaryColor', label:'Primärfarbe', type:'color' },
-    { key:'primaryLight', label:'Primärfarbe hell (Verlauf)', type:'color' },
-    { key:'accentColor', label:'Akzentfarbe', type:'color' },
-    { key:'accentDarkColor', label:'Akzentfarbe dunkel', type:'color' },
-    { key:'footerText', label:'Footer-Text', type:'text' },
-    { key:'footerLink', label:'Footer-Link', type:'text', placeholder:'https://...' },
-    { key:'logoUrl', label:'Logo-Pfad (Datei in template/, wird ins ZIP gepackt)', type:'text', placeholder:'default-logo.svg', help:'Datei mit diesem Namen muss in builder/template/ existieren.' }
+    { key:'kicker', label:t('panes.theme.fields.kicker'), type:'text' },
+    { key:'fontFamily', label:t('panes.theme.fields.fontFamily'), type:'text' },
+    { key:'primaryColor', label:t('panes.theme.fields.primaryColor'), type:'color' },
+    { key:'primaryLight', label:t('panes.theme.fields.primaryLight'), type:'color' },
+    { key:'accentColor', label:t('panes.theme.fields.accentColor'), type:'color' },
+    { key:'accentDarkColor', label:t('panes.theme.fields.accentDarkColor'), type:'color' },
+    { key:'footerText', label:t('panes.theme.fields.footerText'), type:'text' },
+    { key:'footerLink', label:t('panes.theme.fields.footerLink'), type:'text', placeholder:'https://...' },
+    { key:'logoUrl', label:t('panes.theme.fields.logoUrl.label'), type:'text', placeholder:'default-logo.svg', help:t('panes.theme.fields.logoUrl.help') }
   ].forEach(spec => host.appendChild(renderField(spec, get, set)));
   const logoField = el('div', {className:'field'});
   const logoInputId = 'fld_logoUpload';
-  logoField.appendChild(el('label', {text:'Logo per Upload (überschreibt Pfad)', attrs:{'for': logoInputId}}));
-  logoField.appendChild(el('div', {className:'field-help', text:'Lädt das Bild als Data-URL ins JSON.'}));
+  logoField.appendChild(el('label', {text:t('panes.theme.logoUpload.label'), attrs:{'for': logoInputId}}));
+  logoField.appendChild(el('div', {className:'field-help', text:t('panes.theme.logoUpload.help')}));
   const inp = el('input', {attrs:{type:'file', accept:'image/*', id: logoInputId}});
   inp.addEventListener('change', e => {
     const file = e.target.files && e.target.files[0]; if(!file) return;
     const r = new FileReader();
-    r.onload = () => { state.theme.logoDataUrl = r.result; persistTheme(); renderActivePane(); toast('Logo geladen.'); };
+    r.onload = () => { state.theme.logoDataUrl = r.result; persistTheme(); renderActivePane(); toast(t('panes.theme.logoUpload.loaded')); };
     r.readAsDataURL(file);
   });
   logoField.appendChild(inp);
-  if(t.logoDataUrl){
-    const preview = el('img', {attrs:{src: t.logoDataUrl, alt:'Logo'}, style:{maxHeight:'60px', marginTop:'0.5rem', display:'block'}});
+  if(theme.logoDataUrl){
+    const preview = el('img', {attrs:{src: theme.logoDataUrl, alt:t('panes.theme.logoAlt')}, style:{maxHeight:'60px', marginTop:'0.5rem', display:'block'}});
     logoField.appendChild(preview);
-    const remove = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Upload-Logo entfernen', style:{marginTop:'0.4rem'}});
+    const remove = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:t('panes.theme.logoUpload.remove'), style:{marginTop:'0.4rem'}});
     remove.addEventListener('click', () => { state.theme.logoDataUrl = null; persistTheme(); renderActivePane(); });
     logoField.appendChild(remove);
-  } else if(t.logoUrl){
-    const preview = el('img', {attrs:{src: 'template/' + t.logoUrl, alt:'Logo'}, style:{maxHeight:'60px', marginTop:'0.5rem', display:'block'}});
-    preview.onerror = () => { preview.replaceWith(el('div', {className:'field-help', text:'Logo "' + t.logoUrl + '" in template/ nicht gefunden.'})); };
+  } else if(theme.logoUrl){
+    const preview = el('img', {attrs:{src: 'template/' + theme.logoUrl, alt:t('panes.theme.logoAlt')}, style:{maxHeight:'60px', marginTop:'0.5rem', display:'block'}});
+    preview.onerror = () => { preview.replaceWith(el('div', {className:'field-help', text:t('panes.theme.logoMissing', {name: theme.logoUrl})})); };
     logoField.appendChild(preview);
   }
   host.appendChild(logoField);

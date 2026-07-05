@@ -2,13 +2,17 @@
   'use strict';
   Blocks.register('function-sandbox', {
     label: 'Funktionsplot-Sandbox',
+    labelKey: 'block.function-sandbox.label',
     description: 'Funktion mit Schiebereglern interaktiv erkunden, nicht bewertet.',
+    descKey: 'block.function-sandbox.description',
     category: 'Visualisierung',
+    categoryKey: 'block.category.visualization',
     icon: 'ƒ',
     graded: false,
-    defaultConfig(){
+    defaultConfig(locale = 'de'){
+      const en = locale === 'en';
       return {
-        title: 'Funktion erkunden',
+        title: en ? 'Explore the function' : 'Funktion erkunden',
         expr: 'a*sin(b*x + c)',
         xMin: -6.28, xMax: 6.28, yMin: -3, yMax: 3,
         sliders: [
@@ -21,38 +25,42 @@
     builderSchema(){
       return [
         // Funktion
-        { type:'section', label:'Funktion', key:'_sec_fn' },
-        { key:'title', label:'Titel (optional)', type:'text', placeholder:'z. B. Sinus erkunden' },
-        { key:'expr',  label:'f(x) =', type:'text', placeholder:'a*sin(b*x + c)',
-          help:'Slider-Variablen (a, b, c, …) dürfen hier vorkommen.' },
+        { type:'section', label:'Funktion', labelKey:'block.function-sandbox.field._sec_fn.label', key:'_sec_fn' },
+        { key:'title', label:'Titel (optional)', labelKey:'block.function-sandbox.field.title.label', type:'text', placeholder:'z. B. Sinus erkunden', placeholderKey:'block.function-sandbox.field.title.placeholder' },
+        { key:'expr',  label:'f(x) =', labelKey:'block.function-sandbox.field.expr.label', type:'text', placeholder:'a*sin(b*x + c)', placeholderKey:'block.function-sandbox.field.expr.placeholder',
+          help:'Slider-Variablen (a, b, c, …) dürfen hier vorkommen.', helpKey:'block.function-sandbox.field.expr.help' },
         // Koordinatenbereich
-        { type:'section', label:'Koordinatenbereich', key:'_sec_axes' },
-        { key:'xMin', label:'x von', type:'number', step:'any' },
-        { key:'xMax', label:'x bis', type:'number', step:'any' },
-        { key:'yMin', label:'y von', type:'number', step:'any' },
-        { key:'yMax', label:'y bis', type:'number', step:'any' },
+        { type:'section', label:'Koordinatenbereich', labelKey:'block.function-sandbox.field._sec_axes.label', key:'_sec_axes' },
+        { key:'xMin', label:'x von', labelKey:'block.function-sandbox.field.xMin.label', type:'number', step:'any' },
+        { key:'xMax', label:'x bis', labelKey:'block.function-sandbox.field.xMax.label', type:'number', step:'any' },
+        { key:'yMin', label:'y von', labelKey:'block.function-sandbox.field.yMin.label', type:'number', step:'any' },
+        { key:'yMax', label:'y bis', labelKey:'block.function-sandbox.field.yMax.label', type:'number', step:'any' },
         // Schieberegler
-        { type:'section', label:'Schieberegler', key:'_sec_sliders' },
-        { key:'sliders', label:'Regler', type:'list', itemLabel:'Regler',
+        { type:'section', label:'Schieberegler', labelKey:'block.function-sandbox.field._sec_sliders.label', key:'_sec_sliders' },
+        { key:'sliders', label:'Regler', labelKey:'block.function-sandbox.field.sliders.label', type:'list', itemLabel:'Regler', itemLabelKey:'block.function-sandbox.field.sliders.itemLabel',
           itemSummary: item => {
             if(!item.name) return '…';
+            const u = window.BlockUtils;
+            const stepLabel = u && u.t ? u.t('block.function-sandbox.sliderStepShort') : 'step';
+            const startLabel = u && u.t ? u.t('block.function-sandbox.sliderStartShort') : 'start';
             const start = item.value ?? '';
-            return item.name + ':  [' + (item.min ?? '') + ', ' + (item.max ?? '') + ']  Schritt ' + (item.step ?? '') + '  Start ' + start;
+            return item.name + ':  [' + (item.min ?? '') + ', ' + (item.max ?? '') + ']  ' + stepLabel + ' ' + (item.step ?? '') + '  ' + startLabel + ' ' + start;
           },
           itemSchema:[
-            { key:'name',  label:'Variable',    type:'text',   placeholder:'a' },
-            { type:'section', label:'Bereich & Schritt', key:'_sec_range' },
-            { key:'min',   label:'von',          type:'number', step:'any' },
-            { key:'max',   label:'bis',          type:'number', step:'any' },
-            { key:'step',  label:'Schrittweite', type:'number', step:'any' },
-            { key:'value', label:'Startwert',    type:'number', step:'any' }
+            { key:'name',  label:'Variable',    labelKey:'block.function-sandbox.field.sliders.item.name.label',  type:'text',   placeholder:'a', placeholderKey:'block.function-sandbox.field.sliders.item.name.placeholder' },
+            { type:'section', label:'Bereich & Schritt', labelKey:'block.function-sandbox.field.sliders.item._sec_range.label', key:'_sec_range' },
+            { key:'min',   label:'von',          labelKey:'block.function-sandbox.field.sliders.item.min.label',   type:'number', step:'any' },
+            { key:'max',   label:'bis',          labelKey:'block.function-sandbox.field.sliders.item.max.label',   type:'number', step:'any' },
+            { key:'step',  label:'Schrittweite', labelKey:'block.function-sandbox.field.sliders.item.step.label',  type:'number', step:'any' },
+            { key:'value', label:'Startwert',    labelKey:'block.function-sandbox.field.sliders.item.value.label', type:'number', step:'any' }
           ]}
       ];
     },
     mount(host, config, api){
       const u = api.utils;
       const card = document.createElement('section'); card.className = 'section-card';
-      if(config.title){ const h = document.createElement('h3'); h.textContent = config.title; card.appendChild(h); }
+      const titleText = u.l(config.title);
+      if(titleText){ const h = document.createElement('h3'); h.textContent = titleText; card.appendChild(h); }
       const grid = document.createElement('div'); grid.style.cssText = 'display:grid; grid-template-columns:1fr 240px; gap:1rem; align-items:start;';
       const plotHost = document.createElement('div');
       plotHost.style.cssText = 'min-height:240px; aspect-ratio:16/9; border:1px solid var(--line); border-radius:10px; overflow:hidden;';
@@ -128,6 +136,9 @@
       return {};
     },
     preview(host, config){
+      const BU = window.BlockUtils || {};
+      const l = (typeof BU.l === 'function') ? BU.l : (v => v);
+      const t = (typeof BU.t === 'function') ? BU.t : ((k, p) => k);
       // Mini plot at current slider start values
       const vars = {};
       (config.sliders || []).forEach(s => { if(s && s.name) vars[s.name] = Number(s.value) || 0; });
@@ -147,7 +158,7 @@
       const ns = 'http://www.w3.org/2000/svg';
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.4rem 0.7rem; font-size:0.78rem; display:flex; flex-direction:column; height:100%; gap:0.25rem; overflow:hidden;';
-      const tag = document.createElement('div'); tag.textContent = 'ƒ  Sandbox: ' + (config.expr || ''); tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; font-family:"Courier New",monospace;';
+      const tag = document.createElement('div'); tag.textContent = t('block.function-sandbox.preview.tag', { expr: (config.expr || '') }); tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; font-family:"Courier New",monospace;';
       wrap.appendChild(tag);
       const svg = document.createElementNS(ns, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -186,7 +197,7 @@
       // Slider hint
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872; padding-top:0.2rem;';
-      hint.textContent = ((config.sliders||[]).length) + ' Schieberegler · interaktiv im SCORM';
+      hint.textContent = t('block.function-sandbox.preview.sliderHint', { count: ((config.sliders||[]).length) });
       wrap.appendChild(hint);
       host.appendChild(wrap);
     }

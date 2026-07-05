@@ -50,11 +50,11 @@
   function makeRuntimeCard(host, config){
     const u = window.BlockUtils;
     const opts = {
-      title: config.blockTitle || 'Komposition',
-      qBoxTitle: 'Aufgabe'
+      title: u.l(config.blockTitle) || u.t('block.composition.label'),
+      qBoxTitle: u.t('common.task')
     };
     if(config.prompt && String(config.prompt).trim()){
-      opts.question = config.prompt;
+      opts.question = u.l(config.prompt);
     }
     const ui = u.simpleQuestionCard(host, opts);
     return ui;
@@ -72,10 +72,11 @@
 
   // Mode: static (no grading)
   function mountStatic(host, config, api){
+    const u = window.BlockUtils;
     const card = document.createElement('section');
     card.className = 'section-card block-question';
     const h3 = document.createElement('h3');
-    h3.textContent = config.blockTitle || 'Komposition';
+    h3.textContent = u.l(config.blockTitle) || u.t('block.composition.label');
     card.appendChild(h3);
     appendSvg(card, config, 'arr-' + (api.blockId || 'r'));
     host.appendChild(card);
@@ -96,17 +97,18 @@
 
   // Mode: acknowledge. SVG + "Verstanden"-Button.
   function runAcknowledge(ui, config, api, maxPoints){
+    const t = (api && api.utils && api.utils.t) ? api.utils.t : window.BlockUtils.t;
     appendSvg(ui.content, config, 'comp-ack-' + (api?.blockId || ''));
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
     btn.type = 'button';
-    btn.textContent = 'Verstanden (' + maxPoints + ' Pkt.)';
+    btn.textContent = t('block.composition.runtime.acknowledge.button', { pts: maxPoints });
     let done = false;
     btn.addEventListener('click', () => {
       if(done) return;
       done = true;
       btn.disabled = true;
-      ui.fb.ok('Bestätigt. ' + maxPoints + ' / ' + maxPoints + ' Punkte.');
+      ui.fb.ok(t('block.composition.runtime.acknowledge.confirmed', { pts: maxPoints, max: maxPoints }));
       api.reportScore(maxPoints);
     });
     ui.buttons.appendChild(btn);
@@ -115,6 +117,7 @@
 
   // Mode: click. Clicking a shape marked isCorrect awards points
   function runClick(ui, config, api, maxPoints){
+    const t = (api && api.utils && api.utils.t) ? api.utils.t : window.BlockUtils.t;
     const svg = appendSvg(ui.content, config, 'comp-click-' + (api?.blockId || ''));
     const shapes = config.shapes || [];
     const correctCount = shapes.filter(s => s.isCorrect).length;
@@ -145,13 +148,13 @@
         if(sh.isCorrect){ foundCorrect++; markShape(node, 'correct'); }
         else            { wrongClicks++;  markShape(node, 'wrong'); }
         recomputeScore();
-        if(foundCorrect === correctCount){ ui.fb.ok('Alle richtigen Formen gefunden!'); }
+        if(foundCorrect === correctCount){ ui.fb.ok(t('block.composition.runtime.click.allFound')); }
       });
     });
 
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-    checkBtn.textContent = 'Abschließen';
+    checkBtn.textContent = t('block.composition.runtime.click.finish');
     checkBtn.addEventListener('click', () => {
       if(locked) return;
       locked = true;
@@ -169,9 +172,9 @@
                 : penalize ? Math.max(0, Math.round((foundCorrect - wrongClicks) / correctCount * maxPoints * 100) / 100)
                            : Math.round((foundCorrect / correctCount) * maxPoints * 100) / 100;
       api.reportScore(pts);
-      const msg = foundCorrect + ' / ' + correctCount + ' richtige Formen'
-                + (wrongClicks ? ', ' + wrongClicks + ' falsch' : '')
-                + ' → ' + pts + ' / ' + maxPoints + ' Punkte.';
+      const msg = wrongClicks
+        ? t('block.composition.runtime.click.summaryWithWrong', { found: foundCorrect, total: correctCount, wrong: wrongClicks, pts, max: maxPoints })
+        : t('block.composition.runtime.click.summary', { found: foundCorrect, total: correctCount, pts, max: maxPoints });
       if(pts >= maxPoints)    ui.fb.ok(msg);
       else if(pts > 0)        ui.fb.neutral(msg);
       else                    ui.fb.bad(msg);
@@ -392,7 +395,7 @@
       checked = false;
       currentBlanks = blanks;
       u.renderMath(renderedSvgHost);
-      ui.fb.neutral('Neue Werte generiert.');
+      ui.fb.neutral(u.t('block.composition.runtime.fillblanks.regenerated'));
     }
 
     let currentBlanks = [];
@@ -402,10 +405,10 @@
 
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-    checkBtn.textContent = 'Korrektur';
+    checkBtn.textContent = u.t('common.check');
     checkBtn.addEventListener('click', () => {
       if(checked) return;
-      if(currentBlanks.length === 0){ ui.fb.neutral('Keine Luecken definiert.'); api.reportScore(0); return; }
+      if(currentBlanks.length === 0){ ui.fb.neutral(u.t('block.composition.runtime.fillblanks.noBlanks')); api.reportScore(0); return; }
       checked = true;
       checkBtn.disabled = true;
       // Collect what the student actually typed in each numbered slot. Used
@@ -448,7 +451,7 @@
             : mark === 'partial' ? 'comp-blank-partial'
               : 'comp-blank-bad');
         if(mark !== 'correct' && b.expected.asString){
-          b.input.title = 'Lösung: ' + b.expected.asString;
+          b.input.title = u.t('block.composition.runtime.fillblanks.solutionTitle', { solution: b.expected.asString });
         }
         if(mark === 'correct'){ scoreSum += 1; strictCount++; }
         else if(mark === 'partial'){ scoreSum += 0.5; partialCount++; }
@@ -456,9 +459,13 @@
       const pts = Math.round((scoreSum / currentBlanks.length) * maxPoints * 100) / 100;
       api.reportScore(pts);
       const fullCount = strictCount;
-      let msg = fullCount + ' / ' + currentBlanks.length + ' Luecken korrekt';
-      if(partialCount > 0) msg += ', ' + partialCount + ' Folgefehler (halbe Punkte)';
-      msg += ' -> ' + pts + ' / ' + maxPoints + ' Punkte.';
+      const msgKey = partialCount > 0
+        ? 'block.composition.runtime.fillblanks.summaryWithPartial'
+        : 'block.composition.runtime.fillblanks.summary';
+      const msg = u.t(msgKey, {
+        correct: fullCount, total: currentBlanks.length,
+        partial: partialCount, pts, max: maxPoints
+      });
       if(fullCount === currentBlanks.length) ui.fb.ok(msg);
       else if(scoreSum > 0)                  ui.fb.neutral(msg);
       else                                   ui.fb.bad(msg);
@@ -468,7 +475,7 @@
     if(variables.length > 0){
       const newBtn = document.createElement('button');
       newBtn.type = 'button'; newBtn.className = 'btn btn-secondary';
-      newBtn.textContent = 'Neu generieren';
+      newBtn.textContent = u.t('common.regenerate');
       newBtn.addEventListener('click', regenerate);
       ui.buttons.appendChild(newBtn);
       window.BlockUtils.regenPolicy(newBtn, config, api);
@@ -580,18 +587,19 @@
     });
 
     let locked = false;
+    const t = (api && api.utils && api.utils.t) ? api.utils.t : window.BlockUtils.t;
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-    checkBtn.textContent = 'Korrektur';
+    checkBtn.textContent = t('common.check');
     checkBtn.addEventListener('click', () => {
       if(locked) return;
       locked = true;
       checkBtn.disabled = true;
-      if(markers.length === 0){ ui.fb.neutral('Keine Marker definiert.'); api.reportScore(0); return; }
+      if(markers.length === 0){ ui.fb.neutral(t('block.composition.runtime.hotspot.noMarkers')); api.reportScore(0); return; }
       let correctCount = 0;
       markers.forEach(m => {
         const targetIdx = Number(m.shape.markerTargetIdx);
-        const wantTarget = targets.find(t => t.idx === targetIdx);
+        const wantTarget = targets.find(tg => tg.idx === targetIdx);
         const ok = wantTarget && pointInTarget(shapeCenter(m.shape), wantTarget);
         m.node.classList.add(ok ? 'comp-graded-correct' : 'comp-graded-wrong');
         m.node.style.cursor = 'default';
@@ -599,7 +607,9 @@
       });
       const pts = Math.round((correctCount / markers.length) * maxPoints * 100) / 100;
       api.reportScore(pts);
-      const msg = correctCount + ' / ' + markers.length + ' Marker korrekt → ' + pts + ' / ' + maxPoints + ' Punkte.';
+      const msg = t('block.composition.runtime.hotspot.summary', {
+        correct: correctCount, total: markers.length, pts, max: maxPoints
+      });
       if(correctCount === markers.length) ui.fb.ok(msg);
       else if(correctCount > 0)           ui.fb.neutral(msg);
       else                                ui.fb.bad(msg);

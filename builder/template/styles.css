@@ -17,7 +17,12 @@
 html, body { margin: 0; padding: 0; }
 body { font-family: var(--font); color: var(--text); background: linear-gradient(180deg, #eef5f8 0%, #f8fbfc 100%); }
 .scorm-shell { min-height: 100vh; display: flex; flex-direction: column; }
-.scorm-header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: #fff; padding: 2rem 2rem 2.3rem; }
+.scorm-header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: #fff; padding: 2rem 2rem 2.3rem; position: relative; }
+.scorm-lang-switcher { position: absolute; top: 1rem; right: 1rem; display: inline-flex; gap: 0.3rem; padding: 0.25rem 0.4rem; border: 1px solid rgba(255,255,255,0.35); border-radius: 8px; background: rgba(255,255,255,0.1); }
+.scorm-lang-switcher.hidden { display: none; }
+.scorm-lang-btn { padding: 0.15rem 0.5rem; font-family: "Courier New", monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; color: #fff; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.scorm-lang-btn:hover { background: rgba(255,255,255,0.12); }
+.scorm-lang-btn.active { background: #fff; color: var(--primary); border-color: #fff; }
 .brand-block { max-width: 1200px; margin: 0 auto; display: flex; gap: 1.4rem; align-items: flex-start; flex-wrap: wrap; }
 .brand-text { flex: 1 1 320px; }
 .brand-logo { max-height: 80px; max-width: 360px; background: #ffffff; padding: 6px 10px; border-radius: 8px; }

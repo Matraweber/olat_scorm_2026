@@ -5,11 +5,12 @@ import {
 import { state, render, defaultTheme, scheduleAutosave, markCourseSavedToFile } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
+import { t, getLocale, getDefaultLocale, collectContentLocales, l } from './i18n.js';
 
 // *Rel variants prepend 'template/'; plain variants take a path relative to builder/.
 async function fetchTextRel(path){
   const r = await fetch(withBust('template/' + path));
-  if(!r.ok) throw new Error('Konnte Template-Datei nicht laden: ' + path);
+  if(!r.ok) throw new Error(t('io.error.templateLoad', { path }));
   return r.text();
 }
 async function fetchBinaryRel(path){
@@ -19,7 +20,7 @@ async function fetchBinaryRel(path){
 }
 async function fetchText(absPath){
   const r = await fetch(withBust(absPath));
-  if(!r.ok) throw new Error('Konnte Datei nicht laden: ' + absPath);
+  if(!r.ok) throw new Error(t('io.error.fileLoad', { path: absPath }));
   return r.text();
 }
 async function fetchBinary(absPath){
@@ -75,15 +76,25 @@ function buildManifest(template, courseTitle, fileList){
   const fileXml = fileList.map(f => '      <file href="' + f + '"/>').join('\n');
   return template
     .replace(/__MANIFEST_ID__/g, id)
-    .replace(/__COURSE_TITLE__/g, escapeXml(courseTitle || 'SCORM Lerneinheit'))
+    .replace(/__COURSE_TITLE__/g, escapeXml(courseTitle || t('io.manifest.defaultCourseTitle')))
     .replace('__RESOURCE_FILES__', fileXml);
 }
-function buildIndexHtml(template, blockFiles, themeJson, tasksJson){
+function buildIndexHtml(template, blockFiles, themeJson, tasksJson, localeFiles){
   const tags = blockFiles.map(f => '  <script src="' + f + '"></script>').join('\n');
+  const localeTags = (localeFiles || []).map(f => '  <script src="' + f + '"></script>').join('\n');
   const dataScript = '<script>window.__SCORM_THEME__=' + themeJson + ';window.__SCORM_TASKS__=' + tasksJson + ';<\/script>';
   return template
     .replace('<!-- BLOCK_SCRIPTS -->', tags)
+    .replace('<!-- I18N_SCRIPTS -->', localeTags)
     .replace('<!-- DATA_SCRIPT -->', dataScript);
+}
+
+// Available runtime locales. Extend by adding new template/i18n/<code>.js
+// files and appending their codes here. Phase 6 will narrow this to the set
+// of locales that actually appear in the course content.
+const RUNTIME_LOCALES = ['de', 'en'];
+function runtimeLocaleFiles(locales){
+  return (locales || RUNTIME_LOCALES).map(code => 'i18n/' + code + '.js');
 }
 // BLOCK_FILES values can be a single filename or an array (helpers + main).
 // resolveBlockFiles flattens to a string[] so the rest of the code stays simple.
@@ -93,13 +104,14 @@ function resolveBlockFiles(blockType){
   return Array.isArray(v) ? v : [v];
 }
 
-async function gatherTemplateFiles(usedBlocks){
+async function gatherTemplateFiles(usedBlocks, locales){
   // Collect every path first, then fetch in parallel. Sequential awaits
   // here added one RTT per file on the export hot-path.
   const paths = ['scorm12.js', 'utils.js', 'styles.css', 'runtime.js', 'index.html', 'blocks/_registry.js'];
   for(const b of usedBlocks){
     for(const rel of resolveBlockFiles(b)) paths.push('blocks/' + rel);
   }
+  for(const rel of runtimeLocaleFiles(locales)) paths.push(rel);
   const texts = await Promise.all(paths.map(p => fetchTextRel(p)));
   const files = {};
   paths.forEach((p, i) => { files[p] = texts[i]; });
@@ -185,19 +197,16 @@ function extractMediaFromTasks(tasks){
 }
 
 async function buildZip(){
-  if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return null; }
+  if(!window.JSZip){ toast(t('io.error.jszipMissing'), 'error'); return null; }
   if(state.course.tasks.length === 0){
     const ok = await confirmDialog({
-      title: 'Leeres Paket erzeugen?',
-      message: 'Das SCORM-Paket enthält keine Aufgaben. Beim Import in OLAT erscheint nur ein leerer Kurs. Trotzdem fortfahren?',
-      confirmLabel: 'Trotzdem erzeugen'
+      title: t('io.emptyPackage.title'),
+      message: t('io.emptyPackage.message'),
+      confirmLabel: t('io.emptyPackage.confirm')
     });
     if(!ok) return null;
   }
   const used = usedBlockTypes();
-  const tmpl = await gatherTemplateFiles(used);
-  const manifestTpl = await fetchTextRel('imsmanifest.xml');
-  const blockFiles = used.flatMap(b => resolveBlockFiles(b).map(f => 'blocks/' + f));
 
   // Clean tasks (drop UI-only fields), then extract data-URLs into media/.
   const cleanedTasks = state.course.tasks.map(t => {
@@ -206,16 +215,36 @@ async function buildZip(){
   });
   const { tasks: tasksWithPaths, mediaFiles } = extractMediaFromTasks(cleanedTasks);
 
+  // Only pack runtime bundles for locales that actually appear in content.
+  // Every export always includes the builder's default locale so the runtime
+  // has a fallback that matches unmigrated plain-string fields. Content
+  // locales come from any {__i18n} wrappers in the cleaned tree.
+  const chromeLocale = getLocale() || 'de';
+  const bundleDefault = getDefaultLocale() || 'de';
+  const contentLocales = collectContentLocales(tasksWithPaths);
+  const localesSet = new Set([bundleDefault, chromeLocale, ...contentLocales]);
+  const runtimeLocales = RUNTIME_LOCALES.filter(code => localesSet.has(code));
+  if(runtimeLocales.length === 0) runtimeLocales.push(bundleDefault);
+  const tmpl = await gatherTemplateFiles(used, runtimeLocales);
+  const manifestTpl = await fetchTextRel('imsmanifest.xml');
+  const blockFiles = used.flatMap(b => resolveBlockFiles(b).map(f => 'blocks/' + f));
+  const localeFiles = runtimeLocaleFiles(runtimeLocales);
+
+  // Default runtime locale is the chrome locale if it was packed, else the
+  // first packed one. This ensures the runtime boots into a bundle that exists.
+  const defaultLocale = runtimeLocales.includes(chromeLocale) ? chromeLocale : runtimeLocales[0];
   const tasksJson = JSON.stringify({
     courseTitle: state.course.courseTitle,
     courseSubtitle: state.course.courseSubtitle,
     passThreshold: state.course.passThreshold,
     regenLockAfterCheck: !!state.course.regenLockAfterCheck,
     regenNoRegenerate: !!state.course.regenNoRegenerate,
+    locales: runtimeLocales,
+    defaultLocale,
     tasks: tasksWithPaths
   }, null, 2);
   const themeJson = JSON.stringify(state.theme, null, 2);
-  const indexHtml = buildIndexHtml(tmpl['index.html'], blockFiles, themeJson, tasksJson);
+  const indexHtml = buildIndexHtml(tmpl['index.html'], blockFiles, themeJson, tasksJson, localeFiles);
 
   let logoBlob = null, logoFilename = null;
   if(state.theme.logoUrl && !/^(https?:|data:)/i.test(state.theme.logoUrl)){
@@ -227,11 +256,14 @@ async function buildZip(){
   const fileList = [
     'index.html', 'styles.css', 'scorm12.js', 'utils.js', 'runtime.js',
     'theme.json', 'tasks.json', 'blocks/_registry.js',
-    ...blockFiles, ...katexZipFileList(),
+    ...blockFiles, ...localeFiles, ...katexZipFileList(),
     ...Array.from(mediaFiles.keys()),
     ...(logoFilename ? [logoFilename] : [])
   ];
-  const manifestXml = buildManifest(manifestTpl, state.course.courseTitle, fileList);
+  // The manifest carries a single title string. Use the default-locale text
+  // from the multilingual wrapper so OLAT sees a sensible name.
+  const manifestTitle = l(state.course.courseTitle, defaultLocale);
+  const manifestXml = buildManifest(manifestTpl, manifestTitle, fileList);
 
   const zip = new JSZip();
   zip.file('index.html', indexHtml);
@@ -249,6 +281,7 @@ async function buildZip(){
       zip.file(rel, tmpl[rel]);
     }
   });
+  localeFiles.forEach(rel => zip.file(rel, tmpl[rel]));
   await addKatexToZip(zip);
   // Media files are already-compressed binaries (PNG / JPG / MP3 / MP4).
   // Re-running DEFLATE wastes CPU and often grows the file. STORE keeps
@@ -278,17 +311,20 @@ function confirmExportWithIssues(report){
       '</li>'
     ).join('');
     const total = report.issues.length + report.courseIssues.length;
+    const summary = total === 1
+      ? t('io.exportGate.summarySingular', { total: `<strong>${total}</strong>` })
+      : t('io.exportGate.summaryPlural', { total: `<strong>${total}</strong>` });
     overlay.innerHTML = `
       <div class="modal-card export-gate-card">
-        <h2>Bereit zum Export?</h2>
-        <p>Beim Prüfen wurde${total === 1 ? '' : 'n'} <strong>${total}</strong> Punkt${total === 1 ? '' : 'e'} gefunden, die Sie ansehen sollten:</p>
+        <h2>${escapeHtml(t('io.exportGate.title'))}</h2>
+        <p>${summary}</p>
         <ul class="export-gate-list">
           ${courseLines}${blockLines}
         </ul>
-        <p class="hint">Sie können das Paket trotzdem exportieren, die Lerneinheit könnte für Lernende aber unvollständig wirken.</p>
+        <p class="hint">${escapeHtml(t('io.exportGate.hint'))}</p>
         <div class="modal-actions">
-          <button id="exportGateFix" class="btn btn-secondary" type="button">Korrigieren</button>
-          <button id="exportGateProceed" class="btn btn-primary" type="button">Trotzdem exportieren</button>
+          <button id="exportGateFix" class="btn btn-secondary" type="button">${escapeHtml(t('io.exportGate.fix'))}</button>
+          <button id="exportGateProceed" class="btn btn-primary" type="button">${escapeHtml(t('io.exportGate.proceed'))}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -315,11 +351,11 @@ export async function downloadZip(){
       if(!proceed) return;
     }
 
-    const filename = sanitizeFilename(state.course.courseTitle || 'scorm') + '.zip';
+    const filename = sanitizeFilename(l(state.course.courseTitle, getDefaultLocale()) || 'scorm') + '.zip';
     // Open the save picker before the slow ZIP work so user-activation is still fresh.
     const fileHandle = await pickSaveTarget(filename);
 
-    toast('Paket wird erzeugt … 0 %');
+    toast(t('io.toast.packageProgress', { percent: 0 }));
     const zip = await buildZip();
     if(!zip) return;
     let lastPercent = -1;
@@ -328,7 +364,7 @@ export async function downloadZip(){
         ? Math.round(metadata.percent) : null;
       if(p == null || p === lastPercent) return;
       lastPercent = p;
-      toast('Paket wird erzeugt … ' + p + ' %');
+      toast(t('io.toast.packageProgress', { percent: p }));
     });
 
     if(fileHandle){
@@ -338,7 +374,7 @@ export async function downloadZip(){
       // Bind subsequent Ctrl+S saves to this fresh target.
       _loadedFileHandle = fileHandle;
       markCourseSavedToFile();
-      toast('Gespeichert: ' + fileHandle.name);
+      toast(t('io.toast.saved', { name: fileHandle.name }));
       // Refresh folder browser so the new ZIP shows up immediately.
       const folderMod = await import('./folder-browser.js').catch(() => null);
       if(folderMod && typeof folderMod.refresh === 'function'){
@@ -353,15 +389,15 @@ export async function downloadZip(){
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
       if(isSafari){
-        toast('Gespeichert in Downloads. Tipp: Safari > Einstellungen > Allgemein > „Bei jedem Download nachfragen" für Speicherort-Auswahl.');
+        toast(t('io.toast.savedToDownloadsSafari'));
       } else {
-        toast('Download bereit: ' + filename);
+        toast(t('io.toast.downloadReady', { filename }));
       }
     }
   } catch(err){
     if(err && err.name === 'AbortError') return; // user cancelled the picker
     console.error(err);
-    toast('Fehler: ' + err.message, 'error');
+    toast(t('toast.genericError', { msg: err.message }), 'error');
   }
 }
 
@@ -370,7 +406,7 @@ async function pickSaveTarget(filename){
   if(typeof window.showSaveFilePicker !== 'function') return null;
   const opts = {
     suggestedName: filename,
-    types: [{ description: 'SCORM-Paket (ZIP)', accept: { 'application/zip': ['.zip'] } }]
+    types: [{ description: t('io.savePicker.description'), accept: { 'application/zip': ['.zip'] } }]
   };
   // Open the dialog in the user's working folder when one is loaded.
   const folderMod = await import('./folder-browser.js').catch(() => null);
@@ -438,10 +474,10 @@ export async function saveToLoadedHandle(){
       let perm = await _loadedFileHandle.queryPermission(opts);
       if(perm !== 'granted'){
         perm = await _loadedFileHandle.requestPermission(opts);
-        if(perm !== 'granted'){ toast('Schreibrecht nicht gewährt.', 'error'); return false; }
+        if(perm !== 'granted'){ toast(t('io.error.writePermissionDenied'), 'error'); return false; }
       }
     }
-    toast('Paket wird gespeichert …');
+    toast(t('io.toast.savingPackage'));
     const zip = await buildZip();
     if(!zip) return false;
     const blob = await zip.generateAsync({ type:'blob' });
@@ -449,22 +485,22 @@ export async function saveToLoadedHandle(){
     await stream.write(blob);
     await stream.close();
     markCourseSavedToFile();
-    toast('Gespeichert: ' + _loadedFileHandle.name);
+    toast(t('io.toast.saved', { name: _loadedFileHandle.name }));
     // Re-scan the folder view so renames/deletions in the folder are reflected.
     const folderMod = await import('./folder-browser.js').catch(() => null);
     if(folderMod && typeof folderMod.refresh === 'function') folderMod.refresh().catch(() => {});
     return true;
   } catch(err){
     if(err && err.name === 'AbortError') return false;
-    toast('Fehler beim Speichern: ' + err.message, 'error');
+    toast(t('io.error.saveFailed', { msg: err.message }), 'error');
     return false;
   }
 }
 
 export async function loadZipFile(file, sourceHandle){
-  if(!window.JSZip){ toast('JSZip nicht geladen.', 'error'); return; }
+  if(!window.JSZip){ toast(t('io.error.jszipMissing'), 'error'); return; }
   // Parsing a multi-MB ZIP takes a moment; confirm the click registered.
-  toast('Paket wird gelesen …');
+  toast(t('io.toast.readingPackage'));
   try {
     const buf = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(buf);
@@ -472,21 +508,21 @@ export async function loadZipFile(file, sourceHandle){
     const themeFile = zip.file('theme.json');
     if(!tasksFile){
       const ok = await confirmDialog({
-        title: 'Unbekanntes ZIP-Format?',
-        message: 'Diese ZIP-Datei enthält keine tasks.json. Wahrscheinlich wurde sie nicht mit dem SCORM Builder erzeugt. Trotzdem versuchen, sie zu laden?',
-        confirmLabel: 'Trotzdem versuchen'
+        title: t('io.unknownZip.title'),
+        message: t('io.unknownZip.message'),
+        confirmLabel: t('io.unknownZip.confirm')
       });
       if(!ok) return;
     }
     if(tasksFile){
-      toast('Aufgaben werden geladen …');
+      toast(t('io.toast.loadingTasks'));
       const tasksTxt = await tasksFile.async('string');
       const cfg = JSON.parse(tasksTxt);
       const { uid } = await import('./util.js');
       const rawTasks = (cfg.tasks || []).map(t =>
         migrateTaskIfNeeded(Object.assign({id: t.id || uid('t_')}, t))
       );
-      toast('Medien werden eingebettet …');
+      toast(t('io.toast.embeddingMedia'));
       const tasks = await reembedMediaInTasks(rawTasks, zip);
       state.course = {
         courseTitle: cfg.courseTitle || '',
@@ -512,8 +548,8 @@ export async function loadZipFile(file, sourceHandle){
     scheduleAutosave();
     // The freshly loaded course matches its file on disk: not dirty yet.
     markCourseSavedToFile();
-    toast('SCORM-Paket geladen.');
-  } catch(err){ console.error(err); toast('ZIP-Fehler: ' + err.message, 'error'); }
+    toast(t('io.toast.packageLoaded'));
+  } catch(err){ console.error(err); toast(t('io.error.zipFailed', { msg: err.message }), 'error'); }
 }
 
 export function exportJson(){
@@ -523,7 +559,7 @@ export function exportJson(){
   const blob = new Blob([JSON.stringify({course: courseClean, theme: state.theme}, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = sanitizeFilename(state.course.courseTitle || 'scorm') + '.json';
+  a.download = sanitizeFilename(l(state.course.courseTitle, getDefaultLocale()) || 'scorm') + '.json';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -542,22 +578,38 @@ export async function loadJsonFile(file){
       window.scormBuilderSyncHeaderTitle();
     }
     scheduleAutosave();
-    toast('JSON-Konfiguration geladen.');
-  } catch(err){ toast('Fehler: ' + err.message, 'error'); }
+    toast(t('io.toast.jsonLoaded'));
+  } catch(err){ toast(t('toast.genericError', { msg: err.message }), 'error'); }
 }
 
 export async function showPreview(){
   try {
-    toast('Vorschau wird vorbereitet …');
+    toast(t('io.toast.preparingPreview'));
     const used = usedBlockTypes();
-    const tmpl = await gatherTemplateFiles(used);
+    // Detect content locales before fetching so the preview iframe mirrors
+    // what a real SCORM export would include.
+    const previewCleanedTasks = state.course.tasks.map(t => {
+      const clean = cleanTaskForExport(t);
+      return { id: t.id, title: t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
+    });
+    const chromeLocalePv = getLocale() || 'de';
+    const bundleDefaultPv = getDefaultLocale() || 'de';
+    const contentLocalesPv = collectContentLocales(previewCleanedTasks);
+    const localesSetPv = new Set([bundleDefaultPv, chromeLocalePv, ...contentLocalesPv]);
+    const runtimeLocales = RUNTIME_LOCALES.filter(c => localesSetPv.has(c));
+    if(runtimeLocales.length === 0) runtimeLocales.push(bundleDefaultPv);
+    const tmpl = await gatherTemplateFiles(used, runtimeLocales);
     const blockScripts = used.flatMap(b => resolveBlockFiles(b).map(f => tmpl['blocks/' + f])).join('\n;\n');
+    const localeScripts = runtimeLocaleFiles(runtimeLocales).map(f => tmpl[f]).filter(Boolean).join('\n;\n');
+    const defaultLocale = runtimeLocales.includes(chromeLocalePv) ? chromeLocalePv : runtimeLocales[0];
     const tasksJson = JSON.stringify({
       courseTitle: state.course.courseTitle,
       courseSubtitle: state.course.courseSubtitle,
       passThreshold: state.course.passThreshold,
       regenLockAfterCheck: !!state.course.regenLockAfterCheck,
       regenNoRegenerate: !!state.course.regenNoRegenerate,
+      locales: runtimeLocales,
+      defaultLocale,
       tasks: state.course.tasks.map(t => {
         const clean = cleanTaskForExport(t);
         return { id:t.id, title:t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
@@ -570,11 +622,14 @@ export async function showPreview(){
     }
     const themeJson = JSON.stringify(previewTheme);
     let bodyInner = extractBodyInner(tmpl['index.html']);
-    bodyInner = bodyInner.replace(/<script[^>]+src=[^>]+><\/script>/gi, '').replace(/<!--\s*BLOCK_SCRIPTS\s*-->/g, '');
+    bodyInner = bodyInner
+      .replace(/<script[^>]+src=[^>]+><\/script>/gi, '')
+      .replace(/<!--\s*BLOCK_SCRIPTS\s*-->/g, '')
+      .replace(/<!--\s*I18N_SCRIPTS\s*-->/g, '');
     // srcdoc iframes need <base> to resolve relative URLs (local KaTeX, etc.).
     const baseHref = window.location.href.replace(/[^/]*$/, '');
     const html = [
-      '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Vorschau</title>',
+      '<!DOCTYPE html><html lang="', defaultLocale, '"><head><meta charset="UTF-8"><title>' + escapeHtml(t('io.preview.docTitle')) + '</title>',
       '<base href="', baseHref, '" />',
       '<style>', tmpl['styles.css'], '</style>',
       '<link rel="stylesheet" href="lib/katex/katex.min.css" />',
@@ -584,6 +639,7 @@ export async function showPreview(){
       '<script>window.__SCORM_THEME__=', themeJson, ';window.__SCORM_TASKS__=', tasksJson, ';<\/script>',
       '<script>', tmpl['scorm12.js'], '<\/script>',
       '<script>', tmpl['utils.js'], '<\/script>',
+      '<script>', localeScripts, '<\/script>',
       '<script>', tmpl['blocks/_registry.js'], '<\/script>',
       '<script>', blockScripts, '<\/script>',
       '<script>', tmpl['runtime.js'], '<\/script>',
@@ -591,7 +647,7 @@ export async function showPreview(){
     ].join('');
     document.getElementById('previewFrame').srcdoc = html;
     document.getElementById('previewModal').classList.remove('hidden');
-  } catch(err){ console.error(err); toast('Vorschau-Fehler: ' + err.message, 'error'); }
+  } catch(err){ console.error(err); toast(t('io.error.previewFailed', { msg: err.message }), 'error'); }
 }
 
 export function syncJsonEditor(){
@@ -603,7 +659,7 @@ export function applyJsonEditor(){
     const parsed = JSON.parse(document.getElementById('jsonEditor').value);
     if(parsed.course){ state.course = parsed.course; state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
     if(parsed.theme) state.theme = parsed.theme;
-    const s = document.getElementById('jsonStatus'); s.textContent = 'Übernommen.'; s.className = 'json-status ok';
+    const s = document.getElementById('jsonStatus'); s.textContent = t('io.jsonEditor.applied'); s.className = 'json-status ok';
     scheduleAutosave();
     // Don't call render(); it would replace the textarea. Refresh the task list only.
     import('./panes.js').then(m => m.renderTaskList());
@@ -611,6 +667,6 @@ export function applyJsonEditor(){
       window.scormBuilderSyncHeaderTitle();
     }
   } catch(err){
-    const s = document.getElementById('jsonStatus'); s.textContent = 'Fehler: ' + err.message; s.className = 'json-status error';
+    const s = document.getElementById('jsonStatus'); s.textContent = t('toast.genericError', { msg: err.message }); s.className = 'json-status error';
   }
 }

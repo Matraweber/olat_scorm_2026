@@ -27,11 +27,14 @@
 
   Blocks.register('file-download', {
     label: 'Datei-Download',
+    labelKey: 'block.file-download.label',
     description: 'Lerneinheits-Anhang zum Download anbieten, z. B. PDF-Skript, ZIP-Übung oder Vorlagen.',
+    descKey: 'block.file-download.description',
     category: 'Medien & Inhalt',
+    categoryKey: 'block.category.content',
     icon: 'file-download',
     graded: false,
-    defaultConfig(){
+    defaultConfig(locale = 'de'){
       return { src: '', filename: '', title: '', description: '' };
     },
     previewConfig(){
@@ -45,13 +48,16 @@
     },
     builderSchema(){
       return [
-        { key:'title', label:'Titel (vor dem Download-Button)', type:'text', placeholder:'z. B. „Vorlesungs-Skript Woche 3"' },
-        { key:'src', label:'Datei (Upload oder URL)', type:'file', help:'Hochgeladene Dateien werden als Data-URL ins SCORM-Paket eingebettet.' },
-        { key:'filename', label:'Anzeigename / Speichername', type:'text', placeholder:'z. B. „skript-woche-3.pdf"' },
-        { key:'description', label:'Beschreibung (optional, unter dem Button)', type:'text', placeholder:'Format, Seitenzahl, Hinweise …' }
+        { key:'title', label:'Titel (vor dem Download-Button)', labelKey:'block.file-download.field.title.label', type:'text', placeholder:'z. B. „Vorlesungs-Skript Woche 3"', placeholderKey:'block.file-download.field.title.placeholder' },
+        { key:'src', label:'Datei (Upload oder URL)', labelKey:'block.file-download.field.src.label', type:'file', help:'Hochgeladene Dateien werden als Data-URL ins SCORM-Paket eingebettet.', helpKey:'block.file-download.field.src.help' },
+        { key:'filename', label:'Anzeigename / Speichername', labelKey:'block.file-download.field.filename.label', type:'text', placeholder:'z. B. „skript-woche-3.pdf"', placeholderKey:'block.file-download.field.filename.placeholder' },
+        { key:'description', label:'Beschreibung (optional, unter dem Button)', labelKey:'block.file-download.field.description.label', type:'text', placeholder:'Format, Seitenzahl, Hinweise …', placeholderKey:'block.file-download.field.description.placeholder' }
       ];
     },
     mount(host, config, api){
+      const t = (api && api.utils && api.utils.t) ? api.utils.t : (k, p) => k;
+      const l = (api && api.utils && api.utils.l) ? api.utils.l : (v) => v;
+
       const wrap = document.createElement('div');
       wrap.className = 'file-download-block';
       wrap.style.cssText = 'display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem; border:1px solid var(--line, #d2dce5); border-radius:10px; background:#f7fafc;';
@@ -67,16 +73,18 @@
 
       const body = document.createElement('div');
       body.style.cssText = 'flex:1; min-width:0;';
-      if(config.title){
-        const t = document.createElement('div');
-        t.style.cssText = 'font-weight:700; color:var(--primary, #003b5c); margin-bottom:0.15rem;';
-        t.textContent = config.title;
-        body.appendChild(t);
+      const titleText = l(config.title);
+      if(titleText){
+        const tEl = document.createElement('div');
+        tEl.style.cssText = 'font-weight:700; color:var(--primary, #003b5c); margin-bottom:0.15rem;';
+        tEl.textContent = titleText;
+        body.appendChild(tEl);
       }
-      if(config.description){
+      const descText = l(config.description);
+      if(descText){
         const d = document.createElement('div');
         d.style.cssText = 'font-size:0.85rem; color:var(--muted, #6a7986);';
-        d.textContent = config.description;
+        d.textContent = descText;
         body.appendChild(d);
       }
       const fileInfo = document.createElement('div');
@@ -95,19 +103,26 @@
           btn.download = downloadFilename(config);
         }
         btn.style.cssText = 'flex:0 0 auto; padding:0.5rem 1rem; background:var(--primary, #003b5c); color:#fff; border-radius:8px; text-decoration:none; font-weight:700; font-size:0.9rem; white-space:nowrap; display:inline-block;';
-        btn.textContent = '↓ Download';
+        btn.textContent = t('block.file-download.downloadButton');
         wrap.appendChild(btn);
       } else {
         const ph = document.createElement('div');
         ph.style.cssText = 'flex:0 0 auto; padding:0.5rem 1rem; background:#dbe5ec; color:#6a7986; border-radius:8px; font-weight:700; font-size:0.9rem; white-space:nowrap;';
-        ph.textContent = '(keine Datei)';
+        ph.textContent = t('block.file-download.noFile');
         wrap.appendChild(ph);
       }
       host.appendChild(wrap);
       return {};
     },
     preview(host, config){
-      this.mount(host, config, {});
+      const BU = window.BlockUtils || {};
+      const api = {
+        utils: {
+          t: (typeof BU.t === 'function') ? BU.t.bind(BU) : ((k) => k),
+          l: (typeof BU.l === 'function') ? BU.l.bind(BU) : ((v) => v)
+        }
+      };
+      this.mount(host, config, api);
     }
   });
 })();

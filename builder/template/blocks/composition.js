@@ -167,13 +167,14 @@
       const hint = document.createElement('div');
       hint.className = 'comp-hint';
       const _nSel = selIndices().length;
+      const _t = api.utils.t;
       hint.textContent = _nSel >= 2
-        ? _nSel + ' Formen ausgewählt. Ziehen verschiebt alle • Pfeiltasten nudgen (⇧ +10 px) • ⌘/Ctrl + D / C / V • ⌫ löscht • Esc hebt auf.'
+        ? _t('block.composition.canvas.hint.multi', { count: _nSel })
         : _nSel === 1
-          ? 'Form ausgewählt. Ziehen verschiebt sie • Pfeiltasten verschieben pixelweise (⇧ +10 px) • ⌘/Ctrl + Z / ⇧Z rückgängig / wiederherstellen • ⌘/Ctrl + D dupliziert • ⌘/Ctrl + C / V kopiert / fügt ein • ⌫ löscht • Esc hebt die Auswahl auf.'
+          ? _t('block.composition.canvas.hint.single')
           : (block._compTool === 'select'
-              ? 'Auswahl-Werkzeug aktiv: Mit der Maus einen Rahmen aufziehen, um mehrere Formen zu markieren.'
-              : 'Auf eine Form klicken oder einen Rahmen aufziehen für Mehrfachauswahl. Werkzeuge oben links.');
+              ? _t('block.composition.canvas.hint.selectTool')
+              : _t('block.composition.canvas.hint.idle'));
       wrap.appendChild(hint);
       host.appendChild(wrap);
     }
@@ -338,8 +339,11 @@
   // Block registration
   Blocks.register('composition', {
     label: 'Komposition',
+    labelKey: 'block.composition.label',
     description: 'Skizze aus Linien, Kreisen, Pfeilen und Beschriftungen. Optional als Aufgabe bewertbar.',
+    descKey: 'block.composition.description',
     category: 'Visualisierung',
+    categoryKey: 'block.category.visualization',
     icon: '◧',
     // graded:true means the block can award points; behavior depends on
     // config.gradingMode below.
@@ -347,7 +351,7 @@
 
     newShape, // for the right-pane "+ Form" toolbox
 
-    defaultConfig(){
+    defaultConfig(locale = 'de'){
       return {
         blockTitle: '',
         canvasWidth: 600,
@@ -381,63 +385,74 @@
     builderSchema(){
       const isGraded = c => c.gradingMode && c.gradingMode !== 'none';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Komposition' },
-        { type:'section', label:'Zeichenfläche', key:'_sec_canvas' },
-        { key:'canvasWidth',  label:'Breite (px)', type:'number', step:10, min:100, max:1400 },
-        { key:'canvasHeight', label:'Höhe (px)',   type:'number', step:10, min:100, max:1400 },
-        { key:'background',   label:'Hintergrund', type:'color' },
-        { type:'section', label:'Bewertung', key:'_sec_grading' },
-        { key:'gradingMode', label:'Bewertungsart', type:'select', options:[
-            { value:'none',        label:'Keine (nur Anzeige)' },
-            { value:'acknowledge', label:'„Verstanden"-Button' },
-            { value:'fillblanks',  label:'Mit Lösung (Eingabefelder)' }
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.composition.field.blockTitle.label', type:'text', placeholder:'Komposition', placeholderKey:'block.composition.field.blockTitle.placeholder' },
+        { type:'section', label:'Zeichenfläche', labelKey:'block.composition.field._sec_canvas.label', key:'_sec_canvas' },
+        { key:'canvasWidth',  label:'Breite (px)', labelKey:'block.composition.field.canvasWidth.label', type:'number', step:10, min:100, max:1400 },
+        { key:'canvasHeight', label:'Höhe (px)',   labelKey:'block.composition.field.canvasHeight.label', type:'number', step:10, min:100, max:1400 },
+        { key:'background',   label:'Hintergrund', labelKey:'block.composition.field.background.label', type:'color' },
+        { type:'section', label:'Bewertung', labelKey:'block.composition.field._sec_grading.label', key:'_sec_grading' },
+        { key:'gradingMode', label:'Bewertungsart', labelKey:'block.composition.field.gradingMode.label', type:'select', options:[
+            { value:'none',        label:'Keine (nur Anzeige)',         labelKey:'block.composition.field.gradingMode.option.none' },
+            { value:'acknowledge', label:'„Verstanden"-Button',         labelKey:'block.composition.field.gradingMode.option.acknowledge' },
+            { value:'fillblanks',  label:'Mit Lösung (Eingabefelder)',  labelKey:'block.composition.field.gradingMode.option.fillblanks' },
+            { value:'click',       label:'Klick-Aufgabe (richtige Formen anklicken)', labelKey:'block.composition.field.gradingMode.option.click' },
+            { value:'hotspot',     label:'Hotspot-Aufgabe (Bereiche markieren)',      labelKey:'block.composition.field.gradingMode.option.hotspot' }
           ],
-          help: 'Bei „Mit Lösung" können Labels Eingabefelder enthalten: schreiben Sie {} in den Text, dort erscheint das Antwortfeld. {a} wird zu einer Variable.'
+          help: 'Bei „Mit Lösung" können Labels Eingabefelder enthalten: schreiben Sie {} in den Text, dort erscheint das Antwortfeld. {a} wird zu einer Variable.',
+          helpKey: 'block.composition.field.gradingMode.help'
         },
-        { key:'prompt',    label:'Aufgabentext (optional)', type:'textarea', rows:2, showIf: isGraded,
-          help:'Wird oberhalb der Komposition angezeigt.' },
-        { key:'maxPoints', label:'Maximalpunkte', type:'number', min:1, max:100, step:1, showIf: isGraded },
+        { key:'prompt',    label:'Aufgabentext (optional)', labelKey:'block.composition.field.prompt.label', type:'textarea', rows:2, showIf: isGraded,
+          help:'Wird oberhalb der Komposition angezeigt.', helpKey:'block.composition.field.prompt.help' },
+        { key:'maxPoints', label:'Maximalpunkte', labelKey:'block.composition.field.maxPoints.label', type:'number', min:1, max:100, step:1, showIf: isGraded },
         ...window.BlockUtils.regenSchemaFields(c => c.gradingMode === 'fillblanks'),
-        { key:'tolerance', label:'Toleranz', type:'number', step:'any', min:0,
+        { key:'tolerance', label:'Toleranz', labelKey:'block.composition.field.tolerance.label', type:'number', step:'any', min:0,
           showIf: c => c.gradingMode === 'fillblanks',
-          help:'Zulässige Abweichung der Antwort vom berechneten Wert. 0.01 bedeutet ±0,01. Wird auf alle Lösungsfelder angewendet, die keine eigene Toleranz haben.' },
-        { key:'penalizeWrong', label:'Falsche Klicks abziehen', type:'boolean',
+          help:'Zulässige Abweichung der Antwort vom berechneten Wert. 0.01 bedeutet ±0,01. Wird auf alle Lösungsfelder angewendet, die keine eigene Toleranz haben.',
+          helpKey:'block.composition.field.tolerance.help' },
+        { key:'penalizeWrong', label:'Falsche Klicks abziehen', labelKey:'block.composition.field.penalizeWrong.label', type:'boolean',
           showIf: c => c.gradingMode === 'click',
-          help:'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.' },
-        { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
-        { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
+          help:'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.',
+          helpKey:'block.composition.field.penalizeWrong.help' },
+        { type:'section', label:'Zufallsvariablen', labelKey:'block.composition.field._sec_vars.label', key:'_sec_vars' },
+        { key:'variables', label:'Variablen', labelKey:'block.composition.field.variables.label', type:'list', itemLabel:'Variable', itemLabelKey:'block.composition.field.variables.itemLabel',
           help:'In jedem Label kann {name} als Platzhalter genutzt werden. Bei jedem "Neu generieren"-Klick (erscheint sobald mindestens eine Variable definiert ist) werden alle Variablen im angegebenen Bereich neu gezogen. Im Lückentext-Modus können Lücken zusätzlich eine Formel referenzieren, die mit den aktuellen Werten ausgewertet wird.',
+          helpKey:'block.composition.field.variables.help',
           itemSummary: item => (item.name || '?') + ' = [' + (item.min ?? '?') + '..' + (item.max ?? '?') + ']',
           itemSchema: [
-            { key:'name',    label:'Name', type:'text', placeholder:'z. B. a' },
-            { key:'min',     label:'Min',  type:'number', step:1 },
-            { key:'max',     label:'Max',  type:'number', step:1 },
-            { key:'integer', label:'Ganzzahlig', type:'boolean', default:true }
+            { key:'name',    label:'Name', labelKey:'block.composition.field.variables.item.name.label', type:'text', placeholder:'z. B. a', placeholderKey:'block.composition.field.variables.item.name.placeholder' },
+            { key:'min',     label:'Min',  labelKey:'block.composition.field.variables.item.min.label',  type:'number', step:1 },
+            { key:'max',     label:'Max',  labelKey:'block.composition.field.variables.item.max.label',  type:'number', step:1 },
+            { key:'integer', label:'Ganzzahlig', labelKey:'block.composition.field.variables.item.integer.label', type:'boolean', default:true }
           ]},
         // Advanced manual editing; day-to-day work happens on the canvas.
-        { type:'section', label:'Formen (erweitert)', key:'_sec_shapes' },
-        { key:'shapes', label:'Formen', type:'list', itemLabel:'Form',
+        { type:'section', label:'Formen (erweitert)', labelKey:'block.composition.field._sec_shapes.label', key:'_sec_shapes' },
+        { key:'shapes', label:'Formen', labelKey:'block.composition.field.shapes.label', type:'list', itemLabel:'Form', itemLabelKey:'block.composition.field.shapes.itemLabel',
           help:'Tipp: Formen lassen sich auch direkt auf der Canvas verschieben und in der Werkzeugleiste oberhalb der Canvas anpassen.',
+          helpKey:'block.composition.field.shapes.help',
           itemSummary: shapeSummary,
           itemSchema: [
-            { key:'type', label:'Typ', type:'select', options:[
-              {value:'line',label:'Linie'},{value:'arrow',label:'Pfeil'},
-              {value:'circle',label:'Kreis'},{value:'ellipse',label:'Ellipse'},
-              {value:'polygon',label:'Polygon'},{value:'rect',label:'Rechteck'},
-              {value:'label',label:'Beschriftung'},{value:'coords',label:'Koordinatensystem'},
-              {value:'image',label:'Bild'}
+            { key:'type', label:'Typ', labelKey:'block.composition.field.shapes.item.type.label', type:'select', options:[
+              {value:'line',    label:'Linie',              labelKey:'block.composition.shape.line'},
+              {value:'arrow',   label:'Pfeil',              labelKey:'block.composition.shape.arrow'},
+              {value:'circle',  label:'Kreis',              labelKey:'block.composition.shape.circle'},
+              {value:'ellipse', label:'Ellipse',            labelKey:'block.composition.shape.ellipse'},
+              {value:'polygon', label:'Polygon',            labelKey:'block.composition.shape.polygon'},
+              {value:'rect',    label:'Rechteck',           labelKey:'block.composition.shape.rect'},
+              {value:'label',   label:'Beschriftung',       labelKey:'block.composition.shape.label'},
+              {value:'coords',  label:'Koordinatensystem',  labelKey:'block.composition.shape.coords'},
+              {value:'image',   label:'Bild',               labelKey:'block.composition.shape.image'}
             ]},
-            { key:'text', label:'Text', type:'text', fullWidth:true, showIf: s => s.type === 'label' },
-            { key:'sides', label:'Ecken', type:'number', min:3, max:20, step:1, showIf: s => s.type === 'polygon' },
-            { key:'color', label:'Linienfarbe', type:'color' },
-            { key:'fill',  label:'Füllfarbe',   type:'color', showIf: s => s.type === 'circle' || s.type === 'ellipse' || s.type === 'polygon' || s.type === 'rect' },
+            { key:'text', label:'Text', labelKey:'block.composition.field.shapes.item.text.label', type:'text', fullWidth:true, showIf: s => s.type === 'label' },
+            { key:'sides', label:'Ecken', labelKey:'block.composition.field.shapes.item.sides.label', type:'number', min:3, max:20, step:1, showIf: s => s.type === 'polygon' },
+            { key:'color', label:'Linienfarbe', labelKey:'block.composition.field.shapes.item.color.label', type:'color' },
+            { key:'fill',  label:'Füllfarbe',   labelKey:'block.composition.field.shapes.item.fill.label',  type:'color', showIf: s => s.type === 'circle' || s.type === 'ellipse' || s.type === 'polygon' || s.type === 'rect' },
             // Grading flags (relevant per mode)
-            { key:'isCorrect',   label:'Richtige Antwort (Klick-Modus)', type:'boolean' },
-            { key:'blank',       label:'Als Lücke (Label-Modus)', type:'boolean', showIf: s => s.type === 'label' },
-            { key:'correctText', label:'Lösung (Lücke)', type:'text', showIf: s => s.type === 'label' && s.blank },
-            { key:'isTarget',    label:'Zielzone (Hotspot-Modus)', type:'boolean' },
-            { key:'isMarker',    label:'Beweglicher Marker (Hotspot-Modus)', type:'boolean' },
-            { key:'markerTargetIdx', label:'Index der korrekten Zielzone', type:'number', min:0, step:1, showIf: s => s.isMarker }
+            { key:'isCorrect',   label:'Richtige Antwort (Klick-Modus)', labelKey:'block.composition.field.shapes.item.isCorrect.label', type:'boolean' },
+            { key:'blank',       label:'Als Lücke (Label-Modus)', labelKey:'block.composition.field.shapes.item.blank.label', type:'boolean', showIf: s => s.type === 'label' },
+            { key:'correctText', label:'Lösung (Lücke)', labelKey:'block.composition.field.shapes.item.correctText.label', type:'text', showIf: s => s.type === 'label' && s.blank },
+            { key:'isTarget',    label:'Zielzone (Hotspot-Modus)', labelKey:'block.composition.field.shapes.item.isTarget.label', type:'boolean' },
+            { key:'isMarker',    label:'Beweglicher Marker (Hotspot-Modus)', labelKey:'block.composition.field.shapes.item.isMarker.label', type:'boolean' },
+            { key:'markerTargetIdx', label:'Index der korrekten Zielzone', labelKey:'block.composition.field.shapes.item.markerTargetIdx.label', type:'number', min:0, step:1, showIf: s => s.isMarker }
           ]
         }
       ];
@@ -475,7 +490,7 @@
         const regenBtn = document.createElement('button');
         regenBtn.type = 'button';
         regenBtn.className = 'btn btn-secondary';
-        regenBtn.textContent = 'Neu generieren';
+        regenBtn.textContent = api.utils.t('common.regenerate');
         regenBtn.addEventListener('click', () => {
           currentVars = compGenVars(variables);
           doMount();
@@ -488,7 +503,7 @@
 
     preview(host, config){
       const u = window.BlockUtils;
-      const wrap = u.tagPreview(host, { icon:'◧', label:'Komposition' });
+      const wrap = u.tagPreview(host, { icon:'◧', label: u.t('block.composition.label') });
       const inner = document.createElement('div');
       inner.style.cssText = 'display:flex; justify-content:center; margin-top:0.3rem;';
       const svg = buildSvg(config, { idPrefix: 'prev' });
@@ -498,7 +513,10 @@
       const meta = document.createElement('div');
       meta.style.cssText = 'font-size:0.74rem; color:#5d6872; margin-top:0.3rem;';
       const count = (config.shapes || []).length;
-      meta.textContent = count + ' Form' + (count === 1 ? '' : 'en') + ' · ' +
+      const shapeWord = count === 1
+        ? u.t('block.composition.preview.shapeSingular')
+        : u.t('block.composition.preview.shapePlural');
+      meta.textContent = count + ' ' + shapeWord + ' · ' +
         (config.canvasWidth || 600) + '×' + (config.canvasHeight || 360) + ' px';
       wrap.appendChild(meta);
     }

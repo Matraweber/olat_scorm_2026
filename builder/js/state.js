@@ -1,9 +1,10 @@
 // state.js: Global state, defaults, history (undo/redo), clipboard.
 // render/renderActivePane are set by main.js to break circular imports.
 import { toast } from './util.js';
+import { t } from './i18n.js';
 
 export function defaultCourse(){
-  return { courseTitle: 'Neue SCORM-Lerneinheit', courseSubtitle: '', passThreshold: 0.5,
+  return { courseTitle: t('state.defaultCourseTitle'), courseSubtitle: '', passThreshold: 0.5,
     regenLockAfterCheck: false, regenNoRegenerate: false, tasks: [] };
 }
 export function defaultTheme(){
@@ -21,6 +22,27 @@ export function defaultTheme(){
 const THEME_STORAGE_KEY    = 'scorm-builder-persistent-theme';
 const AUTOSAVE_KEY         = 'scorm-builder-autosave-course';
 const AUTOSAVE_META_KEY    = 'scorm-builder-autosave-meta';
+const EDITOR_LOCALE_KEY    = 'scorm-builder-editor-language';
+
+// Editor locale controls which language the author is currently writing into
+// for multilingual content fields. Separate from the chrome locale (which UI
+// language the builder shows). Defaults to 'de' on first boot; persisted in
+// localStorage so it survives reloads.
+let _editorLocale = null;
+export function getEditorLocale(){
+  if(_editorLocale) return _editorLocale;
+  try {
+    const stored = localStorage.getItem(EDITOR_LOCALE_KEY);
+    if(stored){ _editorLocale = stored; return _editorLocale; }
+  } catch{}
+  _editorLocale = 'de';
+  return _editorLocale;
+}
+export function setEditorLocale(code){
+  if(!code) return;
+  _editorLocale = code;
+  try { localStorage.setItem(EDITOR_LOCALE_KEY, code); } catch{}
+}
 
 export function mergeTheme(theme){
   return Object.assign(defaultTheme(), theme || {});
@@ -179,7 +201,7 @@ function applySnapshot(snap){
       state.selected = state.course.tasks.length > 0 ? {kind:'task', idx:0} : {kind:'course'};
     }
     render();
-  } catch(e){ toast('Rückgängig fehlgeschlagen: ' + e.message, 'error'); }
+  } catch(e){ toast(t('state.toast.undoFailed', { msg: e.message }), 'error'); }
 }
 export function pushHistory(){
   history.past.push(snapshotState());
@@ -208,18 +230,18 @@ export function pushHistoryDebounced(){
 }
 
 export function undo(){
-  if(history.past.length === 0){ toast('Nichts zum Rückgängigmachen.'); return; }
+  if(history.past.length === 0){ toast(t('state.toast.nothingToUndo')); return; }
   history.future.push(snapshotState());
   applySnapshot(history.past.pop());
   scheduleAutosave();
-  toast('Rückgängig');
+  toast(t('state.toast.undone'));
 }
 export function redo(){
-  if(history.future.length === 0){ toast('Nichts zum Wiederherstellen.'); return; }
+  if(history.future.length === 0){ toast(t('state.toast.nothingToRedo')); return; }
   history.past.push(snapshotState());
   applySnapshot(history.future.pop());
   scheduleAutosave();
-  toast('Wiederherstellen');
+  toast(t('state.toast.redone'));
 }
 
 // Clipboard for blocks, persisted via localStorage.
@@ -238,7 +260,7 @@ export function copySelectedBlocks(){
   const blocks = (task.blocks || []).filter(b => selectedIds.includes(b.id));
   if(blocks.length === 0) return false;
   clipboardPut({ kind: 'blocks', data: blocks.map(b => JSON.parse(JSON.stringify(b))) });
-  toast(blocks.length + ' Block' + (blocks.length === 1 ? '' : 'e') + ' kopiert.');
+  toast(t(blocks.length === 1 ? 'state.toast.blocksCopiedSingular' : 'state.toast.blocksCopiedPlural', { n: blocks.length }));
   return true;
 }
 
@@ -250,7 +272,7 @@ export function pasteBlocks(){
   if(!task) return false;
   const payload = clipboardGet();
   if(!payload || payload.kind !== 'blocks' || !Array.isArray(payload.data)) {
-    toast('Zwischenablage ist leer.'); return false;
+    toast(t('state.toast.clipboardEmpty')); return false;
   }
   pushHistory();
   const newIds = [];
@@ -263,6 +285,6 @@ export function pasteBlocks(){
   });
   task._uiSelectedBlockIds = newIds;
   render();
-  toast(payload.data.length + ' Block' + (payload.data.length === 1 ? '' : 'e') + ' eingefügt.');
+  toast(t(payload.data.length === 1 ? 'state.toast.blocksPastedSingular' : 'state.toast.blocksPastedPlural', { n: payload.data.length }));
   return true;
 }

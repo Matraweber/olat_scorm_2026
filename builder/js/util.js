@@ -1,5 +1,27 @@
 // util.js: DOM helpers, string/file utilities, toast. No app-module imports.
 
+import { t } from './i18n.js';
+
+// Block-registration and schema-field helper. Blocks expose their chrome
+// strings under runtime i18n keys (block.<blockId>.*) and populate optional
+// *Key fields alongside the literal ones. tProp picks the translated string
+// when a key is available and falls back to the literal (backwards
+// compatible so unmigrated blocks keep working).
+//
+// Standard pattern is `<prop>Key` (labelKey, helpKey, placeholderKey,
+// itemLabelKey, categoryKey). One historical exception: block descriptions
+// use the shorter `descKey` alias, checked below.
+const PROP_KEY_ALIASES = { description: 'descKey' };
+export function tProp(obj, prop){
+  if(!obj) return '';
+  let key = obj[prop + 'Key'];
+  if(!key && PROP_KEY_ALIASES[prop]) key = obj[PROP_KEY_ALIASES[prop]];
+  if(key && typeof window !== 'undefined' && window.BlockUtils && typeof window.BlockUtils.t === 'function'){
+    return window.BlockUtils.t(key);
+  }
+  return obj[prop] == null ? '' : String(obj[prop]);
+}
+
 // el(tag, { className, id, text, html, attrs, style, on, children })
 export function el(tag, opts){
   const e = document.createElement(tag);
@@ -83,13 +105,13 @@ export function toast(msg, type){
 // Styled confirm() replacement. Returns Promise<boolean>; falls back to native confirm().
 export function confirmDialog(opts){
   if(typeof document === 'undefined' || !document.body){
-    return Promise.resolve(window.confirm(opts && opts.message ? opts.message : 'OK?'));
+    return Promise.resolve(window.confirm(opts && opts.message ? opts.message : t('util.confirmDialog.fallbackMessage')));
   }
   const {
     title = '',
     message = '',
-    confirmLabel = 'OK',
-    cancelLabel = 'Abbrechen',
+    confirmLabel = t('common.ok'),
+    cancelLabel = t('common.cancel'),
     danger = false
   } = opts || {};
   return new Promise(resolve => {
@@ -139,8 +161,8 @@ export function formDialog(opts){
     title = '',
     message = '',
     fields = [],
-    confirmLabel = 'Speichern',
-    cancelLabel = 'Abbrechen'
+    confirmLabel = t('common.save'),
+    cancelLabel = t('common.cancel')
   } = opts || {};
   return new Promise(resolve => {
     const prevFocus = document.activeElement;

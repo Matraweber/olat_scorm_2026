@@ -2,8 +2,11 @@
   'use strict';
   Blocks.register('number-base', {
     label: 'Zahlensysteme (Bin/Dez/Hex)',
+    labelKey: 'block.number-base.label',
     description: 'Umrechnung zwischen Binär, Oktal, Dezimal und Hexadezimal.',
+    descKey: 'block.number-base.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: '0x',
     graded: true,
     defaultConfig(){
@@ -16,56 +19,75 @@
         maxPoints: 1
       };
     },
-    summary(){ return 'Zahlensystem-Umrechnung'; },
+    summary(){
+      const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
+      return t('block.number-base.summary');
+    },
     builderSchema(){
       const baseOpts = [
-        {value:'bin', label:'Binär (Basis 2)'},
-        {value:'oct', label:'Oktal (Basis 8)'},
-        {value:'dec', label:'Dezimal (Basis 10)'},
-        {value:'hex', label:'Hexadezimal (Basis 16)'}
+        {value:'bin', label:'Binär (Basis 2)',      labelKey:'block.number-base.field.from.option.bin'},
+        {value:'oct', label:'Oktal (Basis 8)',      labelKey:'block.number-base.field.from.option.oct'},
+        {value:'dec', label:'Dezimal (Basis 10)',   labelKey:'block.number-base.field.from.option.dec'},
+        {value:'hex', label:'Hexadezimal (Basis 16)', labelKey:'block.number-base.field.from.option.hex'}
+      ];
+      const baseOptsTo = [
+        {value:'bin', label:'Binär (Basis 2)',      labelKey:'block.number-base.field.to.option.bin'},
+        {value:'oct', label:'Oktal (Basis 8)',      labelKey:'block.number-base.field.to.option.oct'},
+        {value:'dec', label:'Dezimal (Basis 10)',   labelKey:'block.number-base.field.to.option.dec'},
+        {value:'hex', label:'Hexadezimal (Basis 16)', labelKey:'block.number-base.field.to.option.hex'}
       ];
       const presetOpts = [
-        {value:'custom', label:'Eigene Richtungen'},
-        {value:'standard', label:'Standardmix'},
-        {value:'all-decimal', label:'Alle von/nach Dezimal'},
-        {value:'dec-bin', label:'Dezimal → Binär'},
-        {value:'bin-dec', label:'Binär → Dezimal'},
-        {value:'dec-hex', label:'Dezimal → Hex'},
-        {value:'hex-dec', label:'Hex → Dezimal'},
-        {value:'bin-hex', label:'Binär ↔ Hex'}
+        {value:'custom',      label:'Eigene Richtungen',   labelKey:'block.number-base.field.directionPreset.option.custom'},
+        {value:'standard',    label:'Standardmix',         labelKey:'block.number-base.field.directionPreset.option.standard'},
+        {value:'all-decimal', label:'Alle von/nach Dezimal', labelKey:'block.number-base.field.directionPreset.option.all-decimal'},
+        {value:'dec-bin',     label:'Dezimal → Binär',     labelKey:'block.number-base.field.directionPreset.option.dec-bin'},
+        {value:'bin-dec',     label:'Binär → Dezimal',     labelKey:'block.number-base.field.directionPreset.option.bin-dec'},
+        {value:'dec-hex',     label:'Dezimal → Hex',       labelKey:'block.number-base.field.directionPreset.option.dec-hex'},
+        {value:'hex-dec',     label:'Hex → Dezimal',       labelKey:'block.number-base.field.directionPreset.option.hex-dec'},
+        {value:'bin-hex',     label:'Binär ↔ Hex',         labelKey:'block.number-base.field.directionPreset.option.bin-hex'}
       ];
       const BASE_LABEL = { bin:'Binär', oct:'Oktal', dec:'Dezimal', hex:'Hex' };
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Zahlensysteme' },
-        { key:'directionPreset', label:'Umrechnungs-Preset', type:'select', options: presetOpts },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.number-base.field.blockTitle.label', type:'text', placeholder:'Zahlensysteme', placeholderKey:'block.number-base.field.blockTitle.placeholder' },
+        { key:'directionPreset', label:'Umrechnungs-Preset', labelKey:'block.number-base.field.directionPreset.label', type:'select', options: presetOpts },
         // Directions (only when "Custom directions" is selected)
-        { type:'section', label:'Erlaubte Umrechnungs-Richtungen', key:'_sec_dir',
+        { type:'section', label:'Erlaubte Umrechnungs-Richtungen', labelKey:'block.number-base.field.sectionDirections.label', key:'_sec_dir',
           showIf: c => (c.directionPreset || 'standard') === 'custom' },
-        { key:'directions', label:'Richtungen', type:'list', itemLabel:'Richtung',
+        { key:'directions', label:'Richtungen', labelKey:'block.number-base.field.directions.label', type:'list', itemLabel:'Richtung', itemLabelKey:'block.number-base.field.directions.itemLabel',
           showIf: c => (c.directionPreset || 'standard') === 'custom',
           itemSummary: item => (BASE_LABEL[item.from] || item.from || '?') + '  →  ' + (BASE_LABEL[item.to] || item.to || '?'),
           itemSchema:[
-            { key:'from', label:'Von',  type:'select', options: baseOpts },
-            { key:'to',   label:'Nach', type:'select', options: baseOpts }
+            { key:'from', label:'Von',  labelKey:'block.number-base.field.from.label',  type:'select', options: baseOpts },
+            { key:'to',   label:'Nach', labelKey:'block.number-base.field.to.label', type:'select', options: baseOptsTo }
           ]},
         // Settings & scoring
-        { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
-        { key:'valueRange', label:'Wertebereich (dezimal)', type:'group', schema:[
-          { key:'min', label:'von', type:'number', step:1 },
-          { key:'max', label:'bis', type:'number', step:1 }
+        { type:'section', label:'Einstellungen & Bewertung', labelKey:'block.number-base.field.sectionSettings.label', key:'_sec_opts' },
+        { key:'valueRange', label:'Wertebereich (dezimal)', labelKey:'block.number-base.field.valueRange.label', type:'group', schema:[
+          { key:'min', label:'von', labelKey:'block.number-base.field.valueRange.min.label', type:'number', step:1 },
+          { key:'max', label:'bis', labelKey:'block.number-base.field.valueRange.max.label', type:'number', step:1 }
         ]},
-        { key:'randomize', label:'Richtung zufällig wählen', type:'boolean' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        { key:'randomize', label:'Richtung zufällig wählen', labelKey:'block.number-base.field.randomize.label', type:'boolean' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.number-base.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
       const u = api.utils;
-      const baseLabels = {bin:'Binär', oct:'Oktal', dec:'Dezimal', hex:'Hexadezimal'};
+      const baseLabels = {
+        bin: u.t('block.number-base.base.bin'),
+        oct: u.t('block.number-base.base.oct'),
+        dec: u.t('block.number-base.base.dec'),
+        hex: u.t('block.number-base.base.hex')
+      };
       const baseRadix  = {bin:2, oct:8, dec:10, hex:16};
       let current = null;
 
-      const ui = u.questionCard(host, { h3: config.blockTitle || 'Aufgabe', qBoxTitle:'Frage', inputLabel:'Antwort', inputPlaceholder:'Antwort eingeben' });
+      const ui = u.questionCard(host, {
+        h3: u.l(config.blockTitle) || u.t('common.task'),
+        qBoxTitle: u.t('common.question'),
+        inputLabel: u.t('common.answer'),
+        inputPlaceholder: u.t('common.answerPlaceholder')
+      });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
 
       function buildInstance(){
@@ -86,17 +108,21 @@
         for(let i = 0; current && sameInstance(next, current) && i < 30; i++) next = buildInstance();
         current = next;
         inp.value = '';
-        qText.innerHTML = 'Wandeln Sie <strong>' + current.fromStr + '</strong> aus <em>' + baseLabels[current.dir.from] + '</em> nach <em>' + baseLabels[current.dir.to] + '</em> um.';
-        if(showMsg) fb.neutral('Neue Aufgabe generiert.');
+        qText.innerHTML = u.t('block.number-base.instruction', {
+          value: current.fromStr,
+          from: baseLabels[current.dir.from],
+          to: baseLabels[current.dir.to]
+        });
+        if(showMsg) fb.neutral(u.t('block.number-base.newTaskGenerated'));
       }
       function grade(){
         const cleaned = String(inp.value || '').trim().toUpperCase().replace(/^0X/, '').replace(/^0B/, '').replace(/\s+/g, '');
-        if(!cleaned){ fb.bad('Bitte eine Antwort eingeben.'); return; }
+        if(!cleaned){ fb.bad(u.t('block.number-base.enterAnswer')); return; }
         const valid = {bin:/^[01]+$/, oct:/^[0-7]+$/, dec:/^[0-9]+$/, hex:/^[0-9A-F]+$/}[current.dir.to];
-        if(!valid.test(cleaned)){ fb.bad('Ungültige Zeichen für ' + baseLabels[current.dir.to] + '.'); return; }
+        if(!valid.test(cleaned)){ fb.bad(u.t('block.number-base.invalidChars', { base: baseLabels[current.dir.to] })); return; }
         const parsed = parseInt(cleaned, baseRadix[current.dir.to]);
-        if(parsed === current.valueDec){ fb.ok('Korrekt.'); api.reportScore(config.maxPoints || 1); }
-        else { fb.bad('Nicht korrekt. Richtige Antwort: ' + current.toStr); api.reportScore(0); }
+        if(parsed === current.valueDec){ fb.ok(u.t('common.correct')); api.reportScore(config.maxPoints || 1); }
+        else { fb.bad(u.t('block.number-base.incorrectWithAnswer', { answer: current.toStr })); api.reportScore(0); }
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', () => chooseNew(true));
@@ -107,9 +133,14 @@
     },
     preview(host, config){
       const u = window.BlockUtils;
-      const baseLabels = {bin:'Binär (₂)', oct:'Oktal (₈)', dec:'Dezimal (₁₀)', hex:'Hex (₁₆)'};
+      const baseLabels = {
+        bin: u.t('block.number-base.baseShort.bin'),
+        oct: u.t('block.number-base.baseShort.oct'),
+        dec: u.t('block.number-base.baseShort.dec'),
+        hex: u.t('block.number-base.baseShort.hex')
+      };
       const baseRadix = {bin:2, oct:8, dec:10, hex:16};
-      const wrap = u.tagPreview(host, { icon:'0x', label:'Zahlensystem-Umrechnung', fillHeight:true });
+      const wrap = u.tagPreview(host, { icon:'0x', label: u.t('block.number-base.previewLabel'), fillHeight:true });
       // Show example
       const dirs = directionList(config);
       const dir = dirs[0];
@@ -123,7 +154,7 @@
       wrap.appendChild(ex);
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872; margin-top:0.3rem;';
-      hint.textContent = dirs.length + ' Richtung(en) im Pool, Werte ' + min + ' bis ' + max;
+      hint.textContent = u.t('block.number-base.previewHint', { count: dirs.length, min: min, max: max });
       wrap.appendChild(hint);
     }
   });

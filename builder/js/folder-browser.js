@@ -3,6 +3,7 @@
 import { el, toast } from './util.js';
 import { loadZipFile, getLoadedHandle, saveToLoadedHandle } from './io.js';
 import { isCourseDirty } from './state.js';
+import { t, getLocale } from './i18n.js';
 
 // Tree node: { name, kind:'dir'|'file', handle?, file?, path, parent, children?, expanded? }
 let root = null;
@@ -34,9 +35,9 @@ export async function pickFolder(){
       await persistHandle(handle).catch(() => {});
       dropdownOpen = true;
       renderDropdown();
-      toast('Ordner „' + handle.name + '" geöffnet.');
+      toast(t('folder.toast.opened', { name: handle.name }));
     } catch(e){
-      if(e && e.name !== 'AbortError') toast('Ordner konnte nicht geöffnet werden: ' + e.message, 'error');
+      if(e && e.name !== 'AbortError') toast(t('folder.toast.openFailed', { msg: e.message }), 'error');
     }
     return;
   }
@@ -53,7 +54,7 @@ export async function pickFolder(){
     root = buildTreeFromFiles(files);
     dropdownOpen = true;
     renderDropdown();
-    toast('Ordner „' + root.name + '" geöffnet.');
+    toast(t('folder.toast.opened', { name: root.name }));
   });
   document.body.appendChild(inp);
   inp.click();
@@ -237,9 +238,10 @@ function buildTreeFromFiles(files){
 function sortChildren(node){
   if(!node.children) return;
   // Dirs first, then files; alphabetical within each.
+  const locale = getLocale();
   node.children.sort((a, b) => {
     if(a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
-    return a.name.localeCompare(b.name, 'de');
+    return a.name.localeCompare(b.name, locale);
   });
 }
 
@@ -253,7 +255,7 @@ async function openFileEntry(entry){
     } else if(entry.file){
       file = entry.file;
     } else {
-      toast('Datei konnte nicht gelesen werden.', 'error');
+      toast(t('folder.toast.fileReadFailed'), 'error');
       return;
     }
     // Before switching units, write the currently-loaded unit back to its own
@@ -270,7 +272,7 @@ async function openFileEntry(entry){
     markActive(entry.path);
     // Keep open so author can switch between sibling ZIPs.
   } catch(e){
-    toast('Fehler beim Laden: ' + e.message, 'error');
+    toast(t('folder.toast.loadFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -312,8 +314,8 @@ function renderDropdown(){
   head.appendChild(title);
   const closeBtn = el('button', {
     className:'folder-dropdown-close icon-btn',
-    attrs:{ type:'button', title:'Ordner schließen (vergisst den Pfad)',
-      'aria-label':'Ordner schließen' },
+    attrs:{ type:'button', title: t('folder.close.title'),
+      'aria-label': t('folder.close.ariaLabel') },
     text:'×'
   });
   closeBtn.addEventListener('click', e => { e.stopPropagation(); closeFolder(); });
@@ -328,8 +330,8 @@ function renderDropdown(){
   // Footer hint
   const hint = el('div', { className:'folder-dropdown-hint',
     text: SUPPORTS_FS_ACCESS
-      ? 'Datei klicken zum Laden. Bleibt offen, bis Sie woanders klicken.'
-      : 'Read-only (Browser ohne File-System-API).' });
+      ? t('folder.hint.click')
+      : t('folder.hint.readOnly') });
   host.appendChild(hint);
 
   document.body.appendChild(host);

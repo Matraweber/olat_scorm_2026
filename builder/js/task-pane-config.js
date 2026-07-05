@@ -1,11 +1,38 @@
 // task-pane-config.js: Right-hand config pane: empty | multi-select | single-block form.
-import { el } from './util.js';
-import { pushHistoryDebounced, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
+import { el, tProp } from './util.js';
+import { pushHistoryDebounced, takeHistorySnap, commitHistorySnap, discardHistorySnap, getEditorLocale, setEditorLocale, renderActivePane } from './state.js';
 import { renderField } from './form.js';
 import { validateBlock } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { bulkAlign, bulkDistribute, bulkDuplicate, bulkDelete } from './task-pane-bulk.js';
 import { BLOCK_HELP } from './block-help.js';
+import { t, availableLocales, localeMeta } from './i18n.js';
+
+// Small toggle at the top of the block-config pane so the author can switch
+// which content locale they are currently editing. Shown only when at least
+// two locale bundles are registered.
+function renderEditorLocaleToggle(){
+  const codes = availableLocales();
+  if(codes.length < 2) return el('span');
+  const wrap = el('div', { className: 'editor-locale-toggle' });
+  wrap.appendChild(el('span', { className: 'editor-locale-toggle-label', text: t('taskPane.config.editorLocale.label') }));
+  const cur = getEditorLocale();
+  codes.forEach(code => {
+    const meta = localeMeta(code);
+    const btn = el('button', {
+      className: 'editor-locale-btn' + (code === cur ? ' active' : ''),
+      attrs: { type: 'button', title: meta.name || code },
+      text: meta.label || code.toUpperCase()
+    });
+    btn.addEventListener('click', () => {
+      if(code === getEditorLocale()) return;
+      setEditorLocale(code);
+      renderActivePane();
+    });
+    wrap.appendChild(btn);
+  });
+  return wrap;
+}
 
 const HELP_COLLAPSED_KEY = 'scorm-builder-block-help-collapsed';
 
@@ -39,7 +66,7 @@ function renderBlockHelp(blockType){
   const toggle = el('button', {
     className: 'block-help-toggle',
     attrs: { type: 'button', 'aria-expanded': String(!collapsed) },
-    html: '<span class="block-help-caret" aria-hidden="true"></span>Was ist das?'
+    html: '<span class="block-help-caret" aria-hidden="true"></span>' + t('taskPane.config.help.toggle')
   });
   box.appendChild(toggle);
 
@@ -47,7 +74,7 @@ function renderBlockHelp(blockType){
   body.appendChild(el('p', { className: 'block-help-summary', text: help.summary }));
 
   if(help.steps && help.steps.length){
-    body.appendChild(el('div', { className: 'block-help-head', text: 'Schritte' }));
+    body.appendChild(el('div', { className: 'block-help-head', text: t('taskPane.config.help.stepsHead') }));
     const ol = el('ol', { className: 'block-help-list' });
     help.steps.forEach(s => {
       const li = document.createElement('li');
@@ -57,7 +84,7 @@ function renderBlockHelp(blockType){
     body.appendChild(ol);
   }
   if(help.tips && help.tips.length){
-    body.appendChild(el('div', { className: 'block-help-head', text: 'Tipps' }));
+    body.appendChild(el('div', { className: 'block-help-head', text: t('taskPane.config.help.tipsHead') }));
     const ul = el('ul', { className: 'block-help-list' });
     help.tips.forEach(t => {
       const li = document.createElement('li');
@@ -78,8 +105,12 @@ function renderBlockHelp(blockType){
 }
 
 export function posLabel(b){
-  return 'Position ' + Math.round(b.pos.x) + ', ' + Math.round(b.pos.y) +
-         ' · Größe ' + Math.round(b.pos.w) + '×' + Math.round(b.pos.h);
+  return t('taskPane.config.posLabel', {
+    x: Math.round(b.pos.x),
+    y: Math.round(b.pos.y),
+    w: Math.round(b.pos.w),
+    h: Math.round(b.pos.h)
+  });
 }
 
 export function renderConfigPane(ctx){
@@ -90,8 +121,8 @@ export function renderConfigPane(ctx){
   if(selBlocks.length === 0){
     configHost.appendChild(el('div', {
       className: 'block-config-empty',
-      html: 'Wählen Sie einen Block auf der Canvas, um ihn zu bearbeiten.' +
-            '<br><span class="block-config-empty-hint"><kbd>?</kbd> öffnet alle Tastaturkürzel.</span>'
+      html: t('taskPane.config.empty.prompt') +
+            '<br><span class="block-config-empty-hint">' + t('taskPane.config.empty.shortcutHint') + '</span>'
     }));
     return;
   }
@@ -107,21 +138,21 @@ export function renderConfigPane(ctx){
 function renderMultiSelectPane(ctx, selBlocks){
   const { configHost } = ctx;
   const head = el('div', {className:'block-config-head'});
-  head.appendChild(el('h3', {html: 'Mehrfachauswahl <span class="multi-count-badge">' + selBlocks.length + '</span>'}));
+  head.appendChild(el('h3', {html: t('taskPane.config.multi.title') + ' <span class="multi-count-badge">' + selBlocks.length + '</span>'}));
   configHost.appendChild(head);
-  configHost.appendChild(el('div', {className:'field-help', text:'Aktion für alle markierten Blöcke wählen.'}));
+  configHost.appendChild(el('div', {className:'field-help', text: t('taskPane.config.multi.hint')}));
 
   const actions = el('div', {className:'bulk-actions'});
 
   const alignRow = el('div', {className:'bulk-row'});
-  alignRow.appendChild(el('strong', {text:'Ausrichten'}));
+  alignRow.appendChild(el('strong', {text: t('taskPane.config.multi.alignHead')}));
   [
-    {label:'⟸ Links',   fn:()=>bulkAlign(ctx, 'left')},
-    {label:'⇔ Mitte X', fn:()=>bulkAlign(ctx, 'cx')},
-    {label:'Rechts ⟹', fn:()=>bulkAlign(ctx, 'right')},
-    {label:'⤒ Oben',   fn:()=>bulkAlign(ctx, 'top')},
-    {label:'⇕ Mitte Y', fn:()=>bulkAlign(ctx, 'cy')},
-    {label:'Unten ⤓',  fn:()=>bulkAlign(ctx, 'bottom')}
+    {label: t('taskPane.config.multi.alignLeft'),   fn:()=>bulkAlign(ctx, 'left')},
+    {label: t('taskPane.config.multi.alignCenterX'), fn:()=>bulkAlign(ctx, 'cx')},
+    {label: t('taskPane.config.multi.alignRight'), fn:()=>bulkAlign(ctx, 'right')},
+    {label: t('taskPane.config.multi.alignTop'),   fn:()=>bulkAlign(ctx, 'top')},
+    {label: t('taskPane.config.multi.alignCenterY'), fn:()=>bulkAlign(ctx, 'cy')},
+    {label: t('taskPane.config.multi.alignBottom'),  fn:()=>bulkAlign(ctx, 'bottom')}
   ].forEach(a => {
     const b = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:a.label});
     b.addEventListener('click', a.fn);
@@ -131,20 +162,20 @@ function renderMultiSelectPane(ctx, selBlocks){
 
   if(selBlocks.length >= 3){
     const distRow = el('div', {className:'bulk-row'});
-    distRow.appendChild(el('strong', {text:'Verteilen (gleicher Abstand)'}));
-    const dh = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Horizontal'});
+    distRow.appendChild(el('strong', {text: t('taskPane.config.multi.distributeHead')}));
+    const dh = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: t('taskPane.config.multi.distributeHorizontal')});
     dh.addEventListener('click', () => bulkDistribute(ctx, 'h'));
-    const dv = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Vertikal'});
+    const dv = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: t('taskPane.config.multi.distributeVertical')});
     dv.addEventListener('click', () => bulkDistribute(ctx, 'v'));
     distRow.appendChild(dh); distRow.appendChild(dv);
     actions.appendChild(distRow);
   }
 
   const commonRow = el('div', {className:'bulk-row'});
-  commonRow.appendChild(el('strong', {text:'Aktionen'}));
-  const dupAll = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'⧉ Duplizieren'});
+  commonRow.appendChild(el('strong', {text: t('taskPane.config.multi.actionsHead')}));
+  const dupAll = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: t('taskPane.config.multi.duplicate')});
   dupAll.addEventListener('click', () => bulkDuplicate(ctx));
-  const delAll = el('button', {className:'btn btn-danger btn-sm', attrs:{type:'button'}, text:'✕ Löschen'});
+  const delAll = el('button', {className:'btn btn-danger btn-sm', attrs:{type:'button'}, text: t('taskPane.config.multi.delete')});
   delAll.addEventListener('click', () => bulkDelete(ctx));
   commonRow.appendChild(dupAll); commonRow.appendChild(delAll);
   actions.appendChild(commonRow);
@@ -155,17 +186,18 @@ function renderSingleBlockPane(ctx, sel){
   const { configHost } = ctx;
   const def = window.Blocks.get(sel.type);
   const headBlock = el('div', {className:'block-config-head'});
-  headBlock.appendChild(el('h3', {text: 'Konfiguration: ' + ((def && def.label) || sel.type)}));
+  headBlock.appendChild(el('h3', {text: t('taskPane.config.single.title', { label: (def && tProp(def, 'label')) || sel.type })}));
   const meta = el('span', {className:'block-config-meta', text: posLabel(sel)});
   headBlock.appendChild(meta);
   configHost.appendChild(headBlock);
+  configHost.appendChild(renderEditorLocaleToggle());
 
   if(!def){
-    configHost.appendChild(el('div', {className:'block-edit-error', text: 'Block-Typ "' + sel.type + '" ist nicht registriert.'}));
+    configHost.appendChild(el('div', {className:'block-edit-error', text: t('taskPane.config.single.unknownType', { type: sel.type })}));
     return;
   }
 
-  if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig() : {};
+  if(!sel.config) sel.config = def.defaultConfig ? def.defaultConfig(getEditorLocale()) : {};
 
   const helpBox = renderBlockHelp(sel.type);
   if(helpBox) configHost.appendChild(helpBox);
@@ -181,7 +213,7 @@ function renderSingleBlockPane(ctx, sel){
     if(action === 'reset'){
       // Snapshot before the mutation so a single Ctrl+Z reverts it.
       pushHistoryDebounced();
-      sel.config = def.defaultConfig ? def.defaultConfig() : {};
+      sel.config = def.defaultConfig ? def.defaultConfig(getEditorLocale()) : {};
       ctx.scheduleBlockPreviewRefresh(sel);
       renderTaskList();
       renderConfigPane(ctx);
@@ -215,7 +247,7 @@ function renderSingleBlockPane(ctx, sel){
 
   const schema = def.builderSchema ? def.builderSchema() : [];
   if(schema.length === 0){
-    configHost.appendChild(el('div', {className:'field-help', text:'Dieser Block hat keine Konfiguration.'}));
+    configHost.appendChild(el('div', {className:'field-help', text: t('taskPane.config.single.noSchema')}));
   } else {
     const topConditionals = [];
     function evalTopConditionals(){
@@ -237,8 +269,8 @@ function renderSingleBlockPane(ctx, sel){
   const warnings = validateBlock(sel);
   if(warnings.length > 0){
     const box = el('div', {className:'config-warnings'});
-    box.appendChild(el('div', {className:'config-warnings-title', text:'Hinweise (' + warnings.length + ')'}));
-    warnings.forEach(w => box.appendChild(el('div', {className:'config-warnings-item', text:'• ' + w})));
+    box.appendChild(el('div', {className:'config-warnings-title', text: t('taskPane.config.warnings.title', { n: warnings.length })}));
+    warnings.forEach(w => box.appendChild(el('div', {className:'config-warnings-item', text: t('taskPane.config.warnings.item', { msg: w })})));
     configHost.appendChild(box);
   }
 }

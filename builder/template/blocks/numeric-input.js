@@ -1,17 +1,20 @@
 (function(){
   'use strict';
   const PRESET_OPTIONS = [
-    {value:'custom',         label:'Manuell (leer)'},
-    {value:'pythagoras',     label:'Beispiel: Pythagoras (c = √(a²+b²))'},
-    {value:'rectangle-area', label:'Beispiel: Rechteckfläche (A = a·b)'},
-    {value:'circle-area',    label:'Beispiel: Kreisfläche (A = π·r²)'},
-    {value:'ohm',            label:'Beispiel: Ohmsches Gesetz (U = R·I)'}
+    {value:'custom',         label:'Manuell (leer)',                            labelKey:'block.numeric-input.field.preset.option.custom'},
+    {value:'pythagoras',     label:'Beispiel: Pythagoras (c = √(a²+b²))',       labelKey:'block.numeric-input.field.preset.option.pythagoras'},
+    {value:'rectangle-area', label:'Beispiel: Rechteckfläche (A = a·b)',       labelKey:'block.numeric-input.field.preset.option.rectangle-area'},
+    {value:'circle-area',    label:'Beispiel: Kreisfläche (A = π·r²)',         labelKey:'block.numeric-input.field.preset.option.circle-area'},
+    {value:'ohm',            label:'Beispiel: Ohmsches Gesetz (U = R·I)',       labelKey:'block.numeric-input.field.preset.option.ohm'}
   ];
 
   Blocks.register('numeric-input', {
     label: 'Numerische Eingabe',
+    labelKey: 'block.numeric-input.label',
     description: 'Numerische Frage mit Zufallsvariablen und Lösungs-Formel.',
+    descKey: 'block.numeric-input.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: '#',
     graded: true,
     defaultConfig(){
@@ -27,22 +30,32 @@
         maxPoints: 1
       };
     },
-    summary(cfg){ return cfg.questionTemplate || '(Frage leer)'; },
+    summary(cfg){
+      const u = window.BlockUtils;
+      const empty = (u && typeof u.t === 'function') ? u.t('block.numeric-input.summary.empty') : '(Frage leer)';
+      return cfg.questionTemplate || empty;
+    },
     validate(cfg){
       if(cfg.preset && cfg.preset !== 'custom') return [];
+      const u = window.BlockUtils;
+      const t = (key, fallback, params) => (u && typeof u.t === 'function') ? u.t(key, params) : fallback;
       const w = [];
-      if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push('Frage-Vorlage fehlt.');
-      if(!cfg.formula || !String(cfg.formula).trim()) w.push('Lösungsformel fehlt.');
+      if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push(t('block.numeric-input.validate.templateMissing', 'Frage-Vorlage fehlt.'));
+      if(!cfg.formula || !String(cfg.formula).trim()) w.push(t('block.numeric-input.validate.formulaMissing', 'Lösungsformel fehlt.'));
       // Variable names must be ASCII identifiers. The substitution regex
       // and the math evaluator both reject non-ASCII names, so reject early.
       (cfg.variables || []).forEach((v, i) => {
         if(!v || !v.name) return;
         if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(v.name)){
-          w.push('Variable ' + (i + 1) + ' („' + v.name + '"): Name darf nur Buchstaben (a-z, A-Z), Ziffern und Unterstrich enthalten.');
+          w.push(t('block.numeric-input.validate.varNameInvalid',
+            'Variable ' + (i + 1) + ' („' + v.name + '"): Name darf nur Buchstaben (a-z, A-Z), Ziffern und Unterstrich enthalten.',
+            { index: i + 1, name: v.name }));
         }
         const lo = Number(v.min), hi = Number(v.max);
         if(isFinite(lo) && isFinite(hi) && lo > hi){
-          w.push('Variable „' + v.name + '": Min (' + lo + ') ist größer als Max (' + hi + ').');
+          w.push(t('block.numeric-input.validate.varRangeInverted',
+            'Variable „' + v.name + '": Min (' + lo + ') ist größer als Max (' + hi + ').',
+            { name: v.name, min: lo, max: hi }));
         }
       });
       // Monte Carlo check: catches 0 under a fraction bar, sqrt(-x), log(0) before export.
@@ -64,17 +77,23 @@
         }
         const ratio = invalid / SAMPLES;
         if(ratio === 1){
-          w.push('Formel ergibt mit den aktuellen Variablenbereichen IMMER ein ungültiges Ergebnis (z. B. Division durch 0, Wurzel aus Negativem). Formel oder Bereiche anpassen.');
+          w.push(t('block.numeric-input.validate.formulaAlwaysInvalid',
+            'Formel ergibt mit den aktuellen Variablenbereichen IMMER ein ungültiges Ergebnis (z. B. Division durch 0, Wurzel aus Negativem). Formel oder Bereiche anpassen.'));
         } else if(ratio >= 0.2){
-          w.push('Formel scheitert in ' + Math.round(ratio * 100) + '% der Stichproben (z. B. Division durch 0). Variablenbereich enger fassen oder Formel anpassen.');
+          w.push(t('block.numeric-input.validate.formulaOftenInvalid',
+            'Formel scheitert in ' + Math.round(ratio * 100) + '% der Stichproben (z. B. Division durch 0). Variablenbereich enger fassen oder Formel anpassen.',
+            { pct: Math.round(ratio * 100) }));
         }
       }
       return w;
     },
     previewConfig(){
+      const u = window.BlockUtils || {};
+      const locale = (u.getLocale && u.getLocale()) || 'de';
+      const en = locale === 'en';
       return {
         blockTitle: '', preset: 'custom',
-        questionTemplate: 'Wie viel ist {a} + {b}?',
+        questionTemplate: en ? 'How much is {a} + {b}?' : 'Wie viel ist {a} + {b}?',
         variables: [
           { name: 'a', min: 1, max: 10, step: 1 },
           { name: 'b', min: 1, max: 10, step: 1 }
@@ -85,14 +104,14 @@
     builderSchema(){
       const isCustom = c => (c.preset || 'custom') === 'custom';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Numerische Eingabe' },
-        { key:'preset', label:'Vorlage', type:'select', options: PRESET_OPTIONS,
-          help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.' },
-        { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.numeric-input.field.blockTitle.label', type:'text', placeholder:'Numerische Eingabe', placeholderKey:'block.numeric-input.field.blockTitle.placeholder' },
+        { key:'preset', label:'Vorlage', labelKey:'block.numeric-input.field.preset.label', type:'select', options: PRESET_OPTIONS,
+          help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.', helpKey:'block.numeric-input.field.preset.help' },
+        { type:'action', label:'↺ Zurücksetzen', labelKey:'block.numeric-input.field.reset.label', action:'reset', showIf: isCustom },
         // Question
-        { type:'section', label:'Frage', key:'_sec_q' },
-        { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {name})', type:'math-textarea', rows:2, showIf: isCustom,
-          help:'Beispiel: „Berechnen Sie {a} + {b}." Variablen werden beim Start zufällig belegt. Die Lösungs-Formel wird automatisch abgeleitet.',
+        { type:'section', label:'Frage', labelKey:'block.numeric-input.field.sectionQuestion.label', key:'_sec_q' },
+        { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {name})', labelKey:'block.numeric-input.field.questionTemplate.label', type:'math-textarea', rows:2, showIf: isCustom,
+          help:'Beispiel: „Berechnen Sie {a} + {b}." Variablen werden beim Start zufällig belegt. Die Lösungs-Formel wird automatisch abgeleitet.', helpKey:'block.numeric-input.field.questionTemplate.help',
           onChange: (val, cfg, set) => {
             // Auto-derive the formula unless the user has edited it.
             const derived = deriveFormula(val);
@@ -107,8 +126,8 @@
             }
           } },
         // Variables
-        { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
-        { key:'variables', label:'Variablen', type:'list', itemLabel:'Variable',
+        { type:'section', label:'Zufallsvariablen', labelKey:'block.numeric-input.field.sectionVariables.label', key:'_sec_vars' },
+        { key:'variables', label:'Variablen', labelKey:'block.numeric-input.field.variables.label', type:'list', itemLabel:'Variable', itemLabelKey:'block.numeric-input.field.variables.itemLabel',
           showIf: isCustom,
           itemSummary: item => {
             if(!item.name) return '…';
@@ -116,45 +135,50 @@
             return item.name + ':  ' + range + (item.integer ? '  (ganz)' : '');
           },
           itemSchema:[
-            { key:'name',    label:'Name',           type:'text',    placeholder:'z. B. a' },
-            { key:'min',     label:'von',             type:'number',  step:'any',
+            { key:'name',    label:'Name',           labelKey:'block.numeric-input.field.variables.item.name.label',    type:'text',    placeholder:'z. B. a', placeholderKey:'block.numeric-input.field.variables.item.name.placeholder' },
+            { key:'min',     label:'von',            labelKey:'block.numeric-input.field.variables.item.min.label',     type:'number',  step:'any',
               onChange:(val, item, set) => {
                 // Lower bound exceeds upper: raise upper alongside.
                 if(val != null && item.max != null && val > item.max) set('max', val);
               }},
-            { key:'max',     label:'bis',             type:'number',  step:'any',
+            { key:'max',     label:'bis',            labelKey:'block.numeric-input.field.variables.item.max.label',     type:'number',  step:'any',
               onChange:(val, item, set) => {
                 // Upper bound below lower: lower the lower bound alongside.
                 if(val != null && item.min != null && val < item.min) set('min', val);
               }},
-            { key:'integer', label:'Nur Ganzzahlen',  type:'boolean' }
+            { key:'integer', label:'Nur Ganzzahlen', labelKey:'block.numeric-input.field.variables.item.integer.label', type:'boolean' }
           ]},
         // Solution
-        { type:'section', label:'Lösung', key:'_sec_formula' },
-        { key:'formula', label:'Lösungs-Formel', type:'formula-text', placeholder:'sqrt(a^2 + b^2)', showIf: isCustom,
-          help:'Wird automatisch aus der Frage abgeleitet. Bei Bedarf manuell überschreiben.' },
-        { key:'tolerance', label:'Toleranz  (±)', type:'number', step:'any',
-          help:'Abweichung, die noch als korrekt gilt. 0 = exakt.' },
-        { key:'unit', label:'Antwort-Einheit (optional)', type:'text', placeholder:'z. B. m/s oder kg',
-          help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehört in den Fragetext.' },
-        { key:'simplifyFractions', label:'Term vereinfachen', type:'boolean',
-          help:'Aktiv: Studierende müssen den gekürzten Bruch eingeben. „10/20" wird als falsch gewertet, „1/2" ist korrekt. Aus: alle äquivalenten Eingaben werden akzeptiert.' },
+        { type:'section', label:'Lösung', labelKey:'block.numeric-input.field.sectionSolution.label', key:'_sec_formula' },
+        { key:'formula', label:'Lösungs-Formel', labelKey:'block.numeric-input.field.formula.label', type:'formula-text', placeholder:'sqrt(a^2 + b^2)', placeholderKey:'block.numeric-input.field.formula.placeholder', showIf: isCustom,
+          help:'Wird automatisch aus der Frage abgeleitet. Bei Bedarf manuell überschreiben.', helpKey:'block.numeric-input.field.formula.help' },
+        { key:'tolerance', label:'Toleranz  (±)', labelKey:'block.numeric-input.field.tolerance.label', type:'number', step:'any',
+          help:'Abweichung, die noch als korrekt gilt. 0 = exakt.', helpKey:'block.numeric-input.field.tolerance.help' },
+        { key:'unit', label:'Antwort-Einheit (optional)', labelKey:'block.numeric-input.field.unit.label', type:'text', placeholder:'z. B. m/s oder kg', placeholderKey:'block.numeric-input.field.unit.placeholder',
+          help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehört in den Fragetext.', helpKey:'block.numeric-input.field.unit.help' },
+        { key:'simplifyFractions', label:'Term vereinfachen', labelKey:'block.numeric-input.field.simplifyFractions.label', type:'boolean',
+          help:'Aktiv: Studierende müssen den gekürzten Bruch eingeben. „10/20" wird als falsch gewertet, „1/2" ist korrekt. Aus: alle äquivalenten Eingaben werden akzeptiert.', helpKey:'block.numeric-input.field.simplifyFractions.help' },
         // Scoring
-        { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        { type:'section', label:'Bewertung', labelKey:'block.numeric-input.field.sectionScoring.label', key:'_sec_score' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.numeric-input.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
       const u = api.utils;
       let current = null;
-      const activeConfig = numericPresetConfig(config);
+      const locale = (u && u.getLocale && u.getLocale()) || 'de';
+      const activeConfig = numericPresetConfig(config, locale);
+      const unitStr = u.l(activeConfig.unit) || '';
+      const titleStr = u.l(activeConfig.blockTitle);
 
       const ui = u.questionCard(host, {
-        h3: activeConfig.blockTitle || 'Aufgabe',
-        qBoxTitle: 'Frage',
-        inputLabel: 'Antwort' + (activeConfig.unit ? ' (' + activeConfig.unit + ')' : ''),
-        inputPlaceholder: 'Zahl oder Bruch (z. B. 0.75 oder 3/4)'
+        h3: titleStr || u.t('common.task'),
+        qBoxTitle: u.t('common.question'),
+        inputLabel: unitStr
+          ? u.t('block.numeric-input.answerWithUnit', { unit: unitStr })
+          : u.t('common.answer'),
+        inputPlaceholder: u.t('block.numeric-input.answerPlaceholder')
       });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
 
@@ -250,7 +274,7 @@
         }
         if(!isValidExpected(expected)){
           // Formula always fails (e.g. 1/0). Feedback and bail out.
-          fb.bad('Aufgabe nicht generierbar: Formel führt mit den aktuellen Variablenbereichen immer zu einem ungültigen Ergebnis (z. B. Division durch 0). Variablenbereiche oder Formel anpassen.');
+          fb.bad(u.t('block.numeric-input.feedback.notGeneratable'));
           return;
         }
         // Prefer a different instance than before, but never sacrifice validity.
@@ -263,29 +287,30 @@
         }
         current = next;
         inp.value = '';
-        qText.textContent = fillTemplate(activeConfig.questionTemplate, vars);
+        qText.textContent = fillTemplate(u.l(activeConfig.questionTemplate), vars);
         u.renderMath(qText);
-        if(showMsg) fb.neutral('Neue Aufgabe generiert.');
+        if(showMsg) fb.neutral(u.t('block.numeric-input.feedback.newTask'));
       }
       function grade(){
-        if(!current || current.expected == null){ fb.bad('Lösung konnte nicht berechnet werden (Formel prüfen).'); return; }
+        if(!current || current.expected == null){ fb.bad(u.t('block.numeric-input.feedback.solutionUnavailable')); return; }
         const got = u.parseNum(inp.value);
-        if(got == null){ fb.bad('Bitte eine gültige Zahl oder Bruch (z. B. 3/4) eingeben.'); return; }
+        if(got == null){ fb.bad(u.t('block.numeric-input.feedback.enterValidNumber')); return; }
         // simplifyFractions: when on, an unsimplified fraction like "10/20"
         // is rejected even though its numeric value matches the expected one.
         if(activeConfig.simplifyFractions !== false){
           const fracParts = parseFractionInput(inp.value);
           if(fracParts && !isFractionSimplified(fracParts.num, fracParts.den)){
-            fb.bad('Bitte gekürzten Bruch eingeben (z. B. 1/2 statt 2/4).');
+            fb.bad(u.t('block.numeric-input.feedback.needSimplifiedFraction'));
             api.reportScore(0);
             return;
           }
         }
         if(u.nearlyEqual(got, current.expected, Number(activeConfig.tolerance) || 0.01)){
-          fb.ok('Korrekt. (Lösung: ' + u.formatSolution(current.expected) + (activeConfig.unit ? ' ' + activeConfig.unit : '') + ')');
+          const solutionText = u.formatSolution(current.expected) + (unitStr ? ' ' + unitStr : '');
+          fb.ok(u.t('block.numeric-input.feedback.correctWithSolution', { solution: solutionText }));
           api.reportScore(activeConfig.maxPoints || 1);
         } else {
-          fb.bad('Nicht korrekt.');
+          fb.bad(u.t('common.wrong'));
           api.reportScore(0);
         }
       }
@@ -298,23 +323,28 @@
       return {};
     },
     preview(host, config){
-      const activeConfig = numericPresetConfig(config);
+      const BU = window.BlockUtils;
+      const locale = (BU && BU.getLocale && BU.getLocale()) || 'de';
+      const activeConfig = numericPresetConfig(config, locale);
+      const previewUnit = BU.l(activeConfig.unit) || '';
+      const previewFormula = BU.l(activeConfig.formula) || '';
+      const previewTemplate = BU.l(activeConfig.questionTemplate) || '';
       // Deterministic sample so the preview is stable across renders.
       const sample = { a: 7, b: 3, p: 20, g: 150, x: 4, y: 3 };
-      const questionText = (activeConfig.questionTemplate || '(Aufgabe)')
+      const questionText = (previewTemplate || BU.t('block.numeric-input.preview.taskPlaceholder'))
         .replace(/\{(\w+)\}/g, (_, name) => (sample[name] != null ? sample[name] : '?'));
       // Evaluate with the same sample so the solution hint shows a number.
       let solution = null;
-      if(activeConfig.formula){
+      if(previewFormula){
         try {
-          solution = window.BlockUtils.safeMathExpr(activeConfig.formula, sample);
+          solution = BU.safeMathExpr(previewFormula, sample);
           if(typeof solution === 'number') solution = Math.round(solution * 100) / 100;
         } catch{}
       }
       const card = document.createElement('div');
       card.className = 'bp-card';
       const h3 = document.createElement('h3');
-      h3.textContent = 'Frage';
+      h3.textContent = BU.t('common.question');
       card.appendChild(h3);
       const q = document.createElement('p');
       q.textContent = questionText;
@@ -323,25 +353,25 @@
       inpRow.className = 'bp-input-row';
       const inp = document.createElement('div');
       inp.className = 'bp-input';
-      inp.textContent = 'Zahl eingeben…';
+      inp.textContent = BU.t('block.numeric-input.preview.enterNumber');
       inpRow.appendChild(inp);
-      if(activeConfig.unit){
+      if(previewUnit){
         const u = document.createElement('span');
         u.className = 'bp-unit';
-        u.textContent = activeConfig.unit;
+        u.textContent = previewUnit;
         inpRow.appendChild(u);
       }
       card.appendChild(inpRow);
       const btn = document.createElement('span');
-      btn.textContent = 'Korrektur';
+      btn.textContent = BU.t('common.check');
       btn.className = 'bp-btn';
       card.appendChild(btn);
       if(solution != null){
         const hint = document.createElement('div');
         hint.className = 'bp-hint';
-        hint.innerHTML = '<div class="bp-hint-title">Beispiel-Lösung</div>' +
-          '<div class="bp-hint-body">' + activeConfig.formula + ' = ' + solution +
-          (activeConfig.unit ? ' ' + activeConfig.unit : '') + '</div>';
+        hint.innerHTML = '<div class="bp-hint-title">' + BU.t('block.numeric-input.preview.exampleSolutionTitle') + '</div>' +
+          '<div class="bp-hint-body">' + previewFormula + ' = ' + solution +
+          (previewUnit ? ' ' + previewUnit : '') + '</div>';
         card.appendChild(hint);
       }
       host.appendChild(card);
@@ -400,8 +430,8 @@
          .replace(/÷/g, '/')
          .replace(/−/g, '-')
          .replace(/√/g, 'sqrt');
-    // Strip German connector words.
-    s = s.replace(/\b(Berechnen Sie|Berechne|Was ist|Wie viel ist|Wieviel ist|Bestimmen Sie|Bestimme|Gib an|Bestimme den Wert von|Geben Sie an)\b/gi, ' ');
+    // Strip German and English connector words.
+    s = s.replace(/\b(Berechnen Sie|Berechne|Was ist|Wie viel ist|Wieviel ist|Bestimmen Sie|Bestimme|Gib an|Bestimme den Wert von|Geben Sie an|Compute|Calculate|Determine|Find|Solve|What is|How much is)\b/gi, ' ');
     // Colon as "outer division": when both sides contain math, group each
     // segment in parens before joining with /. Plain-text templates like
     // "{a}/{b} : {c}/{d}" then auto-derive to ((a)/(b))/((c)/(d)).
@@ -502,31 +532,46 @@
     return out;
   }
 
-  function numericPresetConfig(config){
+  function numericPresetConfig(config, locale){
     const preset = config.preset || 'custom';
     if(preset === 'custom') return config;
+    const u = window.BlockUtils || {};
+    const loc = locale || (u.getLocale && u.getLocale()) || 'de';
+    const en = loc === 'en';
     const base = Object.assign({}, config, { tolerance: config.tolerance || 0.01, unit: '' });
     const vInt = (name, min, max) => ({name, min, max, integer:true});
     const vDec = (name, min, max) => ({name, min, max, integer:false});
     switch(preset){
       case 'addition':
-        return Object.assign(base, {questionTemplate:'Berechnen Sie {a} + {b}.', variables:[vInt('a',1,60), vInt('b',1,60)], formula:'a + b'});
+        return Object.assign(base, {questionTemplate: en ? 'Compute {a} + {b}.' : 'Berechnen Sie {a} + {b}.', variables:[vInt('a',1,60), vInt('b',1,60)], formula:'a + b'});
       case 'subtraction':
-        return Object.assign(base, {questionTemplate:'Berechnen Sie {a} - {b}.', variables:[vInt('a',20,100), vInt('b',1,20)], formula:'a - b'});
+        return Object.assign(base, {questionTemplate: en ? 'Compute {a} - {b}.' : 'Berechnen Sie {a} - {b}.', variables:[vInt('a',20,100), vInt('b',1,20)], formula:'a - b'});
       case 'multiplication':
-        return Object.assign(base, {questionTemplate:'Berechnen Sie {a} · {b}.', variables:[vInt('a',2,12), vInt('b',2,12)], formula:'a * b'});
+        return Object.assign(base, {questionTemplate: en ? 'Compute {a} · {b}.' : 'Berechnen Sie {a} · {b}.', variables:[vInt('a',2,12), vInt('b',2,12)], formula:'a * b'});
       case 'division':
-        return Object.assign(base, {questionTemplate:'Berechnen Sie {a} : {b}.', variables:[vInt('a',20,120), vInt('b',2,12)], formula:'a / b', tolerance:0.05});
+        return Object.assign(base, {questionTemplate: en ? 'Compute {a} : {b}.' : 'Berechnen Sie {a} : {b}.', variables:[vInt('a',20,120), vInt('b',2,12)], formula:'a / b', tolerance:0.05});
       case 'percent':
-        return Object.assign(base, {questionTemplate:'Berechnen Sie {p}% von {g}.', variables:[vInt('p',5,40), vInt('g',20,300)], formula:'g * p / 100'});
+        return Object.assign(base, {questionTemplate: en ? 'Compute {p}% of {g}.' : 'Berechnen Sie {p}% von {g}.', variables:[vInt('p',5,40), vInt('g',20,300)], formula:'g * p / 100'});
       case 'pythagoras':
-        return Object.assign(base, {questionTemplate:'Ein rechtwinkliges Dreieck hat Katheten {a} und {b}. Berechnen Sie die Hypotenuse.', variables:[vInt('a',3,12), vInt('b',4,16)], formula:'sqrt(a^2 + b^2)', tolerance:0.05});
+        return Object.assign(base, {questionTemplate: en
+          ? 'A right triangle has legs {a} and {b}. Compute the hypotenuse.'
+          : 'Ein rechtwinkliges Dreieck hat Katheten {a} und {b}. Berechnen Sie die Hypotenuse.',
+          variables:[vInt('a',3,12), vInt('b',4,16)], formula:'sqrt(a^2 + b^2)', tolerance:0.05});
       case 'rectangle-area':
-        return Object.assign(base, {questionTemplate:'Ein Rechteck ist {a} cm lang und {b} cm breit. Berechnen Sie die Fläche.', variables:[vInt('a',2,30), vInt('b',2,20)], formula:'a * b', unit:'cm²'});
+        return Object.assign(base, {questionTemplate: en
+          ? 'A rectangle is {a} cm long and {b} cm wide. Compute the area.'
+          : 'Ein Rechteck ist {a} cm lang und {b} cm breit. Berechnen Sie die Fläche.',
+          variables:[vInt('a',2,30), vInt('b',2,20)], formula:'a * b', unit:'cm²'});
       case 'circle-area':
-        return Object.assign(base, {questionTemplate:'Ein Kreis hat den Radius {r} cm. Berechnen Sie die Fläche.', variables:[vInt('r',1,12)], formula:'pi * r^2', tolerance:0.1, unit:'cm²'});
+        return Object.assign(base, {questionTemplate: en
+          ? 'A circle has radius {r} cm. Compute the area.'
+          : 'Ein Kreis hat den Radius {r} cm. Berechnen Sie die Fläche.',
+          variables:[vInt('r',1,12)], formula:'pi * r^2', tolerance:0.1, unit:'cm²'});
       case 'ohm':
-        return Object.assign(base, {questionTemplate:'An einem Widerstand von {r} Ω fließt ein Strom von {i} A. Berechnen Sie die Spannung.', variables:[vInt('r',5,200), vDec('i',0.1,3)], formula:'r * i', tolerance:0.1, unit:'V'});
+        return Object.assign(base, {questionTemplate: en
+          ? 'A current of {i} A flows through a resistor of {r} Ω. Compute the voltage.'
+          : 'An einem Widerstand von {r} Ω fließt ein Strom von {i} A. Berechnen Sie die Spannung.',
+          variables:[vInt('r',5,200), vDec('i',0.1,3)], formula:'r * i', tolerance:0.1, unit:'V'});
       default:
         return config;
     }

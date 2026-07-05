@@ -2,12 +2,22 @@
   'use strict';
   Blocks.register('divider', {
     label: 'Trennlinie',
+    labelKey: 'block.divider.label',
     description: 'Horizontale Trennlinie mit etwas Abstand.',
+    descKey: 'block.divider.description',
     category: 'Medien & Inhalt',
+    categoryKey: 'block.category.content',
     icon: '━',
     graded: false,
-    defaultConfig(){ return {}; },
-    summary(){ return 'Trennlinie'; },
+    defaultConfig(locale = 'de'){ return {}; },
+    summary(){
+      try {
+        if(window.BlockUtils && typeof window.BlockUtils.t === 'function'){
+          return window.BlockUtils.t('block.divider.summary');
+        }
+      } catch(_e){}
+      return 'Divider';
+    },
     builderSchema(){ return []; },
     mount(host, config, api){
       const hr = document.createElement('hr');

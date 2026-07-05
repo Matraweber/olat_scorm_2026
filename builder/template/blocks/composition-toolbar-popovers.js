@@ -19,6 +19,12 @@
     slotNumbersInLabel,
     buildSvg
   } = H;
+  // Resolve i18n via BlockUtils; fall back to the key so a missing bundle
+  // still shows something recognisable during dev.
+  function _t(key, params){
+    const u = window.BlockUtils;
+    return (u && typeof u.t === 'function') ? u.t(key, params) : key;
+  }
 
   window.CompositionToolbarPopovers = function(ctx){
     const {
@@ -52,7 +58,7 @@
         });
         luWrap.appendChild(luCb);
         const luText = document.createElement('span');
-        luText.innerHTML = '<strong>Lücke</strong>: Label wird zur Antwort-Eingabe';
+        luText.innerHTML = _t('block.composition.popover.grading.blankToggle');
         luWrap.appendChild(luText);
         pop.appendChild(luWrap);
       }
@@ -65,13 +71,15 @@
         const fmlWrap = document.createElement('div');
         fmlWrap.className = 'comp-bew-field';
         const fmlLbl = document.createElement('label');
-        fmlLbl.textContent = slotN != null ? ('Formel für {' + slotN + '}') : 'Formel (mit Variablen)';
+        fmlLbl.textContent = slotN != null
+          ? _t('block.composition.popover.grading.formulaForSlot', { slot: '{' + slotN + '}' })
+          : _t('block.composition.popover.grading.formulaGeneric');
         fmlWrap.appendChild(fmlLbl);
         const fml = document.createElement('input');
         fml.type = 'text';
-        fml.placeholder = 'z. B. a*b · sqrt(a*a+b*b) · sqrt({1*})';
+        fml.placeholder = _t('block.composition.popover.grading.formulaPlaceholder');
         fml.value = currentFormula || '';
-        fml.title = 'Formel · Schüler-Antworten als {1*}, {2*} … oder s1, s2 …';
+        fml.title = _t('block.composition.popover.grading.formulaTitle');
         fml.addEventListener('input', () => { onChange(fml.value); commitQuiet(); });
         fmlWrap.appendChild(fml);
 
@@ -89,9 +97,9 @@
         const helpRow = document.createElement('div');
         helpRow.className = 'comp-bew-helprow';
         [
-          { label:'√',   ins:'sqrt()',  caret:5, title:'Wurzel' },
-          { label:'π',   ins:'pi',      title:'Kreiszahl π' },
-          { label:'x²',  ins:'^2',      title:'Quadrieren' }
+          { label:'√',   ins:'sqrt()',  caret:5, title: _t('block.composition.popover.grading.helpSqrt') },
+          { label:'π',   ins:'pi',      title: _t('block.composition.popover.grading.helpPi') },
+          { label:'x²',  ins:'^2',      title: _t('block.composition.popover.grading.helpSquare') }
         ].forEach(b => {
           const btn = document.createElement('button');
           btn.type = 'button';
@@ -105,8 +113,8 @@
         if(defVars.length){
           const sel2 = document.createElement('select');
           sel2.className = 'comp-formula-btn';
-          sel2.title = 'Variable in die Formel einfügen';
-          sel2.innerHTML = '<option value="">Variable…</option>' +
+          sel2.title = _t('block.composition.popover.grading.varsSelectTitle');
+          sel2.innerHTML = '<option value="">' + _t('block.composition.popover.grading.varsSelectPlaceholder') + '</option>' +
             defVars.map(v => '<option value="' + v.name + '">' + v.name + '</option>').join('');
           sel2.addEventListener('change', () => {
             const v = sel2.value;
@@ -120,8 +128,8 @@
         if(otherSlots.length){
           const slotSel = document.createElement('select');
           slotSel.className = 'comp-formula-btn';
-          slotSel.title = 'Schüler-Antwort eines anderen Slots in die Formel einfügen';
-          slotSel.innerHTML = '<option value="">Antwort {N*}…</option>' +
+          slotSel.title = _t('block.composition.popover.grading.slotSelectTitle');
+          slotSel.innerHTML = '<option value="">' + _t('block.composition.popover.grading.slotSelectPlaceholder') + '</option>' +
             otherSlots.map(n => '<option value="{' + n + '*}">{' + n + '*}</option>').join('');
           slotSel.addEventListener('change', () => {
             const v = slotSel.value;
@@ -144,8 +152,8 @@
           const hint = document.createElement('div');
           hint.style.cssText = 'font-size:0.78rem; color:#5d6872; line-height:1.35; padding:0 0 0.4rem;';
           hint.innerHTML = numberedSlots.length === 1
-            ? 'Slot <strong>{' + numberedSlots[0] + '}</strong>: Formel für die erwartete Antwort.'
-            : 'Pro Slot eine Formel. Nutze <code>{N*}</code> oder <code>s<i>N</i></code>, um die Antwort aus einem früheren Slot weiterzunutzen.';
+            ? _t('block.composition.popover.grading.multiSlotHintOne', { slot: '{' + numberedSlots[0] + '}' })
+            : _t('block.composition.popover.grading.multiSlotHintMany');
           body.appendChild(hint);
           sel.formulas = sel.formulas || {};
           numberedSlots.forEach(n => {
@@ -170,13 +178,13 @@
           solWrap.className = 'comp-bew-field';
           if(hasFormula) solWrap.style.display = 'none';
           const solLbl = document.createElement('label');
-          solLbl.textContent = 'Lösung (statisch)';
+          solLbl.textContent = _t('block.composition.popover.grading.staticLabel');
           solWrap.appendChild(solLbl);
           const sol = document.createElement('input');
           sol.type = 'text';
-          sol.placeholder = 'z. B. 42 oder "Wasser"';
+          sol.placeholder = _t('block.composition.popover.grading.staticPlaceholder');
           sol.value = sel.correctText || '';
-          sol.title = 'Erwartete Antwort ohne Berechnung. Wird ignoriert sobald eine Formel gesetzt ist.';
+          sol.title = _t('block.composition.popover.grading.staticTitle');
           sol.addEventListener('input', () => { sel.correctText = sol.value; commitQuiet(); });
           solWrap.appendChild(sol);
           body.appendChild(solWrap);
@@ -229,7 +237,8 @@
 
       const head = document.createElement('div');
       head.className = 'comp-tpl-popover-head';
-      head.innerHTML = '<strong>Polygon einfügen</strong><span style="font-size:0.78rem;color:#5d6872;">Voreinstellung wählen</span>';
+      head.innerHTML = '<strong>' + _t('block.composition.popover.polygon.title') + '</strong>' +
+        '<span style="font-size:0.78rem;color:#5d6872;">' + _t('block.composition.popover.polygon.subtitle') + '</span>';
       pop.appendChild(head);
 
       const grid = document.createElement('div');
@@ -291,8 +300,8 @@
 
       const head = document.createElement('div');
       head.className = 'comp-var-dialog-head';
-      head.innerHTML = '<strong>Variablen</strong>' +
-        '<span style="font-size:0.78rem;color:#5d6872;">Tabelle bearbeiten</span>';
+      head.innerHTML = '<strong>' + _t('block.composition.popover.varTable.title') + '</strong>' +
+        '<span style="font-size:0.78rem;color:#5d6872;">' + _t('block.composition.popover.varTable.subtitle') + '</span>';
       pop.appendChild(head);
 
       // Working copy, only persisted on OK.
@@ -311,10 +320,10 @@
       function renderRows(){
         table.innerHTML =
           '<thead><tr>' +
-            '<th style="width:60px;">Name</th>' +
-            '<th>Min</th>' +
-            '<th>Max</th>' +
-            '<th style="width:60px;">Ganz</th>' +
+            '<th style="width:60px;">' + _t('block.composition.popover.varTable.colName') + '</th>' +
+            '<th>' + _t('block.composition.popover.varTable.colMin') + '</th>' +
+            '<th>' + _t('block.composition.popover.varTable.colMax') + '</th>' +
+            '<th style="width:60px;">' + _t('block.composition.popover.varTable.colInteger') + '</th>' +
             '<th style="width:28px;"></th>' +
           '</tr></thead>';
         const tb = document.createElement('tbody');
@@ -325,7 +334,7 @@
             '<td><input data-k="min"  type="number" value="' + (row.min ?? '') + '"/></td>' +
             '<td><input data-k="max"  type="number" value="' + (row.max ?? '') + '"/></td>' +
             '<td style="text-align:center;"><input data-k="integer" type="checkbox"' + (row.integer !== false ? ' checked' : '') + '/></td>' +
-            '<td><button data-act="del" class="icon-btn danger" title="Variable entfernen">✕</button></td>';
+            '<td><button data-act="del" class="icon-btn danger" title="' + _t('block.composition.popover.varTable.removeTitle') + '">✕</button></td>';
           tr.querySelector('[data-k="name"]').addEventListener('input', e => row.name = e.target.value.trim());
           tr.querySelector('[data-k="min"]').addEventListener('input', e => row.min = Number(e.target.value));
           tr.querySelector('[data-k="max"]').addEventListener('input', e => row.max = Number(e.target.value));
@@ -342,7 +351,7 @@
       const addRow = document.createElement('button');
       addRow.type = 'button';
       addRow.className = 'comp-tool-btn-text';
-      addRow.textContent = '+ Variable';
+      addRow.textContent = _t('block.composition.popover.varTable.addRow');
       addRow.style.cssText = 'margin-top:0.5rem;width:100%;';
       addRow.addEventListener('click', () => {
         rows.push({ name: nextFreeName(), min: 1, max: 10, integer: true });
@@ -353,8 +362,8 @@
       const actions = document.createElement('div');
       actions.className = 'comp-var-dialog-actions';
       actions.innerHTML =
-        '<button class="comp-tool-btn-text" data-act="cancel" type="button">Abbrechen</button>' +
-        '<button class="comp-tool-btn-text comp-tool-template" data-act="ok" type="button">Speichern</button>';
+        '<button class="comp-tool-btn-text" data-act="cancel" type="button">' + _t('block.composition.popover.varTable.cancel') + '</button>' +
+        '<button class="comp-tool-btn-text comp-tool-template" data-act="ok" type="button">' + _t('block.composition.popover.varTable.save') + '</button>';
       pop.appendChild(actions);
 
       const r = anchorEl.getBoundingClientRect();
@@ -371,12 +380,12 @@
         // Validate: unique non-empty names, finite min/max with min ≤ max.
         const seen = new Set();
         for(const r of rows){
-          if(!r.name){ alert('Jede Variable braucht einen Namen.'); return; }
-          if(!/^[a-zA-Z_]\w*$/.test(r.name)){ alert('Ungültiger Name: ' + r.name); return; }
-          if(seen.has(r.name)){ alert('Doppelter Name: ' + r.name); return; }
+          if(!r.name){ alert(_t('block.composition.popover.varTable.validate.needName')); return; }
+          if(!/^[a-zA-Z_]\w*$/.test(r.name)){ alert(_t('block.composition.popover.varTable.validate.invalidName', { name: r.name })); return; }
+          if(seen.has(r.name)){ alert(_t('block.composition.popover.varTable.validate.duplicateName', { name: r.name })); return; }
           seen.add(r.name);
           if(!isFinite(r.min) || !isFinite(r.max) || r.min > r.max){
-            alert('Bereich ungültig bei ' + r.name + ' (Min ≤ Max).');
+            alert(_t('block.composition.popover.varTable.validate.rangeInvalid', { name: r.name }));
             return;
           }
         }
@@ -406,8 +415,8 @@
 
       const head = document.createElement('div');
       head.className = 'comp-var-dialog-head';
-      head.innerHTML = '<strong>Formen</strong>' +
-        '<span style="font-size:0.78rem;color:#5d6872;">zum Auswählen klicken</span>';
+      head.innerHTML = '<strong>' + _t('block.composition.popover.shapes.title') + '</strong>' +
+        '<span style="font-size:0.78rem;color:#5d6872;">' + _t('block.composition.popover.shapes.subtitle') + '</span>';
       pop.appendChild(head);
 
       const list = document.createElement('div');
@@ -469,15 +478,15 @@
       for(const c of 'abcdefghijklmnopqrstuvwxyz'){ if(!used.has(c)){ suggested = c; break; } }
 
       pop.innerHTML =
-        '<div class="comp-var-dialog-head"><strong>Neue Variable</strong>' +
-        '<span style="font-size:0.78rem;color:#5d6872;">Im Label-Text als {Name} verwenden</span></div>' +
-        '<div class="comp-var-dialog-row"><label>Name</label><input data-k="name" type="text" maxlength="20" placeholder="a" value="' + suggested + '"/></div>' +
-        '<div class="comp-var-dialog-row"><label>Min</label><input data-k="min" type="number" value="1"/></div>' +
-        '<div class="comp-var-dialog-row"><label>Max</label><input data-k="max" type="number" value="10"/></div>' +
-        '<div class="comp-var-dialog-row"><label></label><label class="comp-var-dialog-check"><input data-k="integer" type="checkbox" checked/> Nur Ganzzahlen</label></div>' +
+        '<div class="comp-var-dialog-head"><strong>' + _t('block.composition.popover.varAdd.title') + '</strong>' +
+        '<span style="font-size:0.78rem;color:#5d6872;">' + _t('block.composition.popover.varAdd.subtitle') + '</span></div>' +
+        '<div class="comp-var-dialog-row"><label>' + _t('block.composition.popover.varAdd.name') + '</label><input data-k="name" type="text" maxlength="20" placeholder="a" value="' + suggested + '"/></div>' +
+        '<div class="comp-var-dialog-row"><label>' + _t('block.composition.popover.varAdd.min') + '</label><input data-k="min" type="number" value="1"/></div>' +
+        '<div class="comp-var-dialog-row"><label>' + _t('block.composition.popover.varAdd.max') + '</label><input data-k="max" type="number" value="10"/></div>' +
+        '<div class="comp-var-dialog-row"><label></label><label class="comp-var-dialog-check"><input data-k="integer" type="checkbox" checked/> ' + _t('block.composition.popover.varAdd.integerOnly') + '</label></div>' +
         '<div class="comp-var-dialog-actions">' +
-        '<button class="comp-tool-btn-text" data-act="cancel" type="button">Abbrechen</button>' +
-        '<button class="comp-tool-btn-text comp-tool-template" data-act="ok" type="button">Hinzufügen</button>' +
+        '<button class="comp-tool-btn-text" data-act="cancel" type="button">' + _t('block.composition.popover.varAdd.cancel') + '</button>' +
+        '<button class="comp-tool-btn-text comp-tool-template" data-act="ok" type="button">' + _t('block.composition.popover.varAdd.add') + '</button>' +
         '</div>';
 
       const r = anchorEl.getBoundingClientRect();
@@ -498,13 +507,13 @@
         const integer = pop.querySelector('[data-k="integer"]').checked;
         if(!name){ pop.querySelector('[data-k="name"]').focus(); return; }
         if(!/^[a-zA-Z_]\w*$/.test(name)){
-          alert('Variable-Name muss mit Buchstaben/Unterstrich beginnen.'); return;
+          alert(_t('block.composition.popover.varAdd.validate.startWithLetter')); return;
         }
         if(used.has(name)){
-          alert('Variable „' + name + '" gibt es schon.'); return;
+          alert(_t('block.composition.popover.varAdd.validate.exists', { name })); return;
         }
         if(!isFinite(min) || !isFinite(max) || min > max){
-          alert('Bereich ungültig (Min ≤ Max).'); return;
+          alert(_t('block.composition.popover.varAdd.validate.rangeInvalid')); return;
         }
         block.config.variables = Array.isArray(block.config.variables) ? block.config.variables : [];
         block.config.variables.push({ name, min, max, integer });
@@ -590,15 +599,14 @@
       choose.className = 'comp-tpl-choose';
       choose.innerHTML =
         '<div style="margin-bottom:0.6rem;color:#5d6872;font-size:0.85rem;">' +
-        'Diese Komposition enthält schon Formen. Wie soll <strong>' + tpl.label + '</strong> eingefügt werden?</div>' +
+        _t('block.composition.popover.templateChooser.question', { name: tpl.label }) + '</div>' +
         '<div class="comp-tpl-choose-actions">' +
-        '<button class="comp-tool-btn-text" data-act="cancel">Abbrechen</button>' +
-        '<button class="comp-tool-btn-text" data-act="append">Hinzufügen</button>' +
-        '<button class="comp-tool-btn-text comp-tool-template" data-act="replace">Ersetzen</button>' +
+        '<button class="comp-tool-btn-text" data-act="cancel">' + _t('block.composition.popover.templateChooser.cancel') + '</button>' +
+        '<button class="comp-tool-btn-text" data-act="append">' + _t('block.composition.popover.templateChooser.append') + '</button>' +
+        '<button class="comp-tool-btn-text comp-tool-template" data-act="replace">' + _t('block.composition.popover.templateChooser.replace') + '</button>' +
         '</div>' +
         '<div style="font-size:0.74rem;color:#5d6872;margin-top:0.5rem;">' +
-        '<strong>Hinzufügen</strong> behält bestehende Formen + Variablen (umbenannt bei Namenskonflikt). ' +
-        '<strong>Ersetzen</strong> verwirft alles bisherige.</div>';
+        _t('block.composition.popover.templateChooser.explain') + '</div>';
       pickerPop.appendChild(choose);
       choose.querySelector('[data-act="cancel"]').addEventListener('click', () => { pickerPop.remove(); });
       choose.querySelector('[data-act="append"]').addEventListener('click', () => {
@@ -619,7 +627,8 @@
 
       const head = document.createElement('div');
       head.className = 'comp-tpl-popover-head';
-      head.innerHTML = '<strong>Vorlage einfügen</strong><span style="font-size:0.78rem;color:#5d6872;">Ersetzt die aktuelle Komposition</span>';
+      head.innerHTML = '<strong>' + _t('block.composition.popover.template.title') + '</strong>' +
+        '<span style="font-size:0.78rem;color:#5d6872;">' + _t('block.composition.popover.template.subtitle') + '</span>';
       pop.appendChild(head);
 
       const grid = document.createElement('div');

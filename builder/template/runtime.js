@@ -91,7 +91,7 @@
       blocks.push({id: 'b_legacy_intro_' + Math.random().toString(36).slice(2,7), type: 'rich-text', config: { html: '<p>' + task.config.intro + '</p>' }});
     }
     if(task.config && task.config.noteHtml){
-      blocks.push({id: 'b_legacy_note_' + Math.random().toString(36).slice(2,7), type: 'note-box', config: { title: task.config.noteTitle || 'Hinweis', html: task.config.noteHtml, variant: 'info' }});
+      blocks.push({id: 'b_legacy_note_' + Math.random().toString(36).slice(2,7), type: 'note-box', config: { title: task.config.noteTitle || utils.t('runtime.legacyNoteTitle'), html: task.config.noteHtml, variant: 'info' }});
     }
     const cleanCfg = Object.assign({}, task.config || {});
     delete cleanCfg.intro; delete cleanCfg.noteTitle; delete cleanCfg.noteHtml;
@@ -157,11 +157,11 @@
     const task = taskScore(currentPageIdx);
     // Per-task only when the current task has graded blocks.
     if(task.max > 0){
-      pill.innerHTML = 'Aufgabe: <strong>' + r(task.pts) + ' / ' + task.max + '</strong>' +
+      pill.innerHTML = utils.t('runtime.scorePill.taskLabel') + '<strong>' + r(task.pts) + ' / ' + task.max + '</strong>' +
         '<span class="score-pill-sep"> · </span>' +
-        'Gesamt: <strong>' + r(total.pts) + ' / ' + total.max + '</strong>';
+        utils.t('runtime.scorePill.totalLabel') + '<strong>' + r(total.pts) + ' / ' + total.max + '</strong>';
     } else {
-      pill.innerHTML = 'Gesamt: <strong>' + r(total.pts) + ' / ' + total.max + '</strong>';
+      pill.innerHTML = utils.t('runtime.scorePill.totalLabel') + '<strong>' + r(total.pts) + ' / ' + total.max + '</strong>';
     }
   }
 
@@ -200,7 +200,8 @@
     const pct = Math.round((done / total) * 100);
     fill.style.width = pct + '%';
     const current = currentPageIdx >= 0 ? currentPageIdx + 1 : 1;
-    text.innerHTML = '<strong>Aufgabe ' + current + ' von ' + total + '</strong> · ' + done + ' erledigt (' + pct + '%)';
+    text.innerHTML = '<strong>' + escapeHtml(utils.t('progress.taskLabel', {current: current, total: total})) + '</strong> · ' +
+      escapeHtml(utils.t('progress.doneSuffix', {done: done, pct: pct}));
   }
 
   function buildNav(){
@@ -210,7 +211,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'nav-link';
-      btn.textContent = task.title || ('Aufgabe ' + (i+1));
+      btn.textContent = utils.l(task.title) || utils.t('taskList.fallbackTitle', {n: i+1});
       btn.addEventListener('click', () => showPage(i));
       nav.appendChild(btn);
     });
@@ -256,9 +257,10 @@
     page.className = 'task-page';
     container.appendChild(page);
 
-    if(task.title){
+    const localizedTitle = utils.l(task.title);
+    if(localizedTitle){
       const h = document.createElement('h2'); h.className='task-page-title';
-      h.textContent = task.title;
+      h.textContent = localizedTitle;
       page.appendChild(h);
     }
 
@@ -272,7 +274,7 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'task-tab-btn' + (ti === task._activeTab ? ' active' : '');
-        btn.textContent = t.title || ('Tab ' + (ti+1));
+        btn.textContent = t.title || utils.t('runtime.tabs.fallbackTitle', {n: ti+1});
         btn.addEventListener('click', () => {
           if(ti === task._activeTab) return;
           task._activeTab = ti;
@@ -310,7 +312,7 @@
       if(pos.y + pos.h + 80 > maxBottom) maxBottom = pos.y + pos.h + 80;
 
       if(!def){
-        cell.innerHTML = '<div class="block-error">Unbekannter Block-Typ: <code>' + escapeHtml(block.type) + '</code></div>';
+        cell.innerHTML = '<div class="block-error">' + utils.t('runtime.error.unknownBlockTypeHtml', {type: '<code>' + escapeHtml(block.type) + '</code>'}) + '</div>';
         return;
       }
       const blockApi = {
@@ -339,7 +341,7 @@
         utils.renderMath(cell);
       } catch(err){
         console.error('Block ' + block.type + ' mount error:', err);
-        cell.innerHTML = '<div class="block-error">Fehler beim Block <code>' + escapeHtml(block.type) + '</code>: ' + escapeHtml(String(err)) + '</div>';
+        cell.innerHTML = '<div class="block-error">' + utils.t('runtime.error.blockMountFailedHtml', {type: '<code>' + escapeHtml(block.type) + '</code>', msg: escapeHtml(String(err))}) + '</div>';
       }
     });
     canvas.style.height = maxBottom + 'px';
@@ -347,17 +349,17 @@
     // Footer navigation
     const foot = document.createElement('footer'); foot.className = 'task-page-foot';
     if(idx > 0){
-      const prev = document.createElement('button'); prev.type='button'; prev.className='btn btn-secondary'; prev.textContent='← Zurück';
+      const prev = document.createElement('button'); prev.type='button'; prev.className='btn btn-secondary'; prev.textContent = '← ' + utils.t('footer.previous');
       prev.addEventListener('click', () => showPage(idx - 1));
       foot.appendChild(prev);
     }
     const spacer = document.createElement('span'); spacer.style.flex='1'; foot.appendChild(spacer);
     if(idx + 1 < courseConfig.tasks.length){
-      const next = document.createElement('button'); next.type='button'; next.className='btn btn-primary'; next.textContent='Weiter →';
+      const next = document.createElement('button'); next.type='button'; next.className='btn btn-primary'; next.textContent = utils.t('footer.next') + ' →';
       next.addEventListener('click', () => showPage(idx + 1));
       foot.appendChild(next);
     } else {
-      const finish = document.createElement('button'); finish.type='button'; finish.className='btn btn-primary'; finish.textContent='Test beenden';
+      const finish = document.createElement('button'); finish.type='button'; finish.className='btn btn-primary'; finish.textContent = utils.t('footer.finish');
       finish.addEventListener('click', () => finishCourse());
       foot.appendChild(finish);
     }
@@ -378,7 +380,20 @@
     const threshold = (courseConfig.passThreshold == null) ? 0.5 : courseConfig.passThreshold;
     const ratio = max > 0 ? pts / max : 0;
     const passed = ratio >= threshold;
-    container.innerHTML = '<div class="task-page"><section class="section-card" style="padding:2rem 2.2rem"><h2 style="color:var(--primary);margin-top:0">Test beendet</h2><p>Erreichte Punktzahl: <strong>' + (Math.round(pts*100)/100) + ' / ' + max + '</strong> (' + Math.round(ratio*100) + '%)</p><p>' + (passed ? '<strong style="color:var(--accent-dark)">Bestanden ✓</strong>' : '<strong style="color:var(--danger)">Nicht bestanden.</strong>') + '</p><p style="color:var(--muted)">Sie können dieses Fenster jetzt schließen und zum Kurs zurückkehren.</p></section></div>';
+    const scoreLineHtml = utils.t('runtime.finish.scoreLineHtml', {
+      pts: Math.round(pts*100)/100,
+      max: max,
+      pct: Math.round(ratio*100)
+    });
+    const passLine = passed
+      ? '<strong style="color:var(--accent-dark)">' + escapeHtml(utils.t('finish.passed')) + ' ✓</strong>'
+      : '<strong style="color:var(--danger)">' + escapeHtml(utils.t('finish.failed')) + '</strong>';
+    container.innerHTML = '<div class="task-page"><section class="section-card" style="padding:2rem 2.2rem">' +
+      '<h2 style="color:var(--primary);margin-top:0">' + escapeHtml(utils.t('finish.title')) + '</h2>' +
+      '<p>' + scoreLineHtml + '</p>' +
+      '<p>' + passLine + '</p>' +
+      '<p style="color:var(--muted)">' + escapeHtml(utils.t('finish.closeHint')) + '</p>' +
+      '</section></div>';
   }
 
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -390,23 +405,76 @@
     return fetch(filename).then(r => r.json());
   }
 
+  // Footer-style language switcher shown when the course was exported with
+  // more than one locale. Each button flips utils.setLocale, re-applies the
+  // static HTML labels, and re-renders the current task page so block content
+  // read via api.utils.l() picks the freshly-selected locale.
+  function buildLangSwitcher(){
+    const host = document.getElementById('scormLangSwitcher');
+    if(!host || !courseConfig) return;
+    const locales = Array.isArray(courseConfig.locales) ? courseConfig.locales : [];
+    if(locales.length < 2){ host.classList.add('hidden'); return; }
+    host.innerHTML = '';
+    host.classList.remove('hidden');
+    const active = utils.getLocale ? utils.getLocale() : (courseConfig.defaultLocale || 'de');
+    locales.forEach(code => {
+      const meta = utils.localeMeta ? utils.localeMeta(code) : { label: String(code).toUpperCase() };
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'scorm-lang-btn' + (code === active ? ' active' : '');
+      btn.textContent = meta.label || String(code).toUpperCase();
+      btn.setAttribute('title', meta.name || code);
+      btn.setAttribute('aria-pressed', code === active ? 'true' : 'false');
+      btn.addEventListener('click', () => {
+        if(code === utils.getLocale()) return;
+        if(utils.setLocale && !utils.setLocale(code)) return;
+        applyRuntimeLocale();
+      });
+      host.appendChild(btn);
+    });
+  }
+
+  // Re-apply everything that depends on the current locale: static HTML
+  // labels, document lang, dynamic titles, nav buttons, progress, and the
+  // currently displayed page (so block content re-reads via l()).
+  function applyRuntimeLocale(){
+    if(!courseConfig) return;
+    if(utils.applyDataI18n) utils.applyDataI18n(document);
+    document.documentElement.setAttribute('lang', utils.getLocale ? utils.getLocale() : 'de');
+    document.title = utils.l(courseConfig.courseTitle) || utils.t('runtime.defaultCourseTitle');
+    const titleEl = document.getElementById('courseTitle');
+    if(titleEl) titleEl.textContent = utils.l(courseConfig.courseTitle) || '';
+    const subEl = document.getElementById('courseSubtitle');
+    if(subEl) subEl.textContent = utils.l(courseConfig.courseSubtitle) || '';
+    buildNav();
+    buildLangSwitcher();
+    updateScorePill();
+    updateNavStates();
+    if(currentPageIdx >= 0) showPage(currentPageIdx);
+  }
+
   function bootstrap(){
     loadJson('__SCORM_THEME__', 'theme.json').then(t => { applyTheme(t); }).catch(() => {});
     loadJson('__SCORM_TASKS__', 'tasks.json').then(cfg => {
       cfg.tasks = (cfg.tasks || []).map(migrateLegacyTask);
       courseConfig = cfg;
-      document.title = cfg.courseTitle || 'SCORM Lerneinheit';
-      document.getElementById('courseTitle').textContent = cfg.courseTitle || '';
-      document.getElementById('courseSubtitle').textContent = cfg.courseSubtitle || '';
+      if(cfg.defaultLocale && utils.setDefaultLocale) utils.setDefaultLocale(cfg.defaultLocale);
+      if(cfg.defaultLocale && utils.setLocale) utils.setLocale(cfg.defaultLocale);
+      if(utils.applyDataI18n) utils.applyDataI18n(document);
+      document.documentElement.setAttribute('lang', utils.getLocale ? utils.getLocale() : (cfg.defaultLocale || 'de'));
+      document.title = utils.l(cfg.courseTitle) || utils.t('runtime.defaultCourseTitle');
+      document.getElementById('courseTitle').textContent = utils.l(cfg.courseTitle) || '';
+      document.getElementById('courseSubtitle').textContent = utils.l(cfg.courseSubtitle) || '';
       cfg.tasks.forEach(() => perTask.push({blockScores: {}, blockInstances: []}));
       buildNav();
+      buildLangSwitcher();
       try { window.Scorm12 && Scorm12.init(); } catch {}
       // Show cumulative max-points immediately, without waiting for mount().
       updateScorePill();
       updateNavStates();
       if(cfg.tasks.length > 0) showPage(0);
     }).catch(err => {
-      document.getElementById('taskContainer').innerHTML = '<section class="hero-card"><div><h2>Konfiguration nicht ladbar</h2><pre>' + escapeHtml(String(err)) + '</pre></div></section>';
+      document.getElementById('taskContainer').innerHTML = '<section class="hero-card"><div><h2>' + escapeHtml(utils.t('error.configNotLoadable')) + '</h2><pre>' + escapeHtml(String(err)) + '</pre></div></section>';
     });
   }
 

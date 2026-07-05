@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SCORM Lerneinheit</title>
+  <title data-i18n="html.title">SCORM Lerneinheit</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="katex/katex.min.css" />
   <script defer src="katex/katex.min.js"></script>
@@ -14,17 +14,18 @@
     <header class="scorm-header">
       <div class="brand-block">
         <div class="brand-text">
-          <div class="brand-kicker" id="brandKicker">Umwelt-Campus Birkenfeld</div>
-          <h1 id="courseTitle">SCORM Lerneinheit</h1>
+          <div class="brand-kicker" id="brandKicker" data-i18n="html.brandKicker">Umwelt-Campus Birkenfeld</div>
+          <h1 id="courseTitle" data-i18n="html.courseTitle">SCORM Lerneinheit</h1>
           <p class="subtitle" id="courseSubtitle"></p>
-          <nav class="top-nav" id="topNav" aria-label="Aufgabennavigation"></nav>
+          <nav class="top-nav" id="topNav" aria-label="Aufgabennavigation" data-i18n-aria="header.nav"></nav>
         </div>
         <img id="brandLogo" class="brand-logo hidden" alt="" />
       </div>
+      <div class="scorm-lang-switcher hidden" id="scormLangSwitcher" role="group" aria-label="Language"></div>
     </header>
 
     <main class="scorm-main" id="scormMain">
-      <div class="progress-bar-wrap" id="progressBarWrap" aria-label="Lernfortschritt">
+      <div class="progress-bar-wrap" id="progressBarWrap" aria-label="Lernfortschritt" data-i18n-aria="progress.ariaLabel">
         <div class="progress-bar-track">
           <div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div>
         </div>
@@ -41,6 +42,7 @@
   <!-- DATA_SCRIPT -->
   <script src="scorm12.js"></script>
   <script src="utils.js"></script>
+  <!-- I18N_SCRIPTS -->
   <script src="blocks/_registry.js"></script>
   <!-- BLOCK_SCRIPTS -->
   <script src="runtime.js"></script>

@@ -223,8 +223,8 @@
     },
     feedbackBox(host){
       const box = utils.el('div', {className: 'formula-box feedback-box'});
-      const title = utils.el('div', {className: 'formula-title', text: 'Rückmeldung'});
-      const text = utils.el('div', {className: 'formula-text', text: 'Noch keine Korrektur durchgeführt.'});
+      const title = utils.el('div', {className: 'formula-title', text: utils.t('feedback.title')});
+      const text = utils.el('div', {className: 'formula-text', text: utils.t('feedback.initial')});
       box.appendChild(title); box.appendChild(text);
       host.appendChild(box);
       return {
@@ -239,7 +239,7 @@
       const card = document.createElement('section');
       card.className = 'section-card block-question';
       const h = document.createElement('h3');
-      h.textContent = opts.h3 || 'Aufgabe';
+      h.textContent = opts.h3 || utils.t('common.task');
       card.appendChild(h);
 
       const qBox = document.createElement('div');
@@ -247,7 +247,7 @@
       qBox.style.marginBottom = '1rem';
       const qBoxTitle = document.createElement('div');
       qBoxTitle.className = 'formula-title';
-      qBoxTitle.textContent = opts.qBoxTitle || 'Aufgabe';
+      qBoxTitle.textContent = opts.qBoxTitle || utils.t('common.task');
       qBox.appendChild(qBoxTitle);
       const qText = document.createElement('div');
       qText.className = 'formula-text';
@@ -257,12 +257,12 @@
       const grp = document.createElement('div');
       grp.className = 'control-group control-group-compact';
       const lbl = document.createElement('label');
-      lbl.textContent = opts.inputLabel || 'Antwort';
+      lbl.textContent = opts.inputLabel || utils.t('common.answer');
       grp.appendChild(lbl);
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.className = 'text-input';
-      inp.placeholder = opts.inputPlaceholder || 'Antwort eingeben';
+      inp.placeholder = opts.inputPlaceholder || utils.t('common.answerPlaceholder');
       grp.appendChild(inp);
       card.appendChild(grp);
 
@@ -271,11 +271,11 @@
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button';
       checkBtn.className = 'btn btn-primary';
-      checkBtn.textContent = 'Korrektur';
+      checkBtn.textContent = utils.t('common.check');
       const newBtn = document.createElement('button');
       newBtn.type = 'button';
       newBtn.className = 'btn btn-secondary';
-      newBtn.textContent = 'Neu generieren';
+      newBtn.textContent = utils.t('common.regenerate');
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
       card.appendChild(btnRow);
 
@@ -290,7 +290,7 @@
       const card = document.createElement('section');
       card.className = 'section-card block-question';
       const h = document.createElement('h3');
-      h.textContent = opts.title || 'Aufgabe';
+      h.textContent = opts.title || utils.t('common.task');
       card.appendChild(h);
 
       const hasQuestion = (opts.questionHtml != null && String(opts.questionHtml).trim() !== '') ||
@@ -300,7 +300,7 @@
       qBox.style.marginBottom = '1rem';
       const qBoxTitle = document.createElement('div');
       qBoxTitle.className = 'formula-title';
-      qBoxTitle.textContent = opts.qBoxTitle || 'Frage';
+      qBoxTitle.textContent = opts.qBoxTitle || utils.t('common.question');
       qBox.appendChild(qBoxTitle);
       const qText = document.createElement('div');
       qText.className = 'formula-text';
@@ -327,9 +327,9 @@
     regenSchemaFields(showIf){
       const cd = (typeof window !== 'undefined' && window.state && window.state.course) || {};
       const opts = on => [
-        { value: '',    label: 'Wie Lerneinheit (' + (on ? 'An' : 'Aus') + ')' },
-        { value: 'on',  label: 'An' },
-        { value: 'off', label: 'Aus' }
+        { value: '',    label: utils.t('utils.regen.inherit', { state: on ? utils.t('utils.regen.on') : utils.t('utils.regen.off') }) },
+        { value: 'on',  label: utils.t('utils.regen.on') },
+        { value: 'off', label: utils.t('utils.regen.off') }
       ];
       const f = (key, label, on, help) => {
         const spec = { key, label, type: 'select', options: opts(on), help };
@@ -337,10 +337,10 @@
         return spec;
       };
       return [
-        f('lockAfterCheck', 'Nach Korrektur sperren', !!cd.regenLockAfterCheck,
-          'Nach dem ersten Prüfen kann keine neue Aufgabe mehr generiert werden. „Wie Lerneinheit" folgt der Einstellung in den Kopfdaten.'),
-        f('noRegenerate', 'Neu-Generieren ausblenden', !!cd.regenNoRegenerate,
-          'Kein „Neu generieren"-Knopf; die erste Zufallsaufgabe muss gelöst werden. „Wie Lerneinheit" folgt den Kopfdaten.')
+        f('lockAfterCheck', utils.t('utils.regen.lockAfterCheckLabel'), !!cd.regenLockAfterCheck,
+          utils.t('utils.regen.lockAfterCheckHelp')),
+        f('noRegenerate', utils.t('utils.regen.noRegenerateLabel'), !!cd.regenNoRegenerate,
+          utils.t('utils.regen.noRegenerateHelp'))
       ];
     },
     // Apply the resolved "Neu generieren" policy to a block's button.
@@ -365,7 +365,7 @@
         api.reportScore = function(){
           const r = orig.apply(api, arguments);
           newBtn.disabled = true;
-          newBtn.title = 'Nach der Korrektur gesperrt';
+          newBtn.title = utils.t('utils.regen.lockedTitle');
           return r;
         };
       }
@@ -534,5 +534,128 @@
     return arr;
   };
 
+  // ---------------------------------------------------------------------------
+  // Runtime i18n. Bundles are registered by template/i18n/<code>.js files
+  // (either directly, or via the __ScormI18nPending queue if this file loads
+  // after them). t(key, params) reads chrome strings; l(value) resolves
+  // multilingual content wrappers of shape { __i18n: true, de: '', en: '' }.
+  // ---------------------------------------------------------------------------
+  const _i18n = { bundles: {}, active: 'de', defaultLocale: 'de', listeners: [] };
+
+  utils.registerLocale = function(code, bundle){
+    _i18n.bundles[code] = bundle || {};
+  };
+  utils.availableLocales = function(){ return Object.keys(_i18n.bundles); };
+  utils.localeMeta = function(code){
+    const b = _i18n.bundles[code];
+    return (b && b.meta) || { name: String(code).toUpperCase(), label: String(code).toUpperCase() };
+  };
+  utils.getLocale = function(){ return _i18n.active; };
+  utils.getDefaultLocale = function(){ return _i18n.defaultLocale; };
+  utils.setDefaultLocale = function(code){
+    if(_i18n.bundles[code]) _i18n.defaultLocale = code;
+  };
+  utils.setLocale = function(code){
+    if(!_i18n.bundles[code]) return false;
+    if(code === _i18n.active) return true;
+    _i18n.active = code;
+    _i18n.listeners.forEach(fn => { try { fn(code); } catch(e){ console.error(e); } });
+    return true;
+  };
+  utils.onLocaleChange = function(fn){
+    _i18n.listeners.push(fn);
+    return function(){
+      const i = _i18n.listeners.indexOf(fn);
+      if(i >= 0) _i18n.listeners.splice(i, 1);
+    };
+  };
+
+  function _lookupI18n(key, code){
+    const b = _i18n.bundles[code];
+    if(!b) return null;
+    const parts = String(key).split('.');
+    let cur = b;
+    for(let i = 0; i < parts.length; i++){
+      if(cur == null) return null;
+      cur = cur[parts[i]];
+    }
+    return typeof cur === 'string' ? cur : null;
+  }
+  function _interpI18n(str, params){
+    return String(str).replace(/\{(\w+)\}/g, (_, name) => {
+      const v = params[name];
+      return v == null ? '' : String(v);
+    });
+  }
+
+  utils.t = function(key, params){
+    let s = _lookupI18n(key, _i18n.active);
+    if(s == null) s = _lookupI18n(key, _i18n.defaultLocale);
+    if(s == null){
+      const codes = Object.keys(_i18n.bundles);
+      if(codes.length) s = _lookupI18n(key, codes[0]);
+    }
+    if(s == null) s = key;
+    return params ? _interpI18n(s, params) : s;
+  };
+
+  utils.isI18nField = function(v){
+    return v != null && typeof v === 'object' && v.__i18n === true;
+  };
+
+  // Translate every element carrying a data-i18n* attribute inside `root`
+  // (defaults to document). Mirrors the builder-side helper so the runtime
+  // can re-translate the static HTML shell whenever the locale changes.
+  utils.applyDataI18n = function(root){
+    const scope = root || document;
+    scope.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = utils.t(el.getAttribute('data-i18n'));
+    });
+    scope.querySelectorAll('[data-i18n-html]').forEach(el => {
+      el.innerHTML = utils.t(el.getAttribute('data-i18n-html'));
+    });
+    scope.querySelectorAll('[data-i18n-title]').forEach(el => {
+      el.setAttribute('title', utils.t(el.getAttribute('data-i18n-title')));
+    });
+    scope.querySelectorAll('[data-i18n-aria]').forEach(el => {
+      el.setAttribute('aria-label', utils.t(el.getAttribute('data-i18n-aria')));
+    });
+    scope.querySelectorAll('[data-i18n-ph]').forEach(el => {
+      el.setAttribute('placeholder', utils.t(el.getAttribute('data-i18n-ph')));
+    });
+    scope.querySelectorAll('[data-i18n-alt]').forEach(el => {
+      el.setAttribute('alt', utils.t(el.getAttribute('data-i18n-alt')));
+    });
+  };
+
+  // l(value, code?): resolve a multilingual content field. Plain strings pass
+  // through unchanged; wrapper objects fall back through active locale,
+  // default locale, then any populated locale, before returning empty.
+  utils.l = function(value, code){
+    if(value == null) return '';
+    if(typeof value === 'string') return value;
+    if(typeof value !== 'object') return String(value);
+    if(!value.__i18n) return '';
+    const loc = code || _i18n.active;
+    const primary = value[loc];
+    if(primary != null && primary !== '') return String(primary);
+    const fb = value[_i18n.defaultLocale];
+    if(fb != null && fb !== '') return String(fb);
+    const keys = Object.keys(value);
+    for(let k = 0; k < keys.length; k++){
+      const key = keys[k];
+      if(key === '__i18n') continue;
+      if(value[key] != null && value[key] !== '') return String(value[key]);
+    }
+    return '';
+  };
+
   window.BlockUtils = utils;
+
+  // Drain bundles that raced ahead of utils.js (defensive; the standard
+  // script order in template/index.html loads utils.js first).
+  if(Array.isArray(window.__ScormI18nPending)){
+    window.__ScormI18nPending.forEach(pair => utils.registerLocale(pair[0], pair[1]));
+    window.__ScormI18nPending = null;
+  }
 })();

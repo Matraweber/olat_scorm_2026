@@ -2,7 +2,22 @@
 // and the simple-input branches (text, textarea, number, boolean, select,
 // color, group, list, section, action). Complex field renderers live in
 // sibling modules so this file stays focused on the dispatch layer.
-import { el } from './util.js';
+import { el, tProp } from './util.js';
+import { t, readForEdit, writeFromEdit, getSourceHint, getDefaultLocale } from './i18n.js';
+import { getEditorLocale } from './state.js';
+
+// Field-property resolver. Wraps util.tProp so callers stay compact.
+// Handles labels for select options, which live on a different object.
+function pLabel(o){ return tProp(o, 'label') || (o && o.value); }
+
+// True when the field carries authored prose that we want to make
+// multilingual. Structured fields (numbers, booleans, media, arrays) keep
+// their raw shape so they behave predictably across locales.
+function isProseField(spec){
+  if(!spec) return false;
+  if(spec.transform === 'csv') return false;
+  return spec.type === 'text' || spec.type === 'textarea' || spec.type === 'string' || !spec.type;
+}
 import {
   renderImageField, renderAudioField, renderVideoField, renderFileField
 } from './form-media.js';
@@ -32,31 +47,31 @@ export function humanSize(bytes){
   return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
 export function validateUpload(file, kind){
-  if(!file) return { ok: false, error: 'Keine Datei ausgewählt.' };
+  if(!file) return { ok: false, error: t('form.upload.noFile') };
   const limit = UPLOAD_SIZE_LIMITS[kind] || UPLOAD_SIZE_LIMITS.file;
   if(file.size > limit){
     const suggestion = kind === 'video'
-      ? ' Tipp: YouTube oder Vimeo unterstützen beliebig große Videos; einfach den Link einfügen.'
+      ? ' ' + t('form.upload.tooLargeVideoTip')
       : '';
-    return { ok:false, error:'Datei ist zu groß (' + humanSize(file.size) + '). Maximum: ' + humanSize(limit) + '.' + suggestion };
+    return { ok:false, error: t('form.upload.tooLarge', { size: humanSize(file.size), max: humanSize(limit) }) + suggestion };
   }
   const mime = file.type || '';
   if(kind === 'image' && !mime.startsWith('image/')){
-    return { ok:false, error:'Diese Datei ist kein Bild' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
+    return { ok:false, error: mime ? t('form.upload.notImageWithType', { type: mime }) : t('form.upload.notImage') };
   }
   if(kind === 'audio' && !mime.startsWith('audio/')){
-    return { ok:false, error:'Diese Datei ist keine Audiodatei' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
+    return { ok:false, error: mime ? t('form.upload.notAudioWithType', { type: mime }) : t('form.upload.notAudio') };
   }
   if(kind === 'video' && !mime.startsWith('video/')){
-    return { ok:false, error:'Diese Datei ist kein Video' + (mime ? ' (Typ: ' + mime + ')' : '') + '.' };
+    return { ok:false, error: mime ? t('form.upload.notVideoWithType', { type: mime }) : t('form.upload.notVideo') };
   }
   const warnThresh = UPLOAD_WARN_THRESHOLDS[kind];
   let warning = null;
   if(warnThresh && file.size > warnThresh){
     const suggestion = kind === 'video'
-      ? ' Für sehr lange Videos kann ein YouTube-/Vimeo-Link sinnvoller sein.'
+      ? ' ' + t('form.upload.veryLargeVideoTip')
       : '';
-    warning = 'Sehr große Datei: der Auto-Save im Browser kann scheitern, d. h. bei Reload wäre die Datei weg. Der SCORM-Export funktioniert weiterhin.' + suggestion;
+    warning = t('form.upload.veryLargeWarning') + suggestion;
   }
   return { ok: true, sizeHuman: humanSize(file.size), warning };
 }
@@ -102,9 +117,9 @@ export function renderField(spec, getObj, setObj){
 
   if(spec.type === 'group'){
     const fs = el('fieldset', {className:'fieldset'});
-    const lg = el('legend', {text: spec.label || spec.key});
+    const lg = el('legend', {text: tProp(spec, 'label') || spec.key});
     fs.appendChild(lg);
-    if(spec.help) fs.appendChild(el('div', {className:'field-help', text: spec.help}));
+    { const helpTxt = tProp(spec, 'help'); if(helpTxt) fs.appendChild(el('div', {className:'field-help', text: helpTxt})); }
     const subGet = () => (obj[spec.key] = obj[spec.key] || {});
     const subSet = (k, v) => { subGet()[k] = v; setObj(spec.key, subGet()); };
     const row = el('div', {className:'field-row'});
@@ -116,11 +131,11 @@ export function renderField(spec, getObj, setObj){
   if(spec.type === 'list'){
     const block = el('div', {className:'list-block'});
     const head = el('div', {className:'list-head'});
-    head.appendChild(el('strong', {text: spec.label || spec.key, style:{color:'var(--primary)'}}));
-    const addBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'+ ' + (spec.itemLabel || 'Eintrag')});
+    head.appendChild(el('strong', {text: tProp(spec, 'label') || spec.key, style:{color:'var(--primary)'}}));
+    const addBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'+ ' + (tProp(spec, 'itemLabel') || t('form.list.itemLabel'))});
     head.appendChild(addBtn);
     block.appendChild(head);
-    if(spec.help) block.appendChild(el('div', {className:'field-help', text: spec.help}));
+    { const helpTxt = tProp(spec, 'help'); if(helpTxt) block.appendChild(el('div', {className:'field-help', text: helpTxt})); }
     const body = el('div');
     block.appendChild(body);
 
@@ -156,7 +171,7 @@ export function renderField(spec, getObj, setObj){
       list.forEach((item, idx) => {
         const card = el('div', {className:'list-item'});
         const ihead = el('div', {className:'list-item-head'});
-        ihead.appendChild(el('span', {className:'list-item-title', text:(spec.itemLabel || 'Eintrag') + ' ' + (idx+1)}));
+        ihead.appendChild(el('span', {className:'list-item-title', text:(tProp(spec, 'itemLabel') || t('form.list.itemLabel')) + ' ' + (idx+1)}));
 
         let summarySpan = null;
         if(spec.itemSummary){
@@ -165,9 +180,9 @@ export function renderField(spec, getObj, setObj){
         }
 
         const ctrls = el('div', {className:'list-item-controls'});
-        const upBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Nach oben'}, text:'▲'});
-        const dnBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Nach unten'}, text:'▼'});
-        const rmBtn = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
+        const upBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('common.up')}, text:'▲'});
+        const dnBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('common.down')}, text:'▼'});
+        const rmBtn = el('button', {className:'icon-btn danger', attrs:{type:'button', title: t('common.remove')}, text:'✕'});
         upBtn.disabled = idx === 0; dnBtn.disabled = idx === list.length - 1;
         upBtn.addEventListener('click', () => { [list[idx-1], list[idx]] = [list[idx], list[idx-1]]; setObj(spec.key, list); rerender(); });
         dnBtn.addEventListener('click', () => { [list[idx+1], list[idx]] = [list[idx], list[idx+1]]; setObj(spec.key, list); rerender(); });
@@ -239,7 +254,7 @@ export function renderField(spec, getObj, setObj){
         card.appendChild(itemBody);
         body.appendChild(card);
       });
-      if(list.length === 0) body.appendChild(el('div', {className:'field-help', text:'Noch keine Einträge.'}));
+      if(list.length === 0) body.appendChild(el('div', {className:'field-help', text: t('form.list.empty')}));
     }
 
     addBtn.addEventListener('click', () => {
@@ -253,7 +268,7 @@ export function renderField(spec, getObj, setObj){
   }
 
   if(spec.type === 'section'){
-    return el('div', {className:'field-section-label', text: spec.label || ''});
+    return el('div', {className:'field-section-label', text: tProp(spec, 'label') || ''});
   }
 
   if(spec.type === 'unit-pair'){
@@ -266,7 +281,7 @@ export function renderField(spec, getObj, setObj){
 
   if(spec.type === 'action'){
     const row = el('div', {className:'field-action-row'});
-    const btn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: spec.label || 'Aktion'});
+    const btn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text: tProp(spec, 'label') || t('form.action.default')});
     btn.addEventListener('click', () => btn.dispatchEvent(
       new CustomEvent('block-field-action', {detail:{action: spec.action}, bubbles:true})
     ));
@@ -274,26 +289,40 @@ export function renderField(spec, getObj, setObj){
     return row;
   }
 
-  const wrap = el('div', {className: 'field' + (spec.help ? ' field-has-help' : '') + (spec.fullWidth ? ' field-full' : '')});
+  const specLabel = tProp(spec, 'label');
+  const specHelp = tProp(spec, 'help');
+  const specPlaceholder = tProp(spec, 'placeholder');
+  const wrap = el('div', {className: 'field' + (specHelp ? ' field-has-help' : '') + (spec.fullWidth ? ' field-full' : '')});
   // Stable id pairs the <label for=""> with the input below, satisfying
   // screen-reader form associations.
   const fieldId = 'fld_' + (spec.key || 'x') + '_' + Math.random().toString(36).slice(2, 8);
   let labelNode = null;
   if(spec.type !== 'boolean'){
-    labelNode = el('label', {text: spec.label || spec.key, attrs:{'for': fieldId}});
+    labelNode = el('label', {text: specLabel || spec.key, attrs:{'for': fieldId}});
     wrap.appendChild(labelNode);
   }
   // For checkboxes the help reads better BELOW the box+label (appended in the
   // boolean branch); every other field type keeps it above the input.
-  if(spec.help && spec.type !== 'boolean') wrap.appendChild(el('div', {className:'field-help', text: spec.help}));
+  if(specHelp && spec.type !== 'boolean') wrap.appendChild(el('div', {className:'field-help', text: specHelp}));
 
   let input;
   if(spec.type === 'textarea'){
-    input = el('textarea', {attrs:{rows: spec.rows || 3, placeholder: spec.placeholder || ''}});
-    input.value = obj[spec.key] != null ? String(obj[spec.key]) : '';
-    input.addEventListener('input', () => setObj(spec.key, input.value));
+    const editorLoc = getEditorLocale();
+    const sourceLoc = getDefaultLocale();
+    input = el('textarea', {attrs:{rows: spec.rows || 3, placeholder: specPlaceholder || ''}});
+    input.value = readForEdit(obj[spec.key], editorLoc, sourceLoc);
+    input.addEventListener('input', () => {
+      setObj(spec.key, writeFromEdit(obj[spec.key], editorLoc, input.value, sourceLoc));
+    });
+    // When editing a non-source locale, surface the source-locale text as a
+    // hint so the author sees what they are translating from.
+    const hint = getSourceHint(obj[spec.key], editorLoc, sourceLoc);
+    if(hint){
+      const hintEl = el('div', {className:'field-i18n-hint', text: sourceLoc.toUpperCase() + ': ' + hint});
+      wrap.appendChild(hintEl);
+    }
   } else if(spec.type === 'number'){
-    input = el('input', {attrs:{type:'number', step: spec.step != null ? spec.step : 'any', placeholder: spec.placeholder || ''}});
+    input = el('input', {attrs:{type:'number', step: spec.step != null ? spec.step : 'any', placeholder: specPlaceholder || ''}});
     input.dataset.fieldKey = spec.key;
     if(spec.min != null) input.min = spec.min;
     if(spec.max != null) input.max = spec.max;
@@ -317,15 +346,15 @@ export function renderField(spec, getObj, setObj){
     cb.checked = !!obj[spec.key];
     const lbl = el('label', {className:'checkbox-field'});
     lbl.appendChild(cb);
-    lbl.appendChild(el('span', {text: spec.label || spec.key}));
+    lbl.appendChild(el('span', {text: specLabel || spec.key}));
     cb.addEventListener('change', () => setObj(spec.key, cb.checked));
     wrap.appendChild(lbl);
-    if(spec.help) wrap.appendChild(el('div', {className:'field-help field-help-checkbox', text: spec.help}));
+    if(specHelp) wrap.appendChild(el('div', {className:'field-help field-help-checkbox', text: specHelp}));
     return wrap;
   } else if(spec.type === 'select'){
     input = el('select');
     (spec.options || []).forEach(o => {
-      const op = el('option', {attrs:{value: o.value}, text: o.label || o.value});
+      const op = el('option', {attrs:{value: o.value}, text: pLabel(o)});
       input.appendChild(op);
     });
     const cur = obj[spec.key];
@@ -335,15 +364,15 @@ export function renderField(spec, getObj, setObj){
     // Native swatch + hex input, kept in sync. Both share the field <label>
     // via aria-label so screen readers announce them as "<spec.label>, Farbe".
     const cfWrap = el('div', {className:'color-field'});
-    const ariaLabel = spec.label || spec.key;
+    const ariaLabel = specLabel || spec.key;
     const swatch = el('input', {
       className:'color-field-swatch',
-      attrs:{type:'color', 'aria-label': ariaLabel + ' (Farbwähler)'}
+      attrs:{type:'color', 'aria-label': t('form.color.pickerAria', { label: ariaLabel })}
     });
     const hexInp = el('input', {
       className:'color-field-hex',
       attrs:{type:'text', maxlength:'7', spellcheck:'false', placeholder:'#RRGGBB',
-             'aria-label': ariaLabel + ' (Hex-Code)'}
+             'aria-label': t('form.color.hexAria', { label: ariaLabel })}
     });
     const initial = (obj[spec.key] && /^#[0-9A-Fa-f]{6}$/.test(obj[spec.key])) ? obj[spec.key] : '#000000';
     swatch.value = initial;
@@ -380,13 +409,28 @@ export function renderField(spec, getObj, setObj){
     return renderZoneEditor(spec, getObj, setObj, wrap);
   } else {
     // plain text
-    input = el('input', {attrs:{type:'text', placeholder: spec.placeholder || ''}});
+    input = el('input', {attrs:{type:'text', placeholder: specPlaceholder || ''}});
     const v = obj[spec.key];
-    input.value = Array.isArray(v) ? v.join(',') : (v != null ? String(v) : '');
-    input.addEventListener('input', () => {
-      if(spec.transform === 'csv') setObj(spec.key, input.value.split(',').map(s => s.trim()).filter(Boolean));
-      else setObj(spec.key, input.value);
-    });
+    if(spec.transform === 'csv'){
+      // Array-valued fields skip the multilingual treatment; the shape would
+      // otherwise become ambiguous (array of wrappers vs wrapper of arrays).
+      input.value = Array.isArray(v) ? v.join(',') : (v != null ? String(v) : '');
+      input.addEventListener('input', () => {
+        setObj(spec.key, input.value.split(',').map(s => s.trim()).filter(Boolean));
+      });
+    } else {
+      const editorLoc = getEditorLocale();
+      const sourceLoc = getDefaultLocale();
+      input.value = readForEdit(v, editorLoc, sourceLoc);
+      input.addEventListener('input', () => {
+        setObj(spec.key, writeFromEdit(obj[spec.key], editorLoc, input.value, sourceLoc));
+      });
+      const hint = getSourceHint(v, editorLoc, sourceLoc);
+      if(hint){
+        const hintEl = el('div', {className:'field-i18n-hint', text: sourceLoc.toUpperCase() + ': ' + hint});
+        wrap.appendChild(hintEl);
+      }
+    }
   }
   if(input) input.id = fieldId;
   wrap.appendChild(input);

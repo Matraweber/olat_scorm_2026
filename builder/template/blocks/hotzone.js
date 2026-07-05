@@ -19,52 +19,64 @@
 
   Blocks.register('hotzone', {
     label: 'Hotzone (Bild markieren)',
+    labelKey: 'block.hotzone.label',
     description: 'Bild mit markierten Bereichen. Lernende klicken in die richtigen Zonen.',
+    descKey: 'block.hotzone.description',
     category: 'Frage',
+    categoryKey: 'block.category.question',
     icon: '◳',
     graded: true,
-    defaultConfig(){
+    defaultConfig(locale){
+      const u = window.BlockUtils || {};
+      const loc = locale || (u.getLocale && u.getLocale()) || 'de';
+      const en = loc === 'en';
       return {
         blockTitle: '',
         src: '', zones: [],
-        prompt: 'Klicken Sie auf alle markierten Bereiche.',
+        prompt: en ? 'Click on all marked areas.' : 'Klicken Sie auf alle markierten Bereiche.',
         showZonesAfterCheck: true,
         maxPoints: 1
       };
     },
     previewConfig(){
+      const u = window.BlockUtils || {};
+      const t = (typeof u.t === 'function') ? u.t : (k => k);
       return {
         blockTitle: '',
         src: STOCK_LANDSCAPE_SVG,
         zones: [{ x: 0.41, y: 0.425, w: 0.19, h: 0.317 }],
-        prompt: 'Klicken Sie auf den Baum.',
+        prompt: t('block.hotzone.preview.prompt'),
         showZonesAfterCheck: true,
         maxPoints: 1
       };
     },
     builderSchema(){
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Hotzone' },
-        { type:'section', label:'Frage', key:'_sec_q' },
-        { key:'prompt', label:'Aufgabentext', type:'math-textarea', rows:2 },
-        { type:'section', label:'Bild & Zonen', key:'_sec_zones' },
-        { key:'src',   label:'Bild', type:'image',
-          help:'Bild hochladen oder URL eingeben.' },
-        { key:'zones', label:'Hotzonen einzeichnen', type:'zone-editor',
-          help:'Rechteck auf dem Bild ziehen → Zone hinzufügen. Zone anklicken → löschen.' },
-        { type:'section', label:'Einstellungen & Bewertung', key:'_sec_opts' },
-        { key:'showZonesAfterCheck', label:'Nicht gefundene Zonen nach Korrektur anzeigen', type:'boolean' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.hotzone.field.blockTitle.label', type:'text', placeholder:'Hotzone', placeholderKey:'block.hotzone.field.blockTitle.placeholder' },
+        { type:'section', label:'Frage', labelKey:'block.hotzone.field._sec_q.label', key:'_sec_q' },
+        { key:'prompt', label:'Aufgabentext', labelKey:'block.hotzone.field.prompt.label', type:'math-textarea', rows:2 },
+        { type:'section', label:'Bild & Zonen', labelKey:'block.hotzone.field._sec_zones.label', key:'_sec_zones' },
+        { key:'src',   label:'Bild', labelKey:'block.hotzone.field.src.label', type:'image',
+          help:'Bild hochladen oder URL eingeben.', helpKey:'block.hotzone.field.src.help' },
+        { key:'zones', label:'Hotzonen einzeichnen', labelKey:'block.hotzone.field.zones.label', type:'zone-editor',
+          help:'Rechteck auf dem Bild ziehen → Zone hinzufügen. Zone anklicken → löschen.', helpKey:'block.hotzone.field.zones.help' },
+        { type:'section', label:'Einstellungen & Bewertung', labelKey:'block.hotzone.field._sec_opts.label', key:'_sec_opts' },
+        { key:'showZonesAfterCheck', label:'Nicht gefundene Zonen nach Korrektur anzeigen', labelKey:'block.hotzone.field.showZonesAfterCheck.label', type:'boolean' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.hotzone.field.maxPoints.label', type:'number', step:1, min:1 }
       ];
     },
     mount(host, config, api){
-      const ui = api.utils.simpleQuestionCard(host, { title: config.blockTitle || 'Aufgabe', qBoxTitle: 'Aufgabe', question: config.prompt || '' });
+      const t = api.utils.t;
+      const l = api.utils.l;
+      const titleText = l(config.blockTitle) || api.utils.t('common.task');
+      const promptText = l(config.prompt) || '';
+      const ui = api.utils.simpleQuestionCard(host, { title: titleText, qBoxTitle: api.utils.t('common.task'), question: promptText });
       const { content, buttons, fb } = ui;
 
       if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'padding:2rem; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:8px;';
-        ph.textContent = '(Kein Bild gesetzt)';
+        ph.textContent = t('block.hotzone.noImage');
         content.appendChild(ph);
         return {};
       }
@@ -89,7 +101,7 @@
       const counter = document.createElement('div');
       counter.style.cssText = 'font-size:0.82rem; color:var(--muted); margin:0.4rem 0 0.2rem;';
       function updateCounter(){
-        counter.textContent = clicks.length + ' / ' + maxClicks + ' Markierungen gesetzt';
+        counter.textContent = t('block.hotzone.counter', { count: clicks.length, max: maxClicks });
         // Visually indicate when max is reached
         stage.style.cursor = (clicks.length >= maxClicks) ? 'not-allowed' : 'crosshair';
       }
@@ -113,7 +125,7 @@
         dot.style.cssText = 'position:absolute; width:18px; height:18px; border-radius:50%; background:rgba(21,101,255,0.7); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer;';
         dot.style.left = (x * 100) + '%';
         dot.style.top  = (y * 100) + '%';
-        dot.title = 'Klicken zum Entfernen';
+        dot.title = t('block.hotzone.removeMark');
         dot.addEventListener('click', ev => {
           if(stage.dataset.locked === '1') return;
           ev.stopPropagation(); // don't let it create a new dot
@@ -128,8 +140,8 @@
       content.appendChild(counter);
       updateCounter();
 
-      const checkBtn = document.createElement('button'); checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
-      const resetBtn = document.createElement('button'); resetBtn.type = 'button'; resetBtn.className = 'btn btn-secondary'; resetBtn.textContent = 'Zurücksetzen';
+      const checkBtn = document.createElement('button'); checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = t('common.check');
+      const resetBtn = document.createElement('button'); resetBtn.type = 'button'; resetBtn.className = 'btn btn-secondary'; resetBtn.textContent = t('block.hotzone.reset');
       buttons.appendChild(checkBtn); buttons.appendChild(resetBtn);
 
       function pointInZone(p, z){
@@ -138,9 +150,9 @@
 
       function grade(){
         const zones = config.zones || [];
-        if(zones.length === 0){ fb.neutral('Keine Hotzonen konfiguriert.'); return; }
+        if(zones.length === 0){ fb.neutral(t('block.hotzone.noZonesConfigured')); return; }
         // No mark placed yet: prompt instead of recording a 0.
-        if(clicks.length === 0){ fb.bad('Bitte mindestens eine Stelle im Bild markieren.'); return; }
+        if(clicks.length === 0){ fb.bad(t('block.hotzone.markAtLeastOne')); return; }
         const found = zones.map(z => clicks.some(c => pointInZone(c, z)));
         const correct = found.filter(Boolean).length;
         const misclicks = clicks.filter(c => !zones.some(z => pointInZone(c, z))).length;
@@ -169,11 +181,13 @@
         const pts = Math.round(ratio * (config.maxPoints || 1) * 100) / 100;
         api.reportScore(pts);
         if(correct === zones.length && misclicks === 0){
-          fb.ok('Alle ' + zones.length + ' Zonen gefunden.');
+          fb.ok(t('block.hotzone.allFound', { total: zones.length }));
         } else if(correct === zones.length){
-          fb.bad(correct + '/' + zones.length + ' Zonen gefunden, aber ' + misclicks + ' Fehlklick(s).');
+          fb.bad(t('block.hotzone.allFoundWithMisclicks', { correct: correct, total: zones.length, misclicks: misclicks }));
+        } else if(misclicks > 0){
+          fb.bad(t('block.hotzone.partialWithMisclicks', { correct: correct, total: zones.length, misclicks: misclicks }));
         } else {
-          fb.bad(correct + ' von ' + zones.length + ' Zonen gefunden' + (misclicks ? ' (' + misclicks + ' Fehlklick(s))' : '') + '.');
+          fb.bad(t('block.hotzone.partial', { correct: correct, total: zones.length }));
         }
       }
       function reset(){
@@ -181,7 +195,7 @@
         overlay.innerHTML = '';
         stage.dataset.locked = '';
         updateCounter();
-        fb.neutral('Zurückgesetzt. Bitte neu klicken.');
+        fb.neutral(t('block.hotzone.resetHint'));
       }
       checkBtn.addEventListener('click', grade);
       resetBtn.addEventListener('click', reset);
@@ -190,22 +204,25 @@
       return {};
     },
     preview(host, config){
+      const t = (window.BlockUtils && window.BlockUtils.t) ? window.BlockUtils.t : function(k){ return k; };
+      const l = (window.BlockUtils && window.BlockUtils.l) ? window.BlockUtils.l : function(v){ return v; };
       const wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex; flex-direction:column; height:100%; padding:0.4rem; box-sizing:border-box; gap:0.3rem;';
       const tag = document.createElement('div');
-      tag.textContent = '◳  Hotzone';
+      tag.textContent = '◳  ' + t('block.hotzone.label');
       tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700;';
       wrap.appendChild(tag);
-      if(config.prompt){
+      const promptText = l(config.prompt);
+      if(promptText){
         const q = document.createElement('div');
-        q.textContent = config.prompt;
+        q.textContent = promptText;
         q.style.cssText = 'color:#003b5c; font-weight:700; font-size:0.82rem;';
         wrap.appendChild(q);
       }
       if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'flex:1; display:flex; align-items:center; justify-content:center; color:#888; font-style:italic; border:1px dashed #d8e0e6; border-radius:6px;';
-        ph.textContent = '(Kein Bild)';
+        ph.textContent = t('block.hotzone.noImageShort');
         wrap.appendChild(ph);
         host.appendChild(wrap); return;
       }
@@ -227,7 +244,7 @@
       wrap.appendChild(stage);
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:0.72rem; color:#5d6872;';
-      hint.textContent = (config.zones || []).length + ' Zone(n) markiert';
+      hint.textContent = t('block.hotzone.zonesMarked', { count: (config.zones || []).length });
       wrap.appendChild(hint);
       host.appendChild(wrap);
     }

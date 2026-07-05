@@ -1,20 +1,23 @@
 (function(){
   'use strict';
   const QUESTION_MODE_OPTIONS = [
-    {value:'custom',      label:'Eigene Frage / Lösung'},
-    {value:'value-at-x',  label:'Funktionswert f(x0)'},
-    {value:'x-for-y',     label:'x-Werte zu f(x) = y0'},
-    {value:'zeros',       label:'Nullstellen'},
-    {value:'y-intercept', label:'y-Achsenabschnitt f(0)'},
-    {value:'minima',      label:'Tiefpunkte / Minima'},
-    {value:'maxima',      label:'Hochpunkte / Maxima'},
-    {value:'extrema',     label:'Alle Extrempunkte'}
+    {value:'custom',      label:'Eigene Frage / Lösung', labelKey:'block.function-question.field.questionMode.option.custom'},
+    {value:'value-at-x',  label:'Funktionswert f(x0)',    labelKey:'block.function-question.field.questionMode.option.value-at-x'},
+    {value:'x-for-y',     label:'x-Werte zu f(x) = y0',   labelKey:'block.function-question.field.questionMode.option.x-for-y'},
+    {value:'zeros',       label:'Nullstellen',            labelKey:'block.function-question.field.questionMode.option.zeros'},
+    {value:'y-intercept', label:'y-Achsenabschnitt f(0)', labelKey:'block.function-question.field.questionMode.option.y-intercept'},
+    {value:'minima',      label:'Tiefpunkte / Minima',    labelKey:'block.function-question.field.questionMode.option.minima'},
+    {value:'maxima',      label:'Hochpunkte / Maxima',    labelKey:'block.function-question.field.questionMode.option.maxima'},
+    {value:'extrema',     label:'Alle Extrempunkte',      labelKey:'block.function-question.field.questionMode.option.extrema'}
   ];
 
   Blocks.register('function-question', {
     label: 'Funktion ablesen',
+    labelKey: 'block.function-question.label',
     description: 'Funktionsgraph anzeigen. Werte, Nullstellen und Extrempunkte ablesen.',
+    descKey: 'block.function-question.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: 'ƒ',
     graded: true,
     defaultConfig(){
@@ -29,56 +32,66 @@
         maxPoints: 1
       };
     },
-    summary(cfg){ return ((cfg.functions || []).length) + ' Funktion(en)'; },
+    summary(cfg){
+      const count = (cfg.functions || []).length;
+      const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
+      return t('block.function-question.summary', { count });
+    },
     builderSchema(){
-      const MODE_LABEL = {
-        'custom':      'Eigene Frage',
-        'value-at-x':  'f(x₀) ablesen',
-        'x-for-y':     'x bei f(x) = y₀',
-        'zeros':       'Nullstellen',
-        'y-intercept': 'y-Achsenabschnitt',
-        'minima':      'Tiefpunkte',
-        'maxima':      'Hochpunkte',
-        'extrema':     'Alle Extrempunkte'
+      const u = (window.BlockUtils && typeof window.BlockUtils.t === 'function') ? window.BlockUtils : null;
+      const modeLabel = key => {
+        if(!key) return '';
+        const fullKey = 'block.function-question.modeLabel.' + key;
+        if(u){
+          const translated = u.t(fullKey);
+          if(translated && translated !== fullKey) return translated;
+        }
+        return '';
       };
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Funktionsplot' },
-        { key:'functions', label:'Funktions-Pool', type:'list', itemLabel:'Funktion',
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.function-question.field.blockTitle.label',
+          type:'text', placeholder:'Funktionsplot', placeholderKey:'block.function-question.field.blockTitle.placeholder' },
+        { key:'functions', label:'Funktions-Pool', labelKey:'block.function-question.field.functions.label',
+          type:'list', itemLabel:'Funktion', itemLabelKey:'block.function-question.field.functions.itemLabel',
           itemSummary: item => {
             const expr = (item.expr || '').trim() || '…';
-            const mode = MODE_LABEL[item.questionMode || 'value-at-x'] || '…';
+            const mode = modeLabel(item.questionMode || 'value-at-x') || '…';
             return 'f(x) = ' + expr + '   ·   ' + mode;
           },
           itemSchema:[
             // Funktion
-            { key:'expr', label:'f(x) =', type:'text', placeholder:'z. B. x^2 - 2*x - 3', fullWidth:true },
+            { key:'expr', label:'f(x) =', labelKey:'block.function-question.field.expr.label',
+              type:'text', placeholder:'z. B. x^2 - 2*x - 3', placeholderKey:'block.function-question.field.expr.placeholder', fullWidth:true },
             // Koordinatenbereich
-            { type:'section', label:'Koordinatenbereich', key:'_sec_axes' },
-            { key:'xMin', label:'x von', type:'number', step:'any' },
-            { key:'xMax', label:'x bis', type:'number', step:'any' },
-            { key:'yMin', label:'y von', type:'number', step:'any' },
-            { key:'yMax', label:'y bis', type:'number', step:'any' },
+            { type:'section', label:'Koordinatenbereich', labelKey:'block.function-question.field._sec_axes.label', key:'_sec_axes' },
+            { key:'xMin', label:'x von', labelKey:'block.function-question.field.xMin.label', type:'number', step:'any' },
+            { key:'xMax', label:'x bis', labelKey:'block.function-question.field.xMax.label', type:'number', step:'any' },
+            { key:'yMin', label:'y von', labelKey:'block.function-question.field.yMin.label', type:'number', step:'any' },
+            { key:'yMax', label:'y bis', labelKey:'block.function-question.field.yMax.label', type:'number', step:'any' },
             // Query options
-            { type:'section', label:'Abfrage', key:'_sec_query' },
-            { key:'questionMode', label:'Was wird gefragt?', type:'select',
+            { type:'section', label:'Abfrage', labelKey:'block.function-question.field._sec_query.label', key:'_sec_query' },
+            { key:'questionMode', label:'Was wird gefragt?', labelKey:'block.function-question.field.questionMode.label', type:'select',
               options: QUESTION_MODE_OPTIONS, default:'value-at-x', fullWidth:true },
-            { key:'xQuery', label:'Stelle  x₀', type:'number', step:'any',
+            { key:'xQuery', label:'Stelle  x₀', labelKey:'block.function-question.field.xQuery.label', type:'number', step:'any',
               showIf: c => (c.questionMode || 'value-at-x') === 'value-at-x' },
-            { key:'targetY', label:'Zielwert  y₀', type:'number', step:'any',
+            { key:'targetY', label:'Zielwert  y₀', labelKey:'block.function-question.field.targetY.label', type:'number', step:'any',
               showIf: c => c.questionMode === 'x-for-y' },
-            { key:'tolerance', label:'Toleranz (± Abweichung)', type:'number', step:'any' },
-            { key:'question', label:'Fragetext', type:'text', fullWidth:true,
-              help:'Leer lassen: die Frage wird automatisch aus dem Typ erzeugt.',
+            { key:'tolerance', label:'Toleranz (± Abweichung)', labelKey:'block.function-question.field.tolerance.label', type:'number', step:'any' },
+            { key:'question', label:'Fragetext', labelKey:'block.function-question.field.question.label', type:'text', fullWidth:true,
+              help:'Leer lassen: die Frage wird automatisch aus dem Typ erzeugt.', helpKey:'block.function-question.field.question.help',
               showIf: c => c.questionMode === 'custom' },
-            { key:'answer', label:'Musterlösung', type:'text', fullWidth:true,
-              help:'Mehrere Werte mit Semikolon trennen.',
+            { key:'answer', label:'Musterlösung', labelKey:'block.function-question.field.answer.label', type:'text', fullWidth:true,
+              help:'Mehrere Werte mit Semikolon trennen.', helpKey:'block.function-question.field.answer.help',
               showIf: c => c.questionMode === 'custom' },
-            { key:'answerType', label:'Antwort-Format', type:'select',
-              options:[{value:'number', label:'Einzelne Zahl'},{value:'list', label:'Mehrere Zahlen'}],
+            { key:'answerType', label:'Antwort-Format', labelKey:'block.function-question.field.answerType.label', type:'select',
+              options:[
+                {value:'number', label:'Einzelne Zahl',   labelKey:'block.function-question.field.answerType.option.number'},
+                {value:'list',   label:'Mehrere Zahlen',  labelKey:'block.function-question.field.answerType.option.list'}
+              ],
               showIf: c => c.questionMode === 'custom' }
           ]},
-        { key:'randomize', label:'Funktion zufällig wählen', type:'boolean' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        { key:'randomize', label:'Funktion zufällig wählen', labelKey:'block.function-question.field.randomize.label', type:'boolean' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.function-question.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -86,11 +99,13 @@
       const u = api.utils;
       let current = null;
 
+      const blockTitleText = u.l(config.blockTitle) || u.t('block.function-question.defaultTitle');
+
       const grid = document.createElement('section'); grid.className = 'content-grid';
       const plotCard = document.createElement('article'); plotCard.className = 'section-card plot-card';
-      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(config.blockTitle || 'Funktionsplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>f(x)</span></div></div><div class="plot-host-wrap wide-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
+      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(blockTitleText) + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>f(x)</span></div></div><div class="plot-host-wrap wide-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">' + u.escapeHtml(u.t('common.question')) + '</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
-      controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Antwort'}));
+      controls.appendChild(Object.assign(document.createElement('h3'), {textContent: u.t('common.answer')}));
       // Dynamic answer area: re-built per question so the number of input fields
       // matches the count of visible solutions (extrema / zeros / x-for-y).
       const answerWrap = document.createElement('div');
@@ -100,8 +115,8 @@
       let answerInputs = []; // [{x, y}] for points, [{v}] for numbers, [{v}] for custom/single
       let noneCheckbox = null;
       const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
-      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
-      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
+      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent = u.t('common.check');
+      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent = u.t('common.regenerate');
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
       controls.appendChild(btnRow);
       const fb = u.feedbackBox(controls);
@@ -154,7 +169,7 @@
         answerInputs = [];
         noneCheckbox = null;
         if(current._mode === 'custom'){
-          const inp = makeInput('Antwort eingeben');
+          const inp = makeInput(u.t('common.answerPlaceholder'));
           answerWrap.appendChild(inp);
           answerInputs.push({ v: inp });
           return;
@@ -167,7 +182,7 @@
           noneCheckbox = document.createElement('input');
           noneCheckbox.type = 'checkbox';
           lbl.appendChild(noneCheckbox);
-          lbl.appendChild(document.createTextNode('Keine im sichtbaren Bereich'));
+          lbl.appendChild(document.createTextNode(u.t('block.function-question.noneInRange')));
           answerWrap.appendChild(lbl);
           return;
         }
@@ -189,7 +204,7 @@
             row.appendChild(lp); row.appendChild(px); row.appendChild(sep); row.appendChild(py); row.appendChild(rp);
             answerInputs.push({ x: px, y: py });
           } else {
-            const v = makeInput('Wert', '8rem');
+            const v = makeInput(u.t('block.function-question.valuePlaceholder'), '8rem');
             row.appendChild(v);
             answerInputs.push({ v: v });
           }
@@ -207,7 +222,7 @@
       function chooseNew(){
         current = pickInstance();
         buildAnswerInputs();
-        fb.neutral('Neue Aufgabe generiert.');
+        fb.neutral(u.t('block.function-question.newTaskGenerated'));
         renderPlot();
       }
       function hasAnyInput(){
@@ -221,7 +236,7 @@
       }
       function grade(){
         // No input at all: prompt instead of recording a 0.
-        if(!hasAnyInput()){ fb.bad('Bitte eine Antwort eingeben.'); return; }
+        if(!hasAnyInput()){ fb.bad(u.t('block.function-question.pleaseEnterAnswer')); return; }
         const result = gradeFunctionAnswer(current, readAnswerText(), u);
         if(result.ok){ fb.ok(result.message); api.reportScore(config.maxPoints || 1); }
         else { fb.bad(result.message); api.reportScore(0); }
@@ -234,8 +249,9 @@
       return {};
     },
     preview(host, config){
+      const u = window.BlockUtils;
       const fn = (config.functions || [])[0] || {expr:'x', xMin:-5, xMax:5, yMin:-5, yMax:5};
-      const previewInstance = prepareFunctionInstance(fn, { safeMathExpr: (expr, vars) => safeMath(expr, vars.x) });
+      const previewInstance = prepareFunctionInstance(fn, { safeMathExpr: (expr, vars) => safeMath(expr, vars.x) }, u);
       const W = 360, H = 220, P = 24;
       const xMin = numOr(fn.xMin, -5), xMax = numOr(fn.xMax, 5);
       const yMin = numOr(fn.yMin, -5), yMax = numOr(fn.yMax, 5);
@@ -303,6 +319,18 @@
     return String(Math.round(n * 1000) / 1000).replace('.', ',');
   }
 
+  function tt(key, params){
+    const bu = window.BlockUtils;
+    if(bu && typeof bu.t === 'function') return bu.t(key, params);
+    return key;
+  }
+
+  function ll(value){
+    const bu = window.BlockUtils;
+    if(bu && typeof bu.l === 'function') return bu.l(value);
+    return value == null ? '' : (typeof value === 'string' ? value : '');
+  }
+
   function prepareFunctionInstance(item, u){
     const src = item || {};
     const fn = Object.assign({
@@ -310,17 +338,18 @@
       questionMode:'value-at-x', xQuery:0, targetY:0, tolerance:0.05,
       question:'', answer:'', answerType:'number'
     }, src);
-    const hasManualAnswer = fn.answer != null && String(fn.answer).trim() !== '';
+    const authoredQuestion = ll(fn.question);
+    const hasManualAnswer = fn.answer != null && String(ll(fn.answer)).trim() !== '';
     const mode = fn.questionMode || (hasManualAnswer ? 'custom' : 'value-at-x');
     const runtime = Object.assign({}, fn, {
       _source: src,
       _mode: mode,
       _answerKind: mode === 'custom' ? 'custom' : 'numbers',
       _expected: [],
-      _question: String(fn.question || '').trim()
+      _question: String(authoredQuestion || '').trim()
     });
     if(mode === 'custom'){
-      if(!runtime._question) runtime._question = 'Lesen Sie den geforderten Wert aus dem Plot ab.';
+      if(!runtime._question) runtime._question = tt('block.function-question.autoQuestion.custom');
       return runtime;
     }
 
@@ -333,31 +362,33 @@
     if(mode === 'value-at-x'){
       const y = u.safeMathExpr(fn.expr, {x:x0});
       runtime._expected = y == null ? [] : [y];
-      runtime._question = runtime._question || 'Bestimmen Sie f(' + prettyNum(x0) + ').';
+      runtime._question = runtime._question || tt('block.function-question.autoQuestion.value-at-x', { x: prettyNum(x0) });
     } else if(mode === 'x-for-y'){
       runtime._expected = findXForY(fn.expr, y0, xMin, xMax, tol, u);
-      runtime._question = runtime._question || 'Für welche x-Werte gilt f(x) = ' + prettyNum(y0) + '?';
+      runtime._question = runtime._question || tt('block.function-question.autoQuestion.x-for-y', { y: prettyNum(y0) });
     } else if(mode === 'zeros'){
       runtime._expected = findXForY(fn.expr, 0, xMin, xMax, tol, u);
-      runtime._question = runtime._question || 'Bestimmen Sie die Nullstelle(n) der Funktion (x-Werte).';
+      runtime._question = runtime._question || tt('block.function-question.autoQuestion.zeros');
     } else if(mode === 'y-intercept'){
       const y = u.safeMathExpr(fn.expr, {x:0});
       runtime._expected = y == null ? [] : [y];
-      runtime._question = runtime._question || 'Bestimmen Sie den y-Achsenabschnitt f(0).';
+      runtime._question = runtime._question || tt('block.function-question.autoQuestion.y-intercept');
     } else if(mode === 'minima' || mode === 'maxima' || mode === 'extrema'){
       runtime._answerKind = 'points';
       runtime._expected = findExtrema(fn.expr, xMin, xMax, yMin, yMax, mode, u);
       const n = runtime._expected.length;
-      const sing = mode === 'minima' ? 'Tiefpunkt' : (mode === 'maxima' ? 'Hochpunkt' : 'Extrempunkt');
-      const plur = mode === 'minima' ? 'Tiefpunkte' : (mode === 'maxima' ? 'Hochpunkte' : 'Extrempunkte');
       let label;
-      if(n === 0)      label = 'Tragen Sie „keine" ein, falls keine ' + plur + ' im sichtbaren Bereich liegen.';
-      else if(n === 1) label = 'Bestimmen Sie den ' + sing + ' als Koordinate (x; y).';
-      else             label = 'Bestimmen Sie die ' + n + ' ' + plur + ' als Koordinaten (x; y).';
+      if(n === 0){
+        label = tt('block.function-question.autoQuestion.extrema.none.' + mode);
+      } else if(n === 1){
+        label = tt('block.function-question.autoQuestion.extrema.single.' + mode);
+      } else {
+        label = tt('block.function-question.autoQuestion.extrema.multiple.' + mode, { n });
+      }
       runtime._question = runtime._question || label;
     } else {
       runtime._expected = [];
-      runtime._question = runtime._question || 'Lesen Sie den geforderten Wert aus dem Plot ab.';
+      runtime._question = runtime._question || tt('block.function-question.autoQuestion.fallback');
     }
     return runtime;
   }
@@ -525,41 +556,42 @@
     const tol = numOr(current.tolerance, 0.05);
     const text = String(raw || '').trim();
     if(current._mode === 'custom'){
+      const answerAuthored = ll(current.answer);
       if(current.answerType === 'list'){
-        const expected = parseNumberList(current.answer, u);
+        const expected = parseNumberList(answerAuthored, u);
         const got = parseNumberList(text, u);
-        if(!text){ return {ok:false, message:'Bitte eine Antwort eingeben.'}; }
+        if(!text){ return {ok:false, message: tt('block.function-question.grade.pleaseEnterAnswer')}; }
         if(!compareNumberLists(expected, got, tol, u)){
-          return {ok:false, message:'Nicht alle Werte passen. Erwartet werden ' + expected.length + ' Wert(e).'};
+          return {ok:false, message: tt('block.function-question.grade.valuesNotMatching', { n: expected.length })};
         }
-        return {ok:true, message:'Korrekt.'};
+        return {ok:true, message: tt('common.correct')};
       }
-      const expected = u.parseNum(current.answer);
+      const expected = u.parseNum(answerAuthored);
       const got = u.parseNum(text);
-      if(got == null){ return {ok:false, message:'Bitte eine gültige Zahl eingeben.'}; }
-      if(u.nearlyEqual(got, expected, tol)) return {ok:true, message:'Korrekt.'};
-      return {ok:false, message:'Wert noch nicht richtig.'};
+      if(got == null){ return {ok:false, message: tt('block.function-question.grade.invalidNumber')}; }
+      if(u.nearlyEqual(got, expected, tol)) return {ok:true, message: tt('common.correct')};
+      return {ok:false, message: tt('block.function-question.grade.valueNotYetCorrect')};
     }
 
     if(current._answerKind === 'points'){
       if(current._expected.length === 0){
-        if(noSolutionAnswer(text)) return {ok:true, message:'Korrekt: Es gibt keine passenden Punkte im sichtbaren Bereich.'};
-        return {ok:false, message:'Es gibt keine passenden Punkte im sichtbaren Bereich. Geben Sie „keine“ ein.'};
+        if(noSolutionAnswer(text)) return {ok:true, message: tt('block.function-question.grade.correctNoPoints')};
+        return {ok:false, message: tt('block.function-question.grade.noPointsInRange')};
       }
       const got = parsePointList(text, u);
-      if(!text || got.length === 0) return {ok:false, message:'Bitte Koordinaten als (x; y) eingeben.'};
-      if(comparePointLists(current._expected, got, tol, u)) return {ok:true, message:'Korrekt.'};
-      return {ok:false, message:'Koordinaten noch nicht richtig. Erwartet werden ' + current._expected.length + ' Punkt(e).'};
+      if(!text || got.length === 0) return {ok:false, message: tt('block.function-question.grade.enterCoordinates')};
+      if(comparePointLists(current._expected, got, tol, u)) return {ok:true, message: tt('common.correct')};
+      return {ok:false, message: tt('block.function-question.grade.coordinatesNotYetCorrect', { n: current._expected.length })};
     }
 
     if(current._expected.length === 0){
-      if(noSolutionAnswer(text)) return {ok:true, message:'Korrekt: Es gibt keine passenden Werte im sichtbaren Bereich.'};
-      return {ok:false, message:'Es gibt keine passenden Werte im sichtbaren Bereich. Geben Sie „keine“ ein.'};
+      if(noSolutionAnswer(text)) return {ok:true, message: tt('block.function-question.grade.correctNoValues')};
+      return {ok:false, message: tt('block.function-question.grade.noValuesInRange')};
     }
     const got = parseNumberList(text, u);
-    if(!text || got.length === 0) return {ok:false, message:'Bitte eine gültige Zahl eingeben.'};
-    if(compareNumberLists(current._expected, got, tol, u)) return {ok:true, message:'Korrekt.'};
-    return {ok:false, message:'Wert(e) noch nicht richtig. Erwartet werden ' + current._expected.length + ' Wert(e).'};
+    if(!text || got.length === 0) return {ok:false, message: tt('block.function-question.grade.invalidNumber')};
+    if(compareNumberLists(current._expected, got, tol, u)) return {ok:true, message: tt('common.correct')};
+    return {ok:false, message: tt('block.function-question.grade.valuesNotYetCorrect', { n: current._expected.length })};
   }
 
   function safeMath(expr, x){

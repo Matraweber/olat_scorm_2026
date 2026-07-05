@@ -143,12 +143,13 @@
     
       // Empty-state hint.
       if(!(block.config.shapes || []).length){
+        const u = window.BlockUtils;
         const hint = document.createElement('div');
         hint.className = 'comp-empty-hint';
         hint.innerHTML =
           '<div class="comp-empty-hint-arrow">↑</div>' +
-          '<div class="comp-empty-hint-title">Komposition ist leer</div>' +
-          '<div class="comp-empty-hint-body">Klicken Sie oben auf <strong>Vorlage…</strong>, um mit einem fertigen Beispiel (Rechteck, Pythagoras, Kreis, Dreieck) zu starten, oder wählen Sie ein Form-Werkzeug.</div>';
+          '<div class="comp-empty-hint-title">' + u.t('block.composition.canvas.empty.title') + '</div>' +
+          '<div class="comp-empty-hint-body">' + u.t('block.composition.canvas.empty.body') + '</div>';
         // Position absolute via CSS .comp-empty-hint; deferred until SVG is in DOM.
         canvasWrap.appendChild(hint);
       }
@@ -212,7 +213,7 @@
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.value = shape.text || '';
-      inp.placeholder = 'z. B. a oder {a}';
+      inp.placeholder = window.BlockUtils.t('block.composition.canvas.labelInputPlaceholder');
       inp.style.cssText = 'width:100%; height:' + (fs + 8) + 'px; box-sizing:border-box; ' +
         'font:' + (shape.fontWeight || 700) + ' ' + (fs - 1) + 'px Verdana, Arial, sans-serif; ' +
         'padding:0.1rem 0.4rem; border:2px solid var(--primary, #003b5c); border-radius:4px; ' +

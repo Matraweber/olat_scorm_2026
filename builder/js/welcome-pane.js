@@ -1,8 +1,9 @@
 // welcome-pane.js: Welcome / help page. Hero, 5-step quickstart, layout
 // legend, block-type grid with live preview modal, tips, shortcuts, scrollspy.
-import { el, escapeHtml } from './util.js';
+import { el, escapeHtml, tProp } from './util.js';
 import { state, renderActivePane } from './state.js';
 import { renderTaskList } from './panes.js';
+import { t } from './i18n.js';
 
 
 function renderWelcomePane(host){
@@ -18,9 +19,9 @@ function renderWelcomePane(host){
   // Two columns: content on the left, sticky chapter rail on the right.
   const layout = el('div', {className:'welcome-layout'});
   const main   = el('main', {className:'welcome-content'});
-  const rail   = el('aside', {className:'welcome-rail', attrs:{'aria-label':'Kapitel-Übersicht'}});
+  const rail   = el('aside', {className:'welcome-rail', attrs:{'aria-label': t('welcome.rail.ariaLabel')}});
   const railList = el('ol', {className:'welcome-rail-list'});
-  rail.appendChild(el('div', {className:'welcome-rail-label', text:'Kapitel'}));
+  rail.appendChild(el('div', {className:'welcome-rail-label', text: t('welcome.rail.label')}));
   rail.appendChild(railList);
   layout.appendChild(main);
   layout.appendChild(rail);
@@ -48,30 +49,30 @@ function renderWelcomePane(host){
   }
 
   // 00 Hero / title page
-  const heroBody = chapter('Willkommen.', { hero: true, hideRail: true });
+  const heroBody = chapter(t('welcome.hero.title'), { hero: true, hideRail: true });
   heroBody.insertAdjacentHTML('afterbegin',
-    '<span class="welcome-kicker">SCORM Builder · Umwelt-Campus Birkenfeld</span>'
+    '<span class="welcome-kicker">' + t('welcome.hero.kicker') + '</span>'
   );
   heroBody.appendChild(el('p', {
     className: 'welcome-lede',
-    html: 'OLAT-Lerneinheiten direkt im Browser bauen.<br><span class="welcome-lede-sub">Ohne Installation, ohne Konto.</span>'
+    html: t('welcome.hero.lede')
   }));
   const heroCta = el('div', {className:'welcome-cta-row'});
-  const newTaskBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
+  const newTaskBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text: t('welcome.hero.ctaPrimary')});
   newTaskBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
-  const goCourseBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text:'Zu Kopfdaten'});
+  const goCourseBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text: t('welcome.hero.ctaSecondary')});
   goCourseBtn.addEventListener('click', () => { state.selected = {kind:'course'}; renderActivePane(); renderTaskList(); });
   heroCta.appendChild(newTaskBtn); heroCta.appendChild(goCourseBtn);
   heroBody.appendChild(heroCta);
 
   // 01 Quickstart: 5 steps
-  const quick = chapter('In 5 Schritten zum SCORM-Paket');
-  quick.appendChild(el('p', {className:'welcome-lead', text:'Vom leeren Builder bis zur fertigen ZIP-Datei.'}));
+  const quick = chapter(t('welcome.quickstart.title'));
+  quick.appendChild(el('p', {className:'welcome-lead', text: t('welcome.quickstart.lead')}));
   const optionalRow = el('div', {className: 'welcome-optional-row'});
   optionalRow.innerHTML =
-    '<span class="welcome-optional-label">Optional vorher:</span> ' +
-    '<button type="button" class="welcome-optional-btn" data-target="course">Kopfdaten</button>' +
-    '<button type="button" class="welcome-optional-btn" data-target="theme">Branding / Theme</button>';
+    '<span class="welcome-optional-label">' + t('welcome.quickstart.optionalLabel') + '</span> ' +
+    '<button type="button" class="welcome-optional-btn" data-target="course">' + t('welcome.quickstart.optionalCourse') + '</button>' +
+    '<button type="button" class="welcome-optional-btn" data-target="theme">' + t('welcome.quickstart.optionalTheme') + '</button>';
   optionalRow.querySelectorAll('.welcome-optional-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.selected = { kind: btn.dataset.target };
@@ -83,29 +84,29 @@ function renderWelcomePane(host){
   const steps = el('div', {className:'welcome-steps'});
   const stepDefs = [
     {
-      n: 1, title: 'Aufgabe anlegen',
-      body: 'In der Seitenleiste auf <strong>+ Aufgabe</strong>. Wählbar: leere Aufgabe oder eine Vorlage (z. B. „Wahrheitstabelle", „Numerische Eingabe mit Variablen").',
+      n: 1, title: t('welcome.step1.title'),
+      body: t('welcome.step1.body'),
       mock: mockSidebarAddTask()
     },
     {
-      n: 2, title: 'Block hinzufügen',
-      body: 'Innerhalb der Aufgabe auf <strong>+ Block</strong>. Ein Menü zeigt alle verfügbaren Block-Typen.',
+      n: 2, title: t('welcome.step2.title'),
+      body: t('welcome.step2.body'),
       mock: mockBlockPicker()
     },
     {
-      n: 3, title: 'Beispiel laden oder selbst füllen',
-      body: 'Jeder Frage-Block startet mit einer <strong>Vorlage</strong>: „Manuell (leer)" für eigene Inhalte oder ein <strong>Beispiel</strong> mit fertigem Inhalt. Mit <strong>Zurücksetzen</strong> entfernen Sie Ihre manuelle Eingabe.',
+      n: 3, title: t('welcome.step3.title'),
+      body: t('welcome.step3.body'),
       mock: mockPresetDropdown()
     },
     {
-      n: 4, title: 'Vorschau ansehen',
-      body: 'Oben rechts auf <strong>Vorschau</strong>. Zeigt die Lerneinheit aus Studierenden-Sicht, Antworten lassen sich direkt ausprobieren.',
-      mock: mockTopbarBtn('Vorschau', 'secondary')
+      n: 4, title: t('welcome.step4.title'),
+      body: t('welcome.step4.body'),
+      mock: mockTopbarBtn(t('welcome.mock.previewBtn'), 'secondary')
     },
     {
-      n: 5, title: 'SCORM-ZIP erzeugen',
-      body: '<strong>SCORM-ZIP erzeugen</strong> lädt ein vollständiges SCORM-1.2-Paket herunter. Die ZIP-Datei wird in OLAT als Lerneinheit hochgeladen.',
-      mock: mockTopbarBtn('SCORM-ZIP erzeugen', 'primary')
+      n: 5, title: t('welcome.step5.title'),
+      body: t('welcome.step5.body'),
+      mock: mockTopbarBtn(t('welcome.mock.exportBtn'), 'primary')
     }
   ];
   stepDefs.forEach(s => {
@@ -121,15 +122,15 @@ function renderWelcomePane(host){
   quick.appendChild(steps);
 
   // 02 The interface (annotated mockup)
-  const oberflaeche = chapter('Die Oberfläche im Überblick');
-  oberflaeche.appendChild(el('p', {className:'welcome-lead', text:'Der Builder besteht aus drei Bereichen.'}));
+  const oberflaeche = chapter(t('welcome.interface.title'));
+  oberflaeche.appendChild(el('p', {className:'welcome-lead', text: t('welcome.interface.lead')}));
   oberflaeche.appendChild(mockBuilderLayout());
 
   const layoutLegend = el('ul', {className:'welcome-legend'});
   [
-    ['1', 'Seitenleiste', 'Liste Ihrer Aufgaben sowie die Allgemein-Links (Kopfdaten, Branding, diese Hilfe). Hier fügen Sie Aufgaben hinzu, sortieren sie um oder löschen sie.'],
-    ['2', 'Canvas', 'Die Arbeitsfläche der ausgewählten Aufgabe. Blöcke werden hier per Drag & Drop angeordnet und in der Größe angepasst.'],
-    ['3', 'Konfigurations-Pane', 'Rechts: Eigenschaften des markierten Blocks. Vorlagen, Texte, Antworten und Bewertung werden hier eingestellt.']
+    ['1', t('welcome.interface.legend.sidebarTitle'), t('welcome.interface.legend.sidebarBody')],
+    ['2', t('welcome.interface.legend.canvasTitle'), t('welcome.interface.legend.canvasBody')],
+    ['3', t('welcome.interface.legend.configTitle'), t('welcome.interface.legend.configBody')]
   ].forEach(([n, k, v]) => {
     const li = el('li');
     li.innerHTML = '<span class="welcome-legend-num">' + n + '</span><strong>' + k + '</strong> ' + v;
@@ -138,15 +139,15 @@ function renderWelcomePane(host){
   oberflaeche.appendChild(layoutLegend);
 
   // 03 Block-Typen
-  const types = chapter('Block-Typen');
-  types.appendChild(el('p', {className:'welcome-lead', text:'Medien- & Text-Blöcke sind statisch, Frage- und MINT-Blöcke werden bewertet. Eine Aufgabe kann beliebig viele Blöcke enthalten.'}));
+  const types = chapter(t('welcome.blockTypes.title'));
+  types.appendChild(el('p', {className:'welcome-lead', text: t('welcome.blockTypes.lead')}));
 
-  types.appendChild(el('p', {className:'welcome-hint', text:'Auf eine Kachel klicken, um eine Live-Vorschau und Details zu sehen.'}));
+  types.appendChild(el('p', {className:'welcome-hint', text: t('welcome.blockTypes.hint')}));
   const blocksGrid = el('div', {className:'welcome-blocks-grid'});
   const allBlocks = window.Blocks ? window.Blocks.ids().map(id => ({ id, def: window.Blocks.get(id) })).filter(x => x.def) : [];
   const byCat = {};
   allBlocks.forEach(({ id, def }) => {
-    const cat = def.category || 'Sonstige';
+    const cat = tProp(def, 'category') || t('welcome.blockTypes.categoryOther');
     if(!byCat[cat]) byCat[cat] = [];
     byCat[cat].push({ id, def });
   });
@@ -157,17 +158,17 @@ function renderWelcomePane(host){
       // <button> for keyboard focus + correct screen-reader announcement.
       const card = el('button', {
         className:'welcome-block-card' + (def.graded ? ' graded' : ''),
-        attrs:{ type:'button', 'data-block-id': id, 'aria-label': (def.label || id) + ': Details ansehen' }
+        attrs:{ type:'button', 'data-block-id': id, 'aria-label': t('welcome.blockTypes.cardAriaLabel', { name: tProp(def, 'label') || id }) }
       });
       // SVG icon from window.BlockIcons, string fallback for legacy blocks.
       const svgIcon = window.BlockIcons && window.BlockIcons.get(id);
       const iconHtml = svgIcon || escapeHtml(def.icon || '◧');
       card.innerHTML =
         '<div class="welcome-block-icon">' + iconHtml + '</div>' +
-        '<div class="welcome-block-name">' + escapeHtml(def.label || id) +
-          (def.graded ? ' <span class="welcome-block-graded">bewertet</span>' : '') +
+        '<div class="welcome-block-name">' + escapeHtml(tProp(def, 'label') || id) +
+          (def.graded ? ' <span class="welcome-block-graded">' + t('welcome.blockTypes.gradedBadge') + '</span>' : '') +
         '</div>' +
-        '<div class="welcome-block-desc">' + escapeHtml(def.description || '') + '</div>';
+        '<div class="welcome-block-desc">' + escapeHtml(tProp(def, 'description')) + '</div>';
       card.addEventListener('click', () => openBlockDetailModal(id, def));
       blocksGrid.appendChild(card);
     });
@@ -175,65 +176,65 @@ function renderWelcomePane(host){
   types.appendChild(blocksGrid);
 
   // 04 Working with the canvas
-  const tips = chapter('Mit dem Canvas arbeiten');
+  const tips = chapter(t('welcome.canvas.title'));
   const tipsGrid = el('div', {className:'welcome-tips-grid'});
   [
     {
       icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L12 22 M2 12 L22 12 M9 5 L12 2 L15 5 M19 9 L22 12 L19 15 M9 19 L12 22 L15 19 M5 9 L2 12 L5 15"/></svg>',
-      title:'Verschieben',
-      body:'Blöcke werden per Maus gezogen. Mit gehaltener Shift-Taste lassen sich mehrere Blöcke gleichzeitig bewegen.'
+      title: t('welcome.canvas.tipMove.title'),
+      body: t('welcome.canvas.tipMove.body')
     },
     {
       icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 L13 11 M21 3 L15 3 M21 3 L21 9 M3 21 L11 13 M3 21 L9 21 M3 21 L3 15"/></svg>',
-      title:'Größe ändern',
-      body:'Unten rechts an jedem Block die Ecke ziehen, oder den Knopf „Höhe an Inhalt anpassen" verwenden.'
+      title: t('welcome.canvas.tipResize.title'),
+      body: t('welcome.canvas.tipResize.body')
     },
     {
       icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><circle cx="3"  cy="3"  r="1.5" fill="currentColor"/><circle cx="21" cy="3"  r="1.5" fill="currentColor"/><circle cx="3"  cy="21" r="1.5" fill="currentColor"/><circle cx="21" cy="21" r="1.5" fill="currentColor"/></svg>',
-      title:'Mehrfach-Auswahl',
-      body:'Shift + Klick wählt mehrere Blöcke aus. Im rechten Pane erscheinen dann Ausrichten, Verteilen und Duplizieren.'
+      title: t('welcome.canvas.tipMultiSelect.title'),
+      body: t('welcome.canvas.tipMultiSelect.body')
     },
     {
       icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6"/><path d="M21 21 L15 15 M7 10 L13 10 M10 7 L10 13"/></svg>',
-      title:'Zoom',
-      body:'Strg/Cmd + Mausrad zoomt die Canvas. Alternativ stehen die +/− Knöpfe oben rechts in der Aufgabe zur Verfügung.'
+      title: t('welcome.canvas.tipZoom.title'),
+      body: t('welcome.canvas.tipZoom.body')
     },
     {
       icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 9 L8 9 L9 6 L15 6 L16 9 L21 9 L21 20 L3 20 Z"/></svg>',
-      title:'Tabs (optional)',
-      body:'Pro Aufgabe können zwei Tabs aktiviert werden, beispielsweise „Visualisierung" und „Aufgabe".'
+      title: t('welcome.canvas.tipTabs.title'),
+      body: t('welcome.canvas.tipTabs.body')
     },
     {
       icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 3 L18 3 L18 21 L12 17 L6 21 Z"/></svg>',
-      title:'Vorlagen speichern',
-      body:'Eine fertige Aufgabe als Vorlage speichern („Vorlage" im Aufgaben-Header). Sie steht beim nächsten Mal sofort zur Verfügung.'
+      title: t('welcome.canvas.tipTemplates.title'),
+      body: t('welcome.canvas.tipTemplates.body')
     }
-  ].forEach(t => {
+  ].forEach(tip => {
     const card = el('div', {className:'welcome-tip-card'});
     card.innerHTML =
-      '<div class="welcome-tip-icon">' + t.icon + '</div>' +
-      '<div class="welcome-tip-title">' + t.title + '</div>' +
-      '<div class="welcome-tip-body">' + t.body + '</div>';
+      '<div class="welcome-tip-icon">' + tip.icon + '</div>' +
+      '<div class="welcome-tip-title">' + tip.title + '</div>' +
+      '<div class="welcome-tip-body">' + tip.body + '</div>';
     tipsGrid.appendChild(card);
   });
   tips.appendChild(tipsGrid);
 
   // 05 Keyboard shortcuts
-  const shortcuts = chapter('Tastaturkürzel');
-  shortcuts.appendChild(el('p', {className:'welcome-lead', text:'Auf der Canvas verfügbar:'}));
+  const shortcuts = chapter(t('welcome.shortcuts.title'));
+  shortcuts.appendChild(el('p', {className:'welcome-lead', text: t('welcome.shortcuts.lead')}));
   const kbdTable = el('table', {className:'welcome-kbd-table'});
   [
-    ['↑ ↓ ← →',         'Markierte Blöcke pixelweise verschieben'],
-    ['Shift + Pfeil',   'Blöcke in 10-px-Schritten verschieben'],
-    ['Strg/⌘ + C',      'Markierte Blöcke kopieren'],
-    ['Strg/⌘ + V',      'Blöcke einfügen'],
-    ['Strg/⌘ + D',      'Markierte Blöcke duplizieren'],
-    ['Strg/⌘ + A',      'Alle Blöcke der Aufgabe markieren'],
-    ['Entf / ⌫',        'Markierte Blöcke löschen'],
-    ['Esc',             'Auswahl aufheben'],
-    ['Strg/⌘ + Z',      'Rückgängig'],
-    ['Strg/⌘ + Shift+Z','Wiederherstellen'],
-    ['Strg/⌘ + Mausrad','Canvas zoomen']
+    ['↑ ↓ ← →',                                    t('welcome.shortcuts.moveByPixel')],
+    ['Shift + ' + t('welcome.shortcuts.keyArrow'), t('welcome.shortcuts.moveBy10')],
+    [t('welcome.shortcuts.keyCtrl') + ' + C',      t('welcome.shortcuts.copy')],
+    [t('welcome.shortcuts.keyCtrl') + ' + V',      t('welcome.shortcuts.paste')],
+    [t('welcome.shortcuts.keyCtrl') + ' + D',      t('welcome.shortcuts.duplicate')],
+    [t('welcome.shortcuts.keyCtrl') + ' + A',      t('welcome.shortcuts.selectAll')],
+    [t('welcome.shortcuts.keyDel') + ' / ⌫',       t('welcome.shortcuts.delete')],
+    ['Esc',                                        t('welcome.shortcuts.deselect')],
+    [t('welcome.shortcuts.keyCtrl') + ' + Z',      t('welcome.shortcuts.undo')],
+    [t('welcome.shortcuts.keyCtrl') + ' + Shift+Z',t('welcome.shortcuts.redo')],
+    [t('welcome.shortcuts.keyCtrl') + ' + ' + t('welcome.shortcuts.keyWheel'), t('welcome.shortcuts.zoom')]
   ].forEach(([k, d]) => {
     const tr = el('tr');
     tr.appendChild(el('td', {className:'welcome-kbd-key', html:'<kbd>' + k.replace(/ \+ /g, '</kbd> + <kbd>') + '</kbd>'}));
@@ -244,8 +245,8 @@ function renderWelcomePane(host){
 
   // Closing call-to-action
   const foot = el('section', {className:'welcome-foot'});
-  foot.innerHTML = '<p>Diese Seite ist jederzeit über <strong>Willkommen / Hilfe</strong> in der Seitenleiste erreichbar.</p>';
-  const footBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'Erste Aufgabe erstellen'});
+  foot.innerHTML = '<p>' + t('welcome.foot.note') + '</p>';
+  const footBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text: t('welcome.hero.ctaPrimary')});
   footBtn.addEventListener('click', () => document.getElementById('btnAddTask').click());
   foot.appendChild(footBtn);
   main.appendChild(foot);
@@ -333,14 +334,14 @@ function openBlockDetailModal(id, def){
 
   const modal = el('div', {
     className:'welcome-block-modal',
-    attrs:{ role:'dialog', 'aria-modal':'true', 'aria-label': (def.label || id) + ': Details' }
+    attrs:{ role:'dialog', 'aria-modal':'true', 'aria-label': t('welcome.modal.ariaLabel', { name: tProp(def, 'label') || id }) }
   });
   const backdrop = el('div', {className:'welcome-block-modal-backdrop'});
   const card     = el('div', {className:'welcome-block-modal-card'});
 
   const closeBtn = el('button', {
     className:'welcome-block-modal-close',
-    attrs:{ type:'button', 'aria-label':'Schließen' }
+    attrs:{ type:'button', 'aria-label': t('common.close') }
   });
   closeBtn.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5 L15 15 M15 5 L5 15"/></svg>';
 
@@ -350,10 +351,10 @@ function openBlockDetailModal(id, def){
   head.innerHTML =
     '<div class="welcome-block-modal-icon">' + modalIcon + '</div>' +
     '<div class="welcome-block-modal-titles">' +
-      '<h3 class="welcome-block-modal-title">' + escapeHtml(def.label || id) + '</h3>' +
+      '<h3 class="welcome-block-modal-title">' + escapeHtml(tProp(def, 'label') || id) + '</h3>' +
       '<div class="welcome-block-modal-meta">' +
-        '<span class="welcome-block-modal-cat">' + escapeHtml(def.category || 'Sonstige') + '</span>' +
-        (def.graded ? '<span class="welcome-block-modal-graded">Bewertet</span>' : '') +
+        '<span class="welcome-block-modal-cat">' + escapeHtml(tProp(def, 'category') || t('welcome.blockTypes.categoryOther')) + '</span>' +
+        (def.graded ? '<span class="welcome-block-modal-graded">' + t('welcome.modal.gradedBadge') + '</span>' : '') +
       '</div>' +
     '</div>';
   card.appendChild(closeBtn);
@@ -362,17 +363,17 @@ function openBlockDetailModal(id, def){
   // Body: description left, live preview right.
   const body = el('div', {className:'welcome-block-modal-body'});
   const left = el('div', {className:'welcome-block-modal-text'});
-  if(def.description){
-    left.appendChild(el('p', {className:'welcome-block-modal-desc', text: def.description}));
-  }
+  { const _d = tProp(def, 'description'); if(_d){
+    left.appendChild(el('p', {className:'welcome-block-modal-desc', text: _d}));
+  } }
   const facts = [];
-  facts.push({ k:'Kategorie', v: def.category || 'Sonstige' });
-  facts.push({ k:'Bewertbar', v: def.graded ? 'Ja' : 'Nein' });
+  facts.push({ k: t('welcome.modal.factCategory'), v: tProp(def, 'category') || t('welcome.blockTypes.categoryOther') });
+  facts.push({ k: t('welcome.modal.factGradable'), v: def.graded ? t('common.yes') : t('common.no') });
   if(typeof def.builderSchema === 'function'){
     try {
       const schema = def.builderSchema();
       const optionCount = Array.isArray(schema) ? schema.filter(s => s && s.key).length : 0;
-      if(optionCount) facts.push({ k:'Konfigurations-Optionen', v: String(optionCount) });
+      if(optionCount) facts.push({ k: t('welcome.modal.factConfigOptions'), v: String(optionCount) });
     } catch{ /* ignore: schema may require runtime context */ }
   }
   const factList = el('dl', {className:'welcome-block-modal-facts'});
@@ -384,7 +385,7 @@ function openBlockDetailModal(id, def){
 
   // Live preview via def.preview() / mount(); same rendering as the canvas.
   const right = el('div', {className:'welcome-block-modal-preview'});
-  right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text:'Live-Vorschau'}));
+  right.appendChild(el('div', {className:'welcome-block-modal-preview-label', text: t('welcome.modal.previewLabel')}));
   const previewHost = el('div', {className:'welcome-block-modal-preview-host'});
   right.appendChild(previewHost);
   try {
@@ -401,14 +402,14 @@ function openBlockDetailModal(id, def){
         initScore(){}, reportScore(){}
       });
     } else {
-      previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'(Keine Vorschau verfügbar)'}));
+      previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text: t('welcome.modal.previewNone')}));
     }
     // Render KaTeX over the preview so $...$ and \(...\) get typeset.
     if(window.BlockUtils && window.BlockUtils.renderMath){
       window.BlockUtils.renderMath(previewHost);
     }
   } catch{
-    previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text:'Vorschau konnte nicht gerendert werden.'}));
+    previewHost.appendChild(el('div', {className:'welcome-block-modal-preview-empty', text: t('welcome.modal.previewError')}));
   }
 
   body.appendChild(left);
@@ -487,9 +488,9 @@ function setupRevealAnimations(host){
 function mockSidebarAddTask(){
   const wrap = el('div', {className:'welcome-mock welcome-mock-sidebar', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
-    '<div class="mm-head"><span>Aufgaben</span><span class="mm-btn mm-btn-primary mm-pulse">+ Aufgabe</span></div>' +
-    '<div class="mm-task">Aufgabe 1<span class="mm-meta">2 Blöcke</span></div>' +
-    '<div class="mm-task mm-task-faint">Aufgabe 2<span class="mm-meta">1 Block</span></div>';
+    '<div class="mm-head"><span>' + t('sidebar.tasks') + '</span><span class="mm-btn mm-btn-primary mm-pulse">' + t('sidebar.addTask') + '</span></div>' +
+    '<div class="mm-task">' + t('welcome.mock.task1') + '<span class="mm-meta">' + t('welcome.mock.blocks2') + '</span></div>' +
+    '<div class="mm-task mm-task-faint">' + t('welcome.mock.task2') + '<span class="mm-meta">' + t('welcome.mock.blocks1') + '</span></div>';
   return wrap;
 }
 // One category header + row of chips; icons from window.BlockIcons so the
@@ -506,21 +507,21 @@ function mockChips(catLabel, chips, isQuestion){
 function mockBlockPicker(){
   const wrap = el('div', {className:'welcome-mock welcome-mock-picker', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
-    '<div class="mm-modal-head">Block hinzufügen</div>' +
+    '<div class="mm-modal-head">' + t('welcome.mock.pickerHead') + '</div>' +
     '<div class="mm-modal-body">' +
-      mockChips('Medien & Inhalt', [
-        { id: 'rich-text',       label: 'Text' },
-        { id: 'image',           label: 'Bild' },
-        { id: 'video',           label: 'Video' }
+      mockChips(t('welcome.mock.catMedia'), [
+        { id: 'rich-text',       label: t('welcome.mock.chipText') },
+        { id: 'image',           label: t('welcome.mock.chipImage') },
+        { id: 'video',           label: t('welcome.mock.chipVideo') }
       ], false) +
-      mockChips('Frage', [
-        { id: 'multiple-choice', label: 'Multiple Choice', pulse: true },
-        { id: 'sort-list',       label: 'Sortieren' },
-        { id: 'numeric-input',   label: 'Numerisch' }
+      mockChips(t('welcome.mock.catQuestion'), [
+        { id: 'multiple-choice', label: t('welcome.mock.chipMultipleChoice'), pulse: true },
+        { id: 'sort-list',       label: t('welcome.mock.chipSort') },
+        { id: 'numeric-input',   label: t('welcome.mock.chipNumeric') }
       ], true) +
-      mockChips('MINT', [
-        { id: 'truth-table',     label: 'Wahrheitstabelle' },
-        { id: 'unit-convert',    label: 'Einheiten' }
+      mockChips(t('welcome.mock.catStem'), [
+        { id: 'truth-table',     label: t('welcome.mock.chipTruthTable') },
+        { id: 'unit-convert',    label: t('welcome.mock.chipUnits') }
       ], true) +
     '</div>';
   return wrap;
@@ -528,17 +529,17 @@ function mockBlockPicker(){
 function mockPresetDropdown(){
   const wrap = el('div', {className:'welcome-mock welcome-mock-config', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
-    '<div class="mm-field"><label>Überschrift</label><div class="mm-inp">Aufgabe</div></div>' +
-    '<div class="mm-field"><label>Vorlage</label>' +
-      '<div class="mm-select mm-pulse">Beispiel: Mathematik, Pythagoras ▾</div></div>' +
-    '<div class="mm-section">Frage</div>' +
-    '<div class="mm-field"><label>Frage-Vorlage</label><div class="mm-inp mm-inp-mono">Berechnen Sie {a}² + {b}².</div></div>';
+    '<div class="mm-field"><label>' + t('welcome.mock.headingLabel') + '</label><div class="mm-inp">' + t('welcome.mock.headingValue') + '</div></div>' +
+    '<div class="mm-field"><label>' + t('welcome.mock.templateLabel') + '</label>' +
+      '<div class="mm-select mm-pulse">' + t('welcome.mock.templateValue') + '</div></div>' +
+    '<div class="mm-section">' + t('welcome.mock.questionSection') + '</div>' +
+    '<div class="mm-field"><label>' + t('welcome.mock.questionTemplateLabel') + '</label><div class="mm-inp mm-inp-mono">' + t('welcome.mock.questionTemplateValue') + '</div></div>';
   return wrap;
 }
 function mockTopbarBtn(label, kind){
   const wrap = el('div', {className:'welcome-mock welcome-mock-topbar', attrs:{'aria-hidden':'true'}});
   wrap.innerHTML =
-    '<span class="mm-btn">JSON exportieren</span>' +
+    '<span class="mm-btn">' + t('welcome.mock.jsonExportBtn') + '</span>' +
     '<span class="mm-btn ' + (kind === 'primary' ? 'mm-btn-primary' : '') + ' mm-pulse">' + label + '</span>';
   return wrap;
 }
@@ -547,24 +548,24 @@ function mockBuilderLayout(){
   wrap.innerHTML =
     '<div class="mm-l-side">' +
       '<div class="mm-l-num">1</div>' +
-      '<div class="mm-l-side-title">Aufgaben</div>' +
-      '<div class="mm-l-row mm-l-row-active">Aufgabe 1</div>' +
-      '<div class="mm-l-row">Aufgabe 2</div>' +
-      '<div class="mm-l-side-title">Allgemein</div>' +
-      '<div class="mm-l-row">Kopfdaten</div>' +
+      '<div class="mm-l-side-title">' + t('sidebar.tasks') + '</div>' +
+      '<div class="mm-l-row mm-l-row-active">' + t('welcome.mock.task1') + '</div>' +
+      '<div class="mm-l-row">' + t('welcome.mock.task2') + '</div>' +
+      '<div class="mm-l-side-title">' + t('sidebar.general') + '</div>' +
+      '<div class="mm-l-row">' + t('sidebar.courseInfoLink') + '</div>' +
     '</div>' +
     '<div class="mm-l-canvas">' +
       '<div class="mm-l-num">2</div>' +
-      '<div class="mm-l-canvas-head">Aufgabe 1 · + Block</div>' +
-      '<div class="mm-l-block mm-l-block-1">Multiple Choice</div>' +
-      '<div class="mm-l-block mm-l-block-2 mm-l-block-active">Numerische Eingabe</div>' +
+      '<div class="mm-l-canvas-head">' + t('welcome.mock.canvasHead') + '</div>' +
+      '<div class="mm-l-block mm-l-block-1">' + t('welcome.mock.chipMultipleChoice') + '</div>' +
+      '<div class="mm-l-block mm-l-block-2 mm-l-block-active">' + t('welcome.mock.blockNumericInput') + '</div>' +
     '</div>' +
     '<div class="mm-l-config">' +
       '<div class="mm-l-num">3</div>' +
-      '<div class="mm-l-config-head">Konfiguration</div>' +
-      '<div class="mm-l-cfg-row">Vorlage</div>' +
-      '<div class="mm-l-cfg-row">Frage</div>' +
-      '<div class="mm-l-cfg-row">Bewertung</div>' +
+      '<div class="mm-l-config-head">' + t('welcome.mock.configHead') + '</div>' +
+      '<div class="mm-l-cfg-row">' + t('welcome.mock.cfgTemplate') + '</div>' +
+      '<div class="mm-l-cfg-row">' + t('welcome.mock.cfgQuestion') + '</div>' +
+      '<div class="mm-l-cfg-row">' + t('welcome.mock.cfgScoring') + '</div>' +
     '</div>';
   return wrap;
 }

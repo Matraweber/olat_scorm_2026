@@ -1,6 +1,7 @@
 // tasks.js: Migration, tab helpers, validation, template management.
 import { state } from './state.js';
-import { uid, toast } from './util.js';
+import { uid, toast, tProp } from './util.js';
+import { t, l } from './i18n.js';
 
 // When tabs are on, task.blocks aliases task.tabs[activeTab].blocks so existing code paths keep working.
 export function hasTabs(task){
@@ -16,8 +17,8 @@ export function syncTaskBlocksAlias(task){
 export function enableTabsOn(task){
   if(hasTabs(task)) return;
   task.tabs = [
-    { title: 'Visualisierung', blocks: task.blocks || [] },
-    { title: 'Aufgabe',         blocks: [] }
+    { title: t('tasks.defaultTab.visualization'), blocks: task.blocks || [] },
+    { title: t('tasks.defaultTab.task'),         blocks: [] }
   ];
   task._uiActiveTab = 0;
   task.blocks = task.tabs[0].blocks;
@@ -61,12 +62,12 @@ export function migrateTaskIfNeeded(task){
     blocks.push({id: uid('b_'), type: 'rich-text', config: { html: '<p>' + String(task.config.intro) + '</p>' }});
   }
   if(task.config && task.config.noteHtml){
-    blocks.push({id: uid('b_'), type: 'note-box', config: { title: task.config.noteTitle || 'Hinweis', html: task.config.noteHtml, variant: 'info' }});
+    blocks.push({id: uid('b_'), type: 'note-box', config: { title: task.config.noteTitle || t('tasks.defaultNoteTitle'), html: task.config.noteHtml, variant: 'info' }});
   }
   const cleanCfg = Object.assign({}, task.config || {});
   delete cleanCfg.intro; delete cleanCfg.noteTitle; delete cleanCfg.noteHtml;
   blocks.push({id: uid('b_'), type: blockType, config: cleanCfg});
-  return { id: task.id || uid('t_'), title: task.title || 'Aufgabe', blocks };
+  return { id: task.id || uid('t_'), title: task.title || t('tasks.defaultTitle'), blocks };
 }
 
 // Validation
@@ -90,7 +91,7 @@ export function validateTask(task){
     : (task.blocks || []);
   allBlocks.forEach((b, i) => {
     const def = window.Blocks && window.Blocks.get(b.type);
-    const label = (def && def.label) || b.type;
+    const label = (def && tProp(def, 'label')) || b.type;
     validateBlock(b).forEach(w => out.push({blockId: b.id, blockLabel: label + ' #' + (i+1), message: w}));
   });
   return out;
@@ -103,14 +104,15 @@ export function validateCourse(course){
   if(!course) return { issues, courseIssues };
   const tasks = course.tasks || [];
   if(tasks.length === 0){
-    courseIssues.push({ message: 'Lerneinheit enthält keine Aufgaben.' });
+    courseIssues.push({ message: t('tasks.validation.noTasks') });
   }
-  if(!course.courseTitle || !String(course.courseTitle).trim()){
-    courseIssues.push({ message: 'Kurstitel ist leer.' });
+  const courseTitleText = l(course.courseTitle);
+  if(!courseTitleText || !courseTitleText.trim()){
+    courseIssues.push({ message: t('tasks.validation.emptyCourseTitle') });
   }
-  tasks.forEach((t, idx) => {
-    const taskTitle = t.title || ('Aufgabe ' + (idx + 1));
-    const taskIssues = validateTask(t);
+  tasks.forEach((task, idx) => {
+    const taskTitle = l(task.title) || t('taskList.fallbackTitle', { n: idx + 1 });
+    const taskIssues = validateTask(task);
     taskIssues.forEach(w => issues.push(Object.assign({ taskIdx: idx, taskTitle }, w)));
   });
   return { issues, courseIssues };
@@ -128,7 +130,7 @@ export function loadUserTemplates(){
 }
 export function saveUserTemplates(){
   try { localStorage.setItem(USER_TEMPLATES_KEY, JSON.stringify(state.userTemplates)); }
-  catch(e){ toast('Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
+  catch(e){ toast(t('tasks.toast.saveTemplatesFailed', { msg: e.message }), 'error'); }
 }
 
 // User block templates. Shape: { id, label, description?, blockType, config }.
@@ -143,7 +145,7 @@ export function loadUserBlockTemplates(){
 }
 export function saveUserBlockTemplates(){
   try { localStorage.setItem(USER_BLOCK_TEMPLATES_KEY, JSON.stringify(state.userBlockTemplates || [])); }
-  catch(e){ toast('Block-Vorlagen konnten nicht gespeichert werden: ' + e.message, 'error'); }
+  catch(e){ toast(t('tasks.toast.saveBlockTemplatesFailed', { msg: e.message }), 'error'); }
 }
 // {blockType: count} drives "most-used first" in the picker. Bumped on every add.
 const BLOCK_USAGE_KEY = 'scorm-builder-block-usage';
@@ -169,7 +171,7 @@ export function bumpBlockUsage(type){
 export function captureBlockAsTemplate(block, label, description){
   return {
     id: uid('btpl_'),
-    label: String(label || '').trim() || 'Eigene Vorlage',
+    label: String(label || '').trim() || t('tasks.defaultTemplateLabel'),
     description: String(description || '').trim(),
     blockType: block.type,
     config: JSON.parse(JSON.stringify(block.config || {}))
@@ -185,16 +187,16 @@ export function instantiateBlockTemplate(tpl){
 }
 export function instantiateTemplate(tpl){
   // Deep-clone with fresh IDs for the task and every block.
-  const t = JSON.parse(JSON.stringify(tpl.task || {title:'Aufgabe', blocks:[]}));
-  t.id = uid('t_');
-  if(t.tabs && Array.isArray(t.tabs) && t.tabs.length){
-    t.tabs.forEach(tab => { tab.blocks = (tab.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')})); });
-    t._uiActiveTab = 0;
-    t.blocks = t.tabs[0].blocks;
+  const task = JSON.parse(JSON.stringify(tpl.task || {title: t('tasks.defaultTitle'), blocks:[]}));
+  task.id = uid('t_');
+  if(task.tabs && Array.isArray(task.tabs) && task.tabs.length){
+    task.tabs.forEach(tab => { tab.blocks = (tab.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')})); });
+    task._uiActiveTab = 0;
+    task.blocks = task.tabs[0].blocks;
   } else {
-    t.blocks = (t.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')}));
+    task.blocks = (task.blocks || []).map(b => Object.assign({}, b, {id: uid('b_')}));
   }
-  return t;
+  return task;
 }
 export function captureTaskAsTemplateData(task){
   // Drop IDs; instantiateTemplate generates fresh ones.

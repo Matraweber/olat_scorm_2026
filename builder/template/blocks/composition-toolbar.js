@@ -13,13 +13,18 @@
   if(!H) throw new Error("composition-toolbar.js: window.CompositionHelpers not loaded.");
   if(!window.CompositionToolbarPopovers) throw new Error("composition-toolbar.js: window.CompositionToolbarPopovers not loaded. Ensure composition-toolbar-popovers.js is loaded first.");
   const {
-    SHAPE_LABELS, SHAPE_ICONS, ACTION_ICONS,
+    shapeLabel, SHAPE_ICONS, ACTION_ICONS,
     NONE_FILL, NONE_STROKE,
     isNoneColor, newShape,
     pickImageDataUrl,
     slotNumbersInLabel,
     regularPolygonPoints, polygonGetPoints, polygonCentroid
   } = H;
+  // Short helper: prefer window.BlockUtils.t but return the key on fallback.
+  function _t(key, params){
+    const u = window.BlockUtils;
+    return (u && typeof u.t === 'function') ? u.t(key, params) : key;
+  }
 
   function buildToolbar(ctx){
     const {
@@ -53,9 +58,9 @@
         });
         toolGroup.appendChild(b);
       }
-      mkToolBtn('move',  'Verschieben-Werkzeug (V)',
+      mkToolBtn('move',  _t('block.composition.toolbar.tool.move'),
         '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path d="M10 2 L13 5 L11 5 L11 9 L15 9 L15 7 L18 10 L15 13 L15 11 L11 11 L11 15 L13 15 L10 18 L7 15 L9 15 L9 11 L5 11 L5 13 L2 10 L5 7 L5 9 L9 9 L9 5 L7 5 Z"/></svg>');
-      mkToolBtn('select','Auswahl-Werkzeug (S): Rahmen aufziehen für Mehrfachauswahl',
+      mkToolBtn('select', _t('block.composition.toolbar.tool.select'),
         '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1" stroke-dasharray="3 2"/><path d="M9 9 L13 13 M11 13 L13 13 L13 11" fill="currentColor"/></svg>');
       bar.appendChild(toolGroup);
     
@@ -65,8 +70,8 @@
       const tplBtn = document.createElement('button');
       tplBtn.type = 'button';
       tplBtn.className = 'comp-tool-btn-text comp-tool-template';
-      tplBtn.title = 'Vorlage einfügen (Rechteck, Dreieck, Pythagoras, Kreis)';
-      tplBtn.textContent = 'Vorlage…';
+      tplBtn.title = _t('block.composition.toolbar.template.title');
+      tplBtn.textContent = _t('block.composition.toolbar.template.label');
       tplBtn.addEventListener('click', e => {
         e.stopPropagation();
         pops.openTemplatePicker(tplBtn);
@@ -112,7 +117,7 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'comp-tool-btn';
-        btn.title = SHAPE_LABELS[type] + ' hinzufügen';
+        btn.title = _t('block.composition.toolbar.addShape', { name: shapeLabel(type) });
         btn.innerHTML = SHAPE_ICONS[type];
         btn.addEventListener('click', e => {
           e.stopPropagation();
@@ -178,17 +183,17 @@
       modeBadge.className = 'comp-tool-group comp-mode-badge';
       const _gradingMode = block.config.gradingMode || 'none';
       const modeLabels = {
-        'none':        'Nur Anzeige',
-        'acknowledge': 'Verstanden-Button',
-        'fillblanks':  'Mit Lösung'
+        'none':        _t('block.composition.toolbar.mode.none'),
+        'acknowledge': _t('block.composition.toolbar.mode.acknowledge'),
+        'fillblanks':  _t('block.composition.toolbar.mode.fillblanks')
       };
       // Mode chip opens an inline dropdown.
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'comp-mode-chip comp-mode-chip-button';
-      chip.title = 'Bewertungsart wechseln';
+      chip.title = _t('block.composition.toolbar.mode.chipTitle');
       chip.innerHTML = '<strong>' + (modeLabels[_gradingMode] || _gradingMode) + '</strong> <span class="comp-mode-chip-caret">▾</span>';
-      chip.setAttribute('aria-label', 'Bewertungsmodus: ' + (modeLabels[_gradingMode] || _gradingMode));
+      chip.setAttribute('aria-label', _t('block.composition.toolbar.mode.aria', { name: modeLabels[_gradingMode] || _gradingMode }));
       chip.addEventListener('click', e => {
         e.stopPropagation();
         document.querySelectorAll('.comp-mode-menu').forEach(n => n.remove());
@@ -238,15 +243,18 @@
       addVarBtn.type = 'button';
       addVarBtn.className = 'comp-tool-btn-text';
       if(existingVars.length === 0){
-        addVarBtn.title = 'Neue Zufallsvariable anlegen (Name, Min, Max)';
-        addVarBtn.textContent = '+ Variable';
+        addVarBtn.title = _t('block.composition.toolbar.addVariable.title');
+        addVarBtn.textContent = _t('block.composition.toolbar.addVariable.label');
         addVarBtn.addEventListener('click', e => {
           e.stopPropagation();
           pops.openVariableDialog(addVarBtn);
         });
       } else {
-        addVarBtn.title = existingVars.length + ' Variable' + (existingVars.length === 1 ? '' : 'n') + ' definiert. Klicken zum Bearbeiten.';
-        addVarBtn.textContent = 'Variablen (' + existingVars.length + ')';
+        const key = existingVars.length === 1
+          ? 'block.composition.toolbar.editVariables.titleSingular'
+          : 'block.composition.toolbar.editVariables.titlePlural';
+        addVarBtn.title = _t(key, { count: existingVars.length });
+        addVarBtn.textContent = _t('block.composition.toolbar.editVariables.label', { count: existingVars.length });
         addVarBtn.addEventListener('click', e => {
           e.stopPropagation();
           pops.openVariableTable(addVarBtn);
@@ -261,8 +269,11 @@
         const shapesBtn = document.createElement('button');
         shapesBtn.type = 'button';
         shapesBtn.className = 'comp-tool-btn-text';
-        shapesBtn.title = shapes.length + ' Form' + (shapes.length === 1 ? '' : 'en') + ' in dieser Komposition. Klicken zum Auswählen.';
-        shapesBtn.textContent = 'Formen (' + shapes.length + ')';
+        const shapesTitleKey = shapes.length === 1
+          ? 'block.composition.toolbar.shapes.titleSingular'
+          : 'block.composition.toolbar.shapes.titlePlural';
+        shapesBtn.title = _t(shapesTitleKey, { count: shapes.length });
+        shapesBtn.textContent = _t('block.composition.toolbar.shapes.label', { count: shapes.length });
         shapesBtn.addEventListener('click', e => {
           e.stopPropagation();
           pops.openShapePicker(shapesBtn);
@@ -304,7 +315,9 @@
           const noBtn = document.createElement('button');
           noBtn.type = 'button';
           noBtn.className = 'comp-tool-btn comp-tool-btn-sm' + (transparent ? ' comp-tool-btn-active' : '');
-          noBtn.title = transparent ? 'Transparent aktiv. Klicken für Farbe' : 'Auf transparent setzen';
+          noBtn.title = transparent
+            ? _t('block.composition.toolbar.transparent.activeTitle')
+            : _t('block.composition.toolbar.transparent.setTitle');
           noBtn.innerHTML = ACTION_ICONS.transparent;
           noBtn.addEventListener('click', e => {
             e.stopPropagation();
@@ -318,9 +331,9 @@
     
       // Stroke / axis / text colour. Images have no colour control.
       if(!sel || sel.type !== 'image'){
-        const label = (sel && sel.type === 'label') ? 'Text'
-                    : (sel && sel.type === 'coords') ? 'Achse'
-                    : 'Linie';
+        const label = (sel && sel.type === 'label') ? _t('block.composition.toolbar.color.text')
+                    : (sel && sel.type === 'coords') ? _t('block.composition.toolbar.color.axis')
+                    : _t('block.composition.toolbar.color.stroke');
         // Transparent doesn't make sense for labels (would hide the text)
         // or coords (would hide the axes).
         const allowTrans = !!sel && sel.type !== 'label' && sel.type !== 'coords';
@@ -339,7 +352,7 @@
       // Fill colour, only for filled shapes.
       if(sel && (sel.type === 'circle' || sel.type === 'ellipse' || sel.type === 'polygon' || sel.type === 'rect')){
         mkColorControl(
-          'Füllung',
+          _t('block.composition.toolbar.color.fill'),
           sel.fill,
           NONE_FILL,
           '#a1d884',
@@ -353,13 +366,13 @@
       if(sel && sel.type === 'polygon'){
         const sLbl = document.createElement('span');
         sLbl.className = 'comp-tool-label';
-        sLbl.textContent = 'Ecken';
+        sLbl.textContent = _t('block.composition.toolbar.polygon.cornersLabel');
         styleGroup.appendChild(sLbl);
         const sInp = document.createElement('input');
         sInp.type = 'number'; sInp.min = '3'; sInp.max = '20'; sInp.step = '1';
         sInp.className = 'comp-tool-num';
         sInp.value = sel.sides ?? 3;
-        sInp.title = 'Anzahl Ecken (regeneriert als regulär)';
+        sInp.title = _t('block.composition.toolbar.polygon.cornersTitle');
         sInp.addEventListener('input', () => {
           const v = parseInt(sInp.value, 10);
           if(!isNaN(v) && v >= 3 && v <= 20){
@@ -376,8 +389,8 @@
         const regBtn = document.createElement('button');
         regBtn.type = 'button';
         regBtn.className = 'comp-tool-btn-text';
-        regBtn.textContent = 'Regulär';
-        regBtn.title = 'Polygon zu reguläre Form zurücksetzen';
+        regBtn.textContent = _t('block.composition.toolbar.polygon.regularLabel');
+        regBtn.title = _t('block.composition.toolbar.polygon.regularTitle');
         regBtn.addEventListener('click', e => {
           e.stopPropagation();
           const c = polygonCentroid(sel);
@@ -396,7 +409,7 @@
       if(sel && (sel.type === 'line' || sel.type === 'arrow' || sel.type === 'circle' || sel.type === 'ellipse' || sel.type === 'polygon' || sel.type === 'rect')){
         const swLbl = document.createElement('span');
         swLbl.className = 'comp-tool-label';
-        swLbl.textContent = 'Stärke';
+        swLbl.textContent = _t('block.composition.toolbar.strokeWidthLabel');
         styleGroup.appendChild(swLbl);
         const sw = document.createElement('input');
         sw.type = 'number'; sw.min = '1'; sw.max = '20'; sw.step = '1';
@@ -410,8 +423,12 @@
     
         const dashSel = document.createElement('select');
         dashSel.className = 'comp-tool-select';
-        dashSel.title = 'Linienstil';
-        [['solid','─ durchgezogen'], ['dashed','┄ gestrichelt'], ['dotted','┈ gepunktet']].forEach(([v, lbl]) => {
+        dashSel.title = _t('block.composition.toolbar.dash.title');
+        [
+          ['solid',  _t('block.composition.toolbar.dash.solid')],
+          ['dashed', _t('block.composition.toolbar.dash.dashed')],
+          ['dotted', _t('block.composition.toolbar.dash.dotted')]
+        ].forEach(([v, lbl]) => {
           const o = document.createElement('option'); o.value = v; o.textContent = lbl;
           dashSel.appendChild(o);
         });
@@ -426,8 +443,8 @@
         ti.type = 'text';
         ti.className = 'comp-tool-text';
         ti.value = sel.text || '';
-        ti.placeholder = 'z. B. a oder {a}';
-        ti.title = 'Text-Inhalt des Labels';
+        ti.placeholder = _t('block.composition.toolbar.label.textPlaceholder');
+        ti.title = _t('block.composition.toolbar.label.textTitle');
         // commitQuiet while typing (otherwise the input loses focus). Update
         // the SVG text node manually. Full commit() on blur.
         function selectedShapeIdx(){
@@ -482,8 +499,8 @@
         const insertBtn = document.createElement('button');
         insertBtn.type = 'button';
         insertBtn.className = 'comp-tool-btn-text';
-        insertBtn.title = 'Variable oder Sonderzeichen einfügen';
-        insertBtn.textContent = 'Einfügen ▾';
+        insertBtn.title = _t('block.composition.toolbar.insert.title');
+        insertBtn.textContent = _t('block.composition.toolbar.insert.label');
         insertBtn.addEventListener('click', e => {
           e.stopPropagation();
           document.querySelectorAll('.comp-insert-popover').forEach(n => n.remove());
@@ -491,7 +508,7 @@
           pop.className = 'comp-insert-popover';
           pop.addEventListener('click', ev => ev.stopPropagation());
           // Solution fields: numbered slots {N} and answer-mirrors {N*}.
-          const hSol = document.createElement('div'); hSol.className = 'comp-insert-head'; hSol.textContent = 'Lösungsfelder';
+          const hSol = document.createElement('div'); hSol.className = 'comp-insert-head'; hSol.textContent = _t('block.composition.popover.insert.solutionsHead');
           pop.appendChild(hSol);
           // Discover which slot numbers are already used across all labels.
           const usedSlots = new Set();
@@ -507,7 +524,7 @@
           const newSlotBtn = document.createElement('button');
           newSlotBtn.type = 'button'; newSlotBtn.className = 'comp-insert-cell comp-insert-cell-var';
           newSlotBtn.textContent = '{' + nextSlot + '}';
-          newSlotBtn.title = 'Neues Antwort-Eingabefeld (Slot ' + nextSlot + ')';
+          newSlotBtn.title = _t('block.composition.popover.insert.newSlotTitle', { slot: nextSlot });
           newSlotBtn.addEventListener('click', () => {
             tiInsertAtCaret('{' + nextSlot + '}');
             if((block.config.gradingMode || 'none') !== 'fillblanks'){
@@ -523,7 +540,7 @@
             const mirBtn = document.createElement('button');
             mirBtn.type = 'button'; mirBtn.className = 'comp-insert-cell';
             mirBtn.textContent = '{' + n + '*}';
-            mirBtn.title = 'Spiegelung: zeigt die Schüler-Antwort aus Slot ' + n + ' an (auch nutzbar in Formeln)';
+            mirBtn.title = _t('block.composition.popover.insert.mirrorTitle', { slot: n });
             mirBtn.addEventListener('click', () => { tiInsertAtCaret('{' + n + '*}'); pop.remove(); });
             solRow.appendChild(mirBtn);
           });
@@ -532,10 +549,10 @@
           // Help line so professors discover the feature.
           const hint = document.createElement('div');
           hint.style.cssText = 'font-size:0.72rem; color:#5d6872; padding:0.3rem 0.5rem 0.4rem; line-height:1.35;';
-          hint.innerHTML = '<strong>{N}</strong>: Antwortfeld · <strong>{N*}</strong>: Schüler-Antwort weiternutzen (im Text oder in einer Formel)';
+          hint.innerHTML = _t('block.composition.popover.insert.hint');
           pop.appendChild(hint);
           if(definedVars.length > 0){
-            const h = document.createElement('div'); h.className = 'comp-insert-head'; h.textContent = 'Variablen';
+            const h = document.createElement('div'); h.className = 'comp-insert-head'; h.textContent = _t('block.composition.popover.insert.variablesHead');
             pop.appendChild(h);
             const row = document.createElement('div'); row.className = 'comp-insert-row';
             definedVars.forEach(v => {
@@ -547,7 +564,7 @@
             });
             pop.appendChild(row);
           }
-          const h2 = document.createElement('div'); h2.className = 'comp-insert-head'; h2.textContent = 'Sonderzeichen';
+          const h2 = document.createElement('div'); h2.className = 'comp-insert-head'; h2.textContent = _t('block.composition.popover.insert.symbolsHead');
           pop.appendChild(h2);
           const SYMS = [
             'α','β','γ','δ','ε','ζ','η','θ','λ','μ','ν','π','ρ','σ','τ','φ','ψ','ω',
@@ -595,7 +612,7 @@
         fs.type = 'number'; fs.min = '8'; fs.max = '96'; fs.step = '1';
         fs.className = 'comp-tool-num';
         fs.value = sel.fontSize ?? 18;
-        fs.title = 'Schriftgröße';
+        fs.title = _t('block.composition.toolbar.label.fontSizeTitle');
         fs.addEventListener('input', () => {
           const v = parseInt(fs.value, 10);
           if(!isNaN(v) && v >= 8){ sel.fontSize = v; commit(); }
@@ -620,8 +637,8 @@
           wrap.appendChild(document.createTextNode(' ' + label));
           styleGroup.appendChild(wrap);
         };
-        mkToggle('showGrid',   'Gitter',   true);
-        mkToggle('showLabels', 'Achsen­beschriftung', true);
+        mkToggle('showGrid',   _t('block.composition.toolbar.coords.showGrid'),   true);
+        mkToggle('showLabels', _t('block.composition.toolbar.coords.showLabels'), true);
     
         const mkRange = (key, label, fallback) => {
           const lbl = document.createElement('span');
@@ -633,28 +650,28 @@
           inp.className = 'comp-tool-num';
           inp.step = '0.5';
           inp.value = sel[key] != null ? sel[key] : fallback;
-          inp.title = 'Achsenbereich ' + label;
+          inp.title = _t('block.composition.toolbar.coords.rangeTitle', { name: label });
           inp.addEventListener('input', () => {
             const v = parseFloat(inp.value);
             if(!isNaN(v)){ sel[key] = v; commit(); }
           });
           styleGroup.appendChild(inp);
         };
-        mkRange('xMin', 'x min', -5);
-        mkRange('xMax', 'x max',  5);
-        mkRange('yMin', 'y min', -3);
-        mkRange('yMax', 'y max',  3);
+        mkRange('xMin', _t('block.composition.toolbar.coords.xMin'), -5);
+        mkRange('xMax', _t('block.composition.toolbar.coords.xMax'),  5);
+        mkRange('yMin', _t('block.composition.toolbar.coords.yMin'), -3);
+        mkRange('yMax', _t('block.composition.toolbar.coords.yMax'),  3);
     
         const stepLbl = document.createElement('span');
         stepLbl.className = 'comp-tool-label';
-        stepLbl.textContent = 'Schritt';
+        stepLbl.textContent = _t('block.composition.toolbar.coords.step');
         styleGroup.appendChild(stepLbl);
         const stepInp = document.createElement('input');
         stepInp.type = 'number';
         stepInp.className = 'comp-tool-num';
         stepInp.step = '0.5'; stepInp.min = '0.01';
         stepInp.value = sel.step != null ? sel.step : 1;
-        stepInp.title = 'Abstand zwischen Gitter/Beschriftung';
+        stepInp.title = _t('block.composition.toolbar.coords.stepTitle');
         stepInp.addEventListener('input', () => {
           const v = parseFloat(stepInp.value);
           if(!isNaN(v) && v > 0){ sel.step = v; commit(); }
@@ -666,7 +683,7 @@
         const replace = document.createElement('button');
         replace.type = 'button';
         replace.className = 'comp-tool-btn-text';
-        replace.textContent = 'Bild ersetzen…';
+        replace.textContent = _t('block.composition.toolbar.image.replace');
         replace.addEventListener('click', e => {
           e.stopPropagation();
           pickImageDataUrl().then(src => { if(src){ sel.src = src; commit(); } });
@@ -690,7 +707,7 @@
           styleGroup.appendChild(wrap);
         }
         if(gMode === 'click'){
-          mkToggle('isCorrect', 'Korrekt',
+          mkToggle('isCorrect', _t('block.composition.toolbar.grading.isCorrect'),
             () => sel.isCorrect, v => { sel.isCorrect = v; });
         }
         if(gMode === 'fillblanks' && sel.type === 'label'){
@@ -700,8 +717,8 @@
             const bewBtn = document.createElement('button');
             bewBtn.type = 'button';
             bewBtn.className = 'comp-tool-btn-text comp-tool-template';
-            bewBtn.title = 'Formel und Toleranz für das Antwortfeld konfigurieren';
-            bewBtn.textContent = 'Formel ▾';
+            bewBtn.title = _t('block.composition.toolbar.grading.formulaTitle');
+            bewBtn.textContent = _t('block.composition.toolbar.grading.formulaLabel');
             bewBtn.addEventListener('click', e => {
               e.stopPropagation();
               pops.openBewertungPopover(bewBtn, sel);
@@ -710,20 +727,20 @@
           }
         }
         if(gMode === 'hotspot'){
-          mkToggle('isTarget', 'Zielzone',
+          mkToggle('isTarget', _t('block.composition.toolbar.grading.isTarget'),
             () => sel.isTarget, v => { sel.isTarget = v; if(v) sel.isMarker = false; });
-          mkToggle('isMarker', 'Marker',
+          mkToggle('isMarker', _t('block.composition.toolbar.grading.isMarker'),
             () => sel.isMarker, v => { sel.isMarker = v; if(v) sel.isTarget = false; });
           if(sel.isMarker){
             // Pick the target's shapes-array idx.
             const targetOpts = (block.config.shapes || [])
-              .map((s, i) => s.isTarget ? { idx: i, label: 'Ziel #' + i + ' (' + (SHAPE_LABELS[s.type] || s.type) + ')' } : null)
+              .map((s, i) => s.isTarget ? { idx: i, label: _t('block.composition.toolbar.grading.targetOption', { idx: i, name: shapeLabel(s.type) }) } : null)
               .filter(Boolean);
             const dd = document.createElement('select');
             dd.className = 'comp-tool-select';
-            dd.title = 'Korrekte Zielzone';
+            dd.title = _t('block.composition.toolbar.grading.targetTitle');
             const none = document.createElement('option');
-            none.value = ''; none.textContent = '(Ziel wählen)';
+            none.value = ''; none.textContent = _t('block.composition.toolbar.grading.targetChoose');
             dd.appendChild(none);
             targetOpts.forEach(o => {
               const opt = document.createElement('option');
@@ -756,10 +773,10 @@
           b.addEventListener('click', e => { e.stopPropagation(); handler(); });
           rightGroup.appendChild(b);
         };
-        mkActionBtn('Nach vorne',  ACTION_ICONS.forward,   () => bringForward());
-        mkActionBtn('Nach hinten', ACTION_ICONS.backward,  () => sendBackward());
-        mkActionBtn('Duplizieren', ACTION_ICONS.duplicate, () => duplicateSelected());
-        mkActionBtn('Form löschen', ACTION_ICONS.delete, () => deleteSelected(), true);
+        mkActionBtn(_t('block.composition.toolbar.action.forward'),   ACTION_ICONS.forward,   () => bringForward());
+        mkActionBtn(_t('block.composition.toolbar.action.backward'),  ACTION_ICONS.backward,  () => sendBackward());
+        mkActionBtn(_t('block.composition.toolbar.action.duplicate'), ACTION_ICONS.duplicate, () => duplicateSelected());
+        mkActionBtn(_t('block.composition.toolbar.action.delete'),    ACTION_ICONS.delete,    () => deleteSelected(), true);
         bar.appendChild(rightGroup);
       }
     

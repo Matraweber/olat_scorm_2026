@@ -1,7 +1,8 @@
 // canvas.js: Canvas constants, default sizes, position helpers, snap
 // algorithm, snap guides, block summary, autofit, drop-marker helpers.
-import { el, cssEscape } from './util.js';
+import { el, cssEscape, tProp } from './util.js';
 import { state, pushHistory, render } from './state.js';
+import { t } from './i18n.js';
 
 // Block-files registry, used for ZIP packaging and template loading.
 // Each value is either a single filename or an array of files loaded in order
@@ -88,9 +89,13 @@ export function ensurePos(block, allBlocks){
 export function ensureAllPos(blocks){ blocks.forEach(b => ensurePos(b, blocks)); }
 
 // Snap algorithm
-const EDGE_LABELS = {
-  left:'links', right:'rechts', cx:'Mitte X',
-  top:'oben',  bottom:'unten', cy:'Mitte Y'
+const EDGE_LABEL_KEYS = {
+  left:'canvas.snap.edge.left',
+  right:'canvas.snap.edge.right',
+  cx:'canvas.snap.edge.centerX',
+  top:'canvas.snap.edge.top',
+  bottom:'canvas.snap.edge.bottom',
+  cy:'canvas.snap.edge.centerY'
 };
 
 export function applySnap(self, candidate, others){
@@ -116,7 +121,7 @@ export function applySnap(self, candidate, others){
     if(bestX.edge === 'left') snappedX = bestX.line;
     else if(bestX.edge === 'right') snappedX = bestX.line - candidate.w;
     else snappedX = bestX.line - candidate.w / 2;
-    guides.push({orientation:'v', val: bestX.line, edge: bestX.edge, label: EDGE_LABELS[bestX.edge]});
+    guides.push({orientation:'v', val: bestX.line, edge: bestX.edge, label: t(EDGE_LABEL_KEYS[bestX.edge])});
   }
   const selfY = [
     {edge:'top',    val: candidate.y},
@@ -132,7 +137,7 @@ export function applySnap(self, candidate, others){
     if(bestY.edge === 'top') snappedY = bestY.line;
     else if(bestY.edge === 'bottom') snappedY = bestY.line - candidate.h;
     else snappedY = bestY.line - candidate.h / 2;
-    guides.push({orientation:'h', val: bestY.line, edge: bestY.edge, label: EDGE_LABELS[bestY.edge]});
+    guides.push({orientation:'h', val: bestY.line, edge: bestY.edge, label: t(EDGE_LABEL_KEYS[bestY.edge])});
   }
   if(!bestX) snappedX = Math.round(snappedX / GRID) * GRID;
   if(!bestY) snappedY = Math.round(snappedY / GRID) * GRID;
@@ -154,12 +159,12 @@ export function applyResizeSnap(self, candidateW, candidateH, others){
   const myRight = self.pos.x + w;
   let bestV = null;
   vLines.forEach(line => { const d = Math.abs(myRight - line); if(d <= SNAP_PX && (!bestV || d < bestV.d)) bestV = {d, line}; });
-  if(bestV){ w = bestV.line - self.pos.x; guides.push({orientation:'v', val: bestV.line, edge:'right', label:'rechte Kante'}); }
+  if(bestV){ w = bestV.line - self.pos.x; guides.push({orientation:'v', val: bestV.line, edge:'right', label: t('canvas.snap.edge.rightEdge')}); }
   else w = Math.round(w / GRID) * GRID;
   const myBottom = self.pos.y + h;
   let bestH = null;
   hLines.forEach(line => { const d = Math.abs(myBottom - line); if(d <= SNAP_PX && (!bestH || d < bestH.d)) bestH = {d, line}; });
-  if(bestH){ h = bestH.line - self.pos.y; guides.push({orientation:'h', val: bestH.line, edge:'bottom', label:'untere Kante'}); }
+  if(bestH){ h = bestH.line - self.pos.y; guides.push({orientation:'h', val: bestH.line, edge:'bottom', label: t('canvas.snap.edge.bottomEdge')}); }
   else h = Math.round(h / GRID) * GRID;
   w = Math.max(80, Math.min(w, CANVAS_WIDTH - self.pos.x));
   h = Math.max(40, h);
@@ -198,7 +203,7 @@ export function blockSummary(block){
   if(def && typeof def.summary === 'function'){
     try { return def.summary(block.config || {}); } catch{}
   }
-  return (def && def.label) || block.type;
+  return (def && tProp(def, 'label')) || block.type;
 }
 
 // Natural content height. Relaxes overflow:hidden on card/body and any SVG

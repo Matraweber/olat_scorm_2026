@@ -1,5 +1,6 @@
 // task-pane-canvas.js: Canvas render + drag-to-move / drag-to-resize with snap guides.
-import { el, uid, cssEscape, toast, confirmDialog, formDialog } from './util.js';
+import { t } from './i18n.js';
+import { el, uid, cssEscape, toast, confirmDialog, formDialog, tProp } from './util.js';
 import { state, pushHistory, takeHistorySnap, commitHistorySnap, discardHistorySnap } from './state.js';
 import { captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
 import {
@@ -32,14 +33,14 @@ export function renderCanvas(ctx){
     const cardHead = el('div', {className:'canvas-block-head'});
     cardHead.appendChild(el('span', {
       className:'canvas-block-type',
-      text: ((def && def.label) || block.type) + (def && def.graded ? ' · gewertet' : '')
+      text: ((def && tProp(def, 'label')) || block.type) + (def && def.graded ? t('taskPane.canvas.gradedSuffix') : '')
     }));
     const ctrls = el('div', {className:'canvas-block-controls'});
-    const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Höhe an Inhalt anpassen'}, text:'↕'});
-    const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Duplizieren'}, text:'⧉'});
+    const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.canvas.fitHeightTitle')}, text:'↕'});
+    const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('common.duplicate')}, text:'⧉'});
     // Block-template button: deep-clones into state.userBlockTemplates.
-    const tplBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Als Block-Vorlage speichern'}, text:'★'});
-    const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title:'Entfernen'}, text:'✕'});
+    const tplBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.canvas.saveAsTemplateTitle')}, text:'★'});
+    const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title: t('common.remove')}, text:'✕'});
     fitBtn.addEventListener('click', e => { e.stopPropagation(); autoFitBlock(block); });
     dupBtn.addEventListener('click', e => {
       e.stopPropagation();
@@ -53,30 +54,30 @@ export function renderCanvas(ctx){
     });
     tplBtn.addEventListener('click', async e => {
       e.stopPropagation();
-      const defaultName = (def && def.label) || block.type;
+      const defaultName = (def && tProp(def, 'label')) || block.type;
       const result = await formDialog({
-        title: 'Block als Vorlage speichern',
+        title: t('taskPane.canvas.saveTemplateDialog.title'),
         fields: [
-          { key:'name',        label:'Name',                 default: defaultName, placeholder:'z. B. Multiple Choice mit 4 Optionen' },
-          { key:'description', label:'Beschreibung (optional)', type:'textarea', rows:2, placeholder:'Was zeichnet diese Vorlage aus?' }
+          { key:'name',        label: t('taskPane.canvas.saveTemplateDialog.nameLabel'),        default: defaultName, placeholder: t('taskPane.canvas.saveTemplateDialog.namePlaceholder') },
+          { key:'description', label: t('taskPane.canvas.saveTemplateDialog.descriptionLabel'), type:'textarea', rows:2, placeholder: t('taskPane.canvas.saveTemplateDialog.descriptionPlaceholder') }
         ],
-        confirmLabel: 'Speichern'
+        confirmLabel: t('common.save')
       });
       if(!result) return;
       const trimmed = String(result.name || '').trim();
-      if(!trimmed){ toast('Vorlage wurde nicht gespeichert (kein Name angegeben).', 'error'); return; }
+      if(!trimmed){ toast(t('taskPane.canvas.templateNotSavedNoName'), 'error'); return; }
       const tpl = captureBlockAsTemplate(block, trimmed, String(result.description || '').trim());
       state.userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
       state.userBlockTemplates.unshift(tpl);
       saveUserBlockTemplates();
-      toast('Block-Vorlage "' + trimmed + '" gespeichert.');
+      toast(t('taskPane.canvas.templateSaved', { name: trimmed }));
     });
     rmBtn.addEventListener('click', async e => {
       e.stopPropagation();
       if(!await confirmDialog({
-        title: 'Block löschen?',
-        message: '„' + ((def && def.label) || block.type) + '" wird von der Canvas entfernt. Diese Aktion kann mit Strg + Z rückgängig gemacht werden.',
-        confirmLabel: 'Löschen',
+        title: t('taskPane.canvas.deleteBlockDialog.title'),
+        message: t('taskPane.canvas.deleteBlockDialog.message', { name: (def && tProp(def, 'label')) || block.type }),
+        confirmLabel: t('common.delete'),
         danger: true
       })) return;
       pushHistory();
@@ -105,7 +106,7 @@ export function renderCanvas(ctx){
     renderBlockPreview(cardBody, block);
     card.appendChild(cardBody);
 
-    const resize = el('div', {className:'canvas-block-resize', attrs:{title:'Größe ändern'}, text:'⌟'});
+    const resize = el('div', {className:'canvas-block-resize', attrs:{title: t('taskPane.canvas.resizeTitle')}, text:'⌟'});
     card.appendChild(resize);
 
     installDragHandlers(ctx, card, block);
@@ -124,12 +125,12 @@ export function renderCanvas(ctx){
     '</svg>';
     empty.innerHTML =
       svg +
-      '<h3 class="canvas-empty-title">Bereit für den ersten Block?</h3>' +
-      '<p class="canvas-empty-body">Wählen Sie einen Block-Typ (z. B. Bild, Text oder Frage) und platzieren Sie ihn frei auf der Canvas.</p>';
+      '<h3 class="canvas-empty-title">' + t('taskPane.canvas.empty.title') + '</h3>' +
+      '<p class="canvas-empty-body">' + t('taskPane.canvas.empty.body') + '</p>';
     const cta = el('button', {
       className:'btn btn-primary canvas-empty-cta',
       attrs:{type:'button'},
-      text:'+ Block hinzufügen'
+      text: t('taskPane.canvas.empty.addBlock')
     });
     cta.addEventListener('click', () => {
       if(typeof ctx.openAddBlockPicker === 'function') ctx.openAddBlockPicker();
@@ -137,7 +138,7 @@ export function renderCanvas(ctx){
     empty.appendChild(cta);
     empty.appendChild(el('p', {
       className:'canvas-empty-hint',
-      html:'Tipp: <kbd>Strg</kbd> + Mausrad zum Zoomen · <kbd>Pfeiltasten</kbd> zum Verschieben'
+      html: t('taskPane.canvas.empty.hint')
     }));
     canvas.appendChild(empty);
   }

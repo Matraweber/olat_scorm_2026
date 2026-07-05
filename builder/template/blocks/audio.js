@@ -5,39 +5,51 @@
 
   Blocks.register('audio', {
     label: 'Audio',
+    labelKey: 'block.audio.label',
     description: 'Audiodatei abspielen, z. B. Sprachaufnahme oder Hörbeispiel. Datei-Upload oder URL.',
+    descKey: 'block.audio.description',
     category: 'Medien & Inhalt',
+    categoryKey: 'block.category.content',
     icon: 'audio',
     graded: false,
-    defaultConfig(){
+    defaultConfig(locale = 'de'){
       return { src: '', title: '', caption: '' };
     },
-    previewConfig(){
+    previewConfig(locale = 'de'){
+      const en = locale === 'en';
       // _demo:true tells preview() to render a mock player.
-      return { src: '', _demo: true, title: 'Audiobeispiel: Sprechprobe', caption: 'Quelle: eigene Aufnahme' };
+      return {
+        src: '',
+        _demo: true,
+        title: en ? 'Audio example: voice sample' : 'Audiobeispiel: Sprechprobe',
+        caption: en ? 'Source: own recording' : 'Quelle: eigene Aufnahme'
+      };
     },
     builderSchema(){
       return [
-        { key:'title', label:'Titel (über dem Player, optional)', type:'text' },
-        { key:'src', label:'Audioquelle (Data-URL oder URL/Pfad)', type:'audio', help:'Hochgeladene Audiodateien werden als Data-URL ins SCORM-Paket eingebettet. URL muss MP3/WAV/OGG sein.' },
-        { key:'caption', label:'Bildunterschrift (unter dem Player, optional)', type:'text' }
+        { key:'title', label:'Titel (über dem Player, optional)', labelKey:'block.audio.field.title.label', type:'text' },
+        { key:'src', label:'Audioquelle (Data-URL oder URL/Pfad)', labelKey:'block.audio.field.src.label', type:'audio', help:'Hochgeladene Audiodateien werden als Data-URL ins SCORM-Paket eingebettet. URL muss MP3/WAV/OGG sein.', helpKey:'block.audio.field.src.help' },
+        { key:'caption', label:'Bildunterschrift (unter dem Player, optional)', labelKey:'block.audio.field.caption.label', type:'text' }
       ];
     },
     mount(host, config, api){
+      const t = (api && api.utils && api.utils.t) ? api.utils.t : (k) => k;
+      const l = (api && api.utils && api.utils.l) ? api.utils.l : (v) => v;
       const wrap = document.createElement('figure');
       wrap.className = 'audio-block';
       wrap.style.margin = '0';
-      if(config.title){
+      const titleText = l(config.title);
+      if(titleText){
         const title = document.createElement('div');
         title.className = 'audio-block-title';
-        title.textContent = config.title;
+        title.textContent = titleText;
         title.style.cssText = 'font-weight:700; color:var(--primary); margin-bottom:0.4rem;';
         wrap.appendChild(title);
       }
       if(!config.src){
         const ph = document.createElement('div');
         ph.className = 'block-placeholder';
-        ph.textContent = '(Audio noch nicht gesetzt)';
+        ph.textContent = t('block.audio.placeholder.notSet');
         wrap.appendChild(ph);
         host.appendChild(wrap);
         return {};
@@ -48,9 +60,10 @@
       audio.src = config.src;
       audio.style.cssText = 'width:100%; display:block;';
       wrap.appendChild(audio);
-      if(config.caption){
+      const captionText = l(config.caption);
+      if(captionText){
         const cap = document.createElement('figcaption');
-        cap.textContent = config.caption;
+        cap.textContent = captionText;
         cap.style.cssText = 'font-size:0.85rem; color:var(--muted); margin-top:0.4rem;';
         wrap.appendChild(cap);
       }
@@ -60,13 +73,17 @@
     preview(host, config){
       // _demo: render a mock player (welcome modal).
       // Otherwise: real <audio> if src set, dashed placeholder if not.
+      const BU = window.BlockUtils || {};
+      const t = (typeof BU.t === 'function') ? BU.t : (k) => k;
+      const l = (typeof BU.l === 'function') ? BU.l : (v) => v;
       const wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex; flex-direction:column; height:100%; padding:0.4rem; box-sizing:border-box; gap:0.3rem; overflow:hidden;';
-      if(config.title){
-        const t = document.createElement('div');
-        t.textContent = config.title;
-        t.style.cssText = 'font-weight:700; color:#003b5c; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
-        wrap.appendChild(t);
+      const titleText = l(config.title);
+      if(titleText){
+        const tEl = document.createElement('div');
+        tEl.textContent = titleText;
+        tEl.style.cssText = 'font-weight:700; color:#003b5c; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
+        wrap.appendChild(tEl);
       }
       if(config._demo){
         // Mock player (static SVG/HTML) for the welcome modal.
@@ -99,7 +116,7 @@
       } else if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'flex:1; display:flex; align-items:center; justify-content:center; color:#888; font-style:italic; font-size:0.8rem; border:1px dashed #c7d3dc; border-radius:6px;';
-        ph.textContent = '(noch keine Audiodatei)';
+        ph.textContent = t('block.audio.preview.noAudio');
         wrap.appendChild(ph);
       } else {
         const audio = document.createElement('audio');
@@ -109,9 +126,10 @@
         audio.style.cssText = 'width:100%; display:block;';
         wrap.appendChild(audio);
       }
-      if(config.caption){
+      const captionText = l(config.caption);
+      if(captionText){
         const cap = document.createElement('div');
-        cap.textContent = config.caption;
+        cap.textContent = captionText;
         cap.style.cssText = 'font-size:0.7rem; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
         wrap.appendChild(cap);
       }

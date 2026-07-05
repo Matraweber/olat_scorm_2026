@@ -2,8 +2,11 @@
   'use strict';
   Blocks.register('truth-table', {
     label: 'Wahrheitstabelle',
+    labelKey: 'block.truth-table.label',
     description: 'Boolesche Ausdrücke (AND, OR, NOT, XOR) auswerten, pro Zeile 0/1.',
+    descKey: 'block.truth-table.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: '01',
     graded: true,
     defaultConfig(){
@@ -16,47 +19,53 @@
         maxPoints: 1
       };
     },
-    summary(cfg){ return ((cfg.expressions || []).length) + ' Ausdrücke'; },
+    summary(cfg){
+      const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
+      return t('block.truth-table.summary.expressionsCount', { count: (cfg.expressions || []).length });
+    },
     validate(cfg){
       if(cfg.expressionPreset && cfg.expressionPreset !== 'custom') return [];
       if(!cfg.expressionPreset && (!Array.isArray(cfg.expressions) || cfg.expressions.length === 0)) return [];
+      const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
       const w = [];
       if(!Array.isArray(cfg.expressions) || cfg.expressions.length === 0 || cfg.expressions.every(e => !e.expr)){
-        w.push('Keine booleschen Ausdrücke definiert.');
+        w.push(t('block.truth-table.validate.noExpressions'));
       }
       return w;
     },
     builderSchema(){
       const isCustom = c => (c.expressionPreset || 'custom') === 'custom';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Wahrheitstabelle' },
-        { key:'expressionPreset', label:'Vorlage', type:'select', options:[
-          {value:'custom',     label:'Manuell (leer)'},
-          {value:'basics-2',   label:'Beispiel: AND, OR, NOT (2 Variablen)'},
-          {value:'mixed-2',    label:'Beispiel: Gemischte Logik (2 Variablen)'},
-          {value:'mixed-3',    label:'Beispiel: Gemischte Logik (3 Variablen)'},
-          {value:'de-morgan',  label:'Beispiel: De-Morgan-Gesetze'},
-          {value:'xor',        label:'Beispiel: XOR / Entweder-oder'}
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.truth-table.field.blockTitle.label', type:'text', placeholder:'Wahrheitstabelle', placeholderKey:'block.truth-table.field.blockTitle.placeholder' },
+        { key:'expressionPreset', label:'Vorlage', labelKey:'block.truth-table.field.expressionPreset.label', type:'select', options:[
+          {value:'custom',     label:'Manuell (leer)',                         labelKey:'block.truth-table.field.expressionPreset.option.custom'},
+          {value:'basics-2',   label:'Beispiel: AND, OR, NOT (2 Variablen)',   labelKey:'block.truth-table.field.expressionPreset.option.basics-2'},
+          {value:'mixed-2',    label:'Beispiel: Gemischte Logik (2 Variablen)', labelKey:'block.truth-table.field.expressionPreset.option.mixed-2'},
+          {value:'mixed-3',    label:'Beispiel: Gemischte Logik (3 Variablen)', labelKey:'block.truth-table.field.expressionPreset.option.mixed-3'},
+          {value:'de-morgan',  label:'Beispiel: De-Morgan-Gesetze',            labelKey:'block.truth-table.field.expressionPreset.option.de-morgan'},
+          {value:'xor',        label:'Beispiel: XOR / Entweder-oder',          labelKey:'block.truth-table.field.expressionPreset.option.xor'}
         ]},
-        { type:'action', label:'↺ Zurücksetzen', action:'reset',
+        { type:'action', label:'↺ Zurücksetzen', labelKey:'block.truth-table.field.reset.label', action:'reset',
           showIf: c => (c.expressionPreset || 'custom') === 'custom' },
-        { key:'variableCount', label:'Variablenzahl', type:'number', step:1, min:2, max:3,
+        { key:'variableCount', label:'Variablenzahl', labelKey:'block.truth-table.field.variableCount.label', type:'number', step:1, min:2, max:3,
           help:'2 Variablen = 4 Zeilen, 3 Variablen = 8 Zeilen.',
+          helpKey:'block.truth-table.field.variableCount.help',
           showIf: c => (c.expressionPreset || 'custom') !== 'custom' },
         // Expressions
-        { type:'section', label:'Boolesche Ausdrücke', key:'_sec_expr', showIf: isCustom },
-        { key:'expressions', label:'Ausdrücke', type:'list', itemLabel:'Ausdruck',
+        { type:'section', label:'Boolesche Ausdrücke', labelKey:'block.truth-table.field.sectionExpressions.label', key:'_sec_expr', showIf: isCustom },
+        { key:'expressions', label:'Ausdrücke', labelKey:'block.truth-table.field.expressions.label', type:'list', itemLabel:'Ausdruck', itemLabelKey:'block.truth-table.field.expressions.itemLabel',
           showIf: isCustom,
           itemSummary: item => (item.expr || '…').slice(0, 70),
           itemSchema:[
-            { key:'expr', label:'Boolescher Ausdruck', type:'text', placeholder:'a && b || !c', fullWidth:true,
-              help:'Operatoren: && (AND), || (OR), ! (NOT), xor (XOR)' },
-            { key:'vars', label:'Variablen (kommasepariert)', type:'text', placeholder:'a,b,c', transform:'csv' }
+            { key:'expr', label:'Boolescher Ausdruck', labelKey:'block.truth-table.field.expr.label', type:'text', placeholder:'a && b || !c', placeholderKey:'block.truth-table.field.expr.placeholder', fullWidth:true,
+              help:'Operatoren: && (AND), || (OR), ! (NOT), xor (XOR)',
+              helpKey:'block.truth-table.field.expr.help' },
+            { key:'vars', label:'Variablen (kommasepariert)', labelKey:'block.truth-table.field.vars.label', type:'text', placeholder:'a,b,c', placeholderKey:'block.truth-table.field.vars.placeholder', transform:'csv' }
           ]},
         // Settings & scoring
-        { type:'section', label:'Einstellungen & Bewertung', key:'_sec_score' },
-        { key:'randomize', label:'Ausdruck zufällig wählen', type:'boolean' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        { type:'section', label:'Einstellungen & Bewertung', labelKey:'block.truth-table.field.sectionSettings.label', key:'_sec_score' },
+        { key:'randomize', label:'Ausdruck zufällig wählen', labelKey:'block.truth-table.field.randomize.label', type:'boolean' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.truth-table.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -65,16 +74,16 @@
       let current = null;
 
       const card = document.createElement('section'); card.className = 'section-card block-question';
-      card.appendChild(Object.assign(document.createElement('h3'), {textContent: config.blockTitle || 'Wahrheitstabelle'}));
+      card.appendChild(Object.assign(document.createElement('h3'), {textContent: u.l(config.blockTitle) || u.t('block.truth-table.defaultTitle')}));
       const exprBox = document.createElement('div'); exprBox.className='formula-box'; exprBox.style.marginBottom='1rem';
-      exprBox.innerHTML = '<div class="formula-title">Ausdruck</div>';
+      exprBox.innerHTML = '<div class="formula-title">' + u.t('block.truth-table.expressionLabel') + '</div>';
       const exprText = document.createElement('div'); exprText.className='formula-text';
       exprBox.appendChild(exprText); card.appendChild(exprBox);
       const tableHost = document.createElement('div'); card.appendChild(tableHost);
 
-      const btnRow = document.createElement('div'); btnRow.className='button-cluster'; 
-      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
-      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
+      const btnRow = document.createElement('div'); btnRow.className='button-cluster';
+      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent=u.t('common.check');
+      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent=u.t('common.regenerate');
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
       card.appendChild(btnRow);
 
@@ -122,7 +131,7 @@
         const table = document.createElement('table'); table.className = 'truth-table';
         const head = document.createElement('tr');
         current.varNames.forEach(v => { const th = document.createElement('th'); th.textContent = v; head.appendChild(th); });
-        const thr = document.createElement('th'); thr.textContent = 'Ergebnis'; head.appendChild(thr);
+        const thr = document.createElement('th'); thr.textContent = u.t('block.truth-table.resultColumn'); head.appendChild(thr);
         table.appendChild(head);
         const rows = genTable(current.varNames);
         current.rows = rows; current.inputs = [];
@@ -141,7 +150,7 @@
       function chooseNew(){
         current = pickInstance();
         renderTable();
-        fb.neutral('Tragen Sie für jede Zeile 0 oder 1 ein.');
+        fb.neutral(u.t('block.truth-table.fillHint'));
       }
       function grade(){
         const totalRows = current.rows.length;
@@ -154,14 +163,14 @@
           const got = v === '1';
           if(got === expected) correctRows++;
         });
-        if(!any){ fb.bad('Bitte alle Zeilen ausfüllen.'); return; }
+        if(!any){ fb.bad(u.t('block.truth-table.fillAllRows')); return; }
         const maxPoints = config.maxPoints || 1;
         const ratio = totalRows > 0 ? correctRows / totalRows : 0;
         const pts = Math.round(ratio * maxPoints * 100) / 100;
         api.reportScore(pts);
-        if(correctRows === totalRows) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte.');
-        else if(correctRows > 0) fb.neutral('Teilweise richtig: ' + correctRows + ' von ' + totalRows + ' Zeilen (' + pts + ' / ' + maxPoints + ' Punkte).');
-        else fb.bad('Keine Zeile korrekt. 0 / ' + maxPoints + ' Punkte.');
+        if(correctRows === totalRows) fb.ok(u.t('feedback.correctScored', { pts, max: maxPoints }));
+        else if(correctRows > 0) fb.neutral(u.t('block.truth-table.partialRows', { correct: correctRows, total: totalRows, pts, max: maxPoints }));
+        else fb.bad(u.t('block.truth-table.noRowCorrect', { max: maxPoints }));
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);
@@ -172,7 +181,7 @@
     },
     preview(host, config){
       const u = window.BlockUtils;
-      const wrap = u.tagPreview(host, { icon:'01', label:'Wahrheitstabelle', fillHeight:true });
+      const wrap = u.tagPreview(host, { icon:'01', label: u.t('block.truth-table.label'), fillHeight:true });
       const exprs = expressionList(config);
       const expr = (exprs[0] || {}).expr || 'a && b';
       const ex = document.createElement('div');

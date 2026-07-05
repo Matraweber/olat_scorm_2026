@@ -2,11 +2,14 @@
   'use strict';
   Blocks.register('complex-question', {
     label: 'Komplexe Zahl ablesen',
+    labelKey: 'block.complex-question.label',
     description: 'Plot in Gaußscher Zahlenebene zeigen, Re/Im/|z|/φ abfragen.',
+    descKey: 'block.complex-question.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: 'z',
     graded: true,
-    defaultConfig(){
+    defaultConfig(locale = 'de'){
       return {
         blockTitle: '',
         pool: [
@@ -21,9 +24,13 @@
         maxPoints: 1
       };
     },
-    summary(cfg){ return ((cfg.pool || []).length) + ' Punkte im Pool'; },
+    summary(cfg){
+      const n = (cfg.pool || []).length;
+      const t = (window.BlockUtils && window.BlockUtils.t) ? window.BlockUtils.t : function(k, _p, fb){ return fb; };
+      return t('block.complex-question.summary', { n }, n + ' points in pool');
+    },
     previewConfig(){
-      // z = 3 + 2i: visible angle arc (~33 deg) inside ±5.5, vector reaches ~60% of half-width.
+      // z = 3 + 2i: visible angle arc (~33 deg) inside +/-5.5, vector reaches ~60% of half-width.
       return {
         blockTitle: '',
         pool: [{a:3, b:2}],
@@ -37,47 +44,47 @@
     },
     builderSchema(){
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Komplexe Zahlen' },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.complex-question.field.blockTitle.label', type:'text', placeholder:'Komplexe Zahlen', placeholderKey:'block.complex-question.field.blockTitle.placeholder' },
         // Question pool
-        { key:'pool', label:'Aufgaben-Pool  (z = a + bi)', type:'list', itemLabel:'Punkt',
+        { key:'pool', label:'Aufgaben-Pool  (z = a + bi)', labelKey:'block.complex-question.field.pool.label', type:'list', itemLabel:'Punkt', itemLabelKey:'block.complex-question.field.pool.itemLabel',
           itemSummary: item => {
             const a = item.a ?? 0, b = item.b ?? 0;
             const bStr = b >= 0 ? '+ ' + b + 'i' : '− ' + Math.abs(b) + 'i';
             return 'z = ' + a + '  ' + bStr;
           },
           itemSchema:[
-            { key:'a', label:'Re(z)  =  a', type:'number', step:'any' },
-            { key:'b', label:'Im(z)  =  b', type:'number', step:'any' }
+            { key:'a', label:'Re(z)  =  a', labelKey:'block.complex-question.field.pool.item.a.label', type:'number', step:'any' },
+            { key:'b', label:'Im(z)  =  b', labelKey:'block.complex-question.field.pool.item.b.label', type:'number', step:'any' }
           ]},
-        { key:'randomize', label:'Zufällig wählen', type:'boolean' },
+        { key:'randomize', label:'Zufällig wählen', labelKey:'block.complex-question.field.randomize.label', type:'boolean' },
         // Query options
-        { type:'section', label:'Abfrage', key:'_sec_query' },
-        { key:'questionMode', label:'Was wird gefragt?', type:'select', options:[
-          {value:'all',       label:'Kartesisch und polar  (Re, Im, |z|, φ)'},
-          {value:'cartesian', label:'Nur kartesisch  (Re(z) und Im(z))'},
-          {value:'polar',     label:'Nur polar  (|z| und φ)'},
-          {value:'conjugate', label:'Konjugierte Zahl  z̄'}
+        { type:'section', label:'Abfrage', labelKey:'block.complex-question.field._sec_query.label', key:'_sec_query' },
+        { key:'questionMode', label:'Was wird gefragt?', labelKey:'block.complex-question.field.questionMode.label', type:'select', options:[
+          {value:'all',       label:'Kartesisch und polar  (Re, Im, |z|, φ)', labelKey:'block.complex-question.field.questionMode.option.all'},
+          {value:'cartesian', label:'Nur kartesisch  (Re(z) und Im(z))',      labelKey:'block.complex-question.field.questionMode.option.cartesian'},
+          {value:'polar',     label:'Nur polar  (|z| und φ)',                 labelKey:'block.complex-question.field.questionMode.option.polar'},
+          {value:'conjugate', label:'Konjugierte Zahl  z̄',                    labelKey:'block.complex-question.field.questionMode.option.conjugate'}
         ]},
         // Fields & tolerances
-        { type:'section', label:'Felder & Toleranzen', key:'_sec_fields' },
-        { key:'fields', label:'Felder individuell ein-/ausblenden',
-          help:'Nur bei „Kartesisch und polar" relevant. Alle anderen Modi legen die Felder fest.',
+        { type:'section', label:'Felder & Toleranzen', labelKey:'block.complex-question.field._sec_fields.label', key:'_sec_fields' },
+        { key:'fields', label:'Felder individuell ein-/ausblenden', labelKey:'block.complex-question.field.fields.label',
+          help:'Nur bei „Kartesisch und polar" relevant. Alle anderen Modi legen die Felder fest.', helpKey:'block.complex-question.field.fields.help',
           type:'group', schema:[
-            { key:'real', label:'Re(z)', type:'boolean' },
-            { key:'imag', label:'Im(z)', type:'boolean' },
-            { key:'abs',  label:'|z|',   type:'boolean' },
-            { key:'arg',  label:'φ',     type:'boolean' }
+            { key:'real', label:'Re(z)', labelKey:'block.complex-question.field.fields.item.real.label', type:'boolean' },
+            { key:'imag', label:'Im(z)', labelKey:'block.complex-question.field.fields.item.imag.label', type:'boolean' },
+            { key:'abs',  label:'|z|',   labelKey:'block.complex-question.field.fields.item.abs.label',  type:'boolean' },
+            { key:'arg',  label:'φ',     labelKey:'block.complex-question.field.fields.item.arg.label',  type:'boolean' }
           ], showIf: c => (c.questionMode || 'all') === 'all' },
-        { key:'tolerances', label:'Toleranzen  (±)', type:'group', schema:[
-          { key:'real', label:'Re(z)',   type:'number', step:'any' },
-          { key:'imag', label:'Im(z)',   type:'number', step:'any' },
-          { key:'abs',  label:'|z|',     type:'number', step:'any' },
-          { key:'arg',  label:'φ (rad)', type:'number', step:'any' }
+        { key:'tolerances', label:'Toleranzen  (±)', labelKey:'block.complex-question.field.tolerances.label', type:'group', schema:[
+          { key:'real', label:'Re(z)',   labelKey:'block.complex-question.field.tolerances.item.real.label', type:'number', step:'any' },
+          { key:'imag', label:'Im(z)',   labelKey:'block.complex-question.field.tolerances.item.imag.label', type:'number', step:'any' },
+          { key:'abs',  label:'|z|',     labelKey:'block.complex-question.field.tolerances.item.abs.label',  type:'number', step:'any' },
+          { key:'arg',  label:'φ (rad)', labelKey:'block.complex-question.field.tolerances.item.arg.label',  type:'number', step:'any' }
         ]},
         // Display & scoring
-        { type:'section', label:'Darstellung & Bewertung', key:'_sec_score' },
-        { key:'plotRange', label:'Plot-Bereich (±)', type:'number', step:'any' },
-        { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 },
+        { type:'section', label:'Darstellung & Bewertung', labelKey:'block.complex-question.field._sec_score.label', key:'_sec_score' },
+        { key:'plotRange', label:'Plot-Bereich (±)', labelKey:'block.complex-question.field.plotRange.label', type:'number', step:'any' },
+        { key:'maxPoints', label:'Punkte',           labelKey:'block.complex-question.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -89,9 +96,11 @@
 
       const grid = document.createElement('section'); grid.className = 'content-grid';
       const plotCard = document.createElement('article'); plotCard.className = 'section-card plot-card';
-      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(config.blockTitle || 'Aufgabenplot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>z</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
+      const plotTitle = u.l(config.blockTitle) || u.t('block.complex-question.plotTitle');
+      const questionLabel = u.t('common.question');
+      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(plotTitle) + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>z</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">' + u.escapeHtml(questionLabel) + '</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
-      controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Eingabe'}));
+      controls.appendChild(Object.assign(document.createElement('h3'), {textContent: u.t('block.complex-question.inputHeading')}));
       const stack = document.createElement('div'); stack.className = 'input-stack';
       controls.appendChild(stack);
       const inputs = {};
@@ -105,14 +114,14 @@
         stack.appendChild(grp); inputs[key] = inp;
       }
       const complexLabel = (config.questionMode || 'all') === 'conjugate' ? 'z̄' : 'z';
-      if(fields.real) addInput('real', 'Re(' + complexLabel + ')', 'z. B. 2');
-      if(fields.imag) addInput('imag', 'Im(' + complexLabel + ')', 'z. B. -1');
-      if(fields.abs)  addInput('abs',  '|z|',   'z. B. 2.24');
-      if(fields.arg)  addInput('arg',  'φ',     'z. B. pi/2');
+      if(fields.real) addInput('real', 'Re(' + complexLabel + ')', u.t('block.complex-question.placeholder.real'));
+      if(fields.imag) addInput('imag', 'Im(' + complexLabel + ')', u.t('block.complex-question.placeholder.imag'));
+      if(fields.abs)  addInput('abs',  '|z|',   u.t('block.complex-question.placeholder.abs'));
+      if(fields.arg)  addInput('arg',  'φ',     u.t('block.complex-question.placeholder.arg'));
 
       const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
-      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
-      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
+      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent = u.t('common.check');
+      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent = u.t('common.regenerate');
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
       controls.appendChild(btnRow);
 
@@ -146,12 +155,12 @@
           arcs: angleArc,
           points: [{x:current.a, y:current.b, label:'z'}]
         });
-        plotCard.querySelector('#' + api.blockId + '_q').textContent = complexQuestionText(config);
+        plotCard.querySelector('#' + api.blockId + '_q').textContent = complexQuestionText(config, u);
       }
       function chooseNew(){
         current = pickInstance();
         Object.values(inputs).forEach(i => i.value = '');
-        fb.neutral('Neue Aufgabe generiert.');
+        fb.neutral(u.t('block.complex-question.newTaskGenerated'));
         renderPlot();
       }
       function grade(){
@@ -159,7 +168,7 @@
         // the text/numeric blocks).
         const activeKeys = ['real','imag','abs','arg'].filter(k => fields[k]);
         if(activeKeys.every(k => String(inputs[k].value || '').trim() === '')){
-          fb.bad('Bitte mindestens ein Feld ausfüllen.');
+          fb.bad(u.t('block.complex-question.fillAtLeastOne'));
           return;
         }
         const parts = []; let okCount = 0, totalActive = 0;
@@ -167,11 +176,11 @@
           if(!fields[key]) return;
           totalActive++;
           const v = parser(inputs[key].value);
-          if(v == null || !Number.isFinite(v)){ parts.push(label + ' fehlt.'); return; }
+          if(v == null || !Number.isFinite(v)){ parts.push(u.t('block.complex-question.partMissing', { label })); return; }
           let ok;
           if(key === 'arg') ok = u.angleEqual(v, expected, tolerance);
           else ok = u.nearlyEqual(v, expected, tolerance);
-          parts.push(ok ? (label + ' richtig.') : (label + ' noch nicht richtig.'));
+          parts.push(ok ? u.t('block.complex-question.partCorrect', { label }) : u.t('block.complex-question.partWrong', { label }));
           if(ok) okCount++;
         }
         const expectedReal = config.questionMode === 'conjugate' ? current.a : current.a;
@@ -184,9 +193,9 @@
         const ratio = totalActive > 0 ? okCount / totalActive : 0;
         const pts = Math.round(ratio * maxPoints * 100) / 100;
         api.reportScore(pts);
-        if(okCount === totalActive) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte.');
-        else if(okCount > 0) fb.neutral('Teilweise richtig (' + okCount + ' von ' + totalActive + '): ' + pts + ' / ' + maxPoints + ' Punkte. ' + parts.join(' '));
-        else fb.bad('0 / ' + maxPoints + ' Punkte. ' + parts.join(' '));
+        if(okCount === totalActive) fb.ok(u.t('feedback.correctScored', { pts, max: maxPoints }));
+        else if(okCount > 0) fb.neutral(u.t('block.complex-question.partialScoredDetail', { ok: okCount, total: totalActive, pts, max: maxPoints, parts: parts.join(' ') }));
+        else fb.bad(u.t('block.complex-question.wrongScoredDetail', { max: maxPoints, parts: parts.join(' ') }));
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);
@@ -196,6 +205,7 @@
       return {};
     },
     preview(host, config){
+      const t = (window.BlockUtils && window.BlockUtils.t) ? window.BlockUtils.t : function(k, _p, fb){ return fb; };
       const pool = (config.pool || []); const pt = pool[0] || {a:1,b:1};
       const R = config.plotRange || 5.5;
       const W = 300, H = 220, P = 22;
@@ -204,7 +214,7 @@
       const ns = 'http://www.w3.org/2000/svg';
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.4rem 0.7rem; font-size:0.78rem; display:flex; flex-direction:column; height:100%; gap:0.25rem; overflow:hidden;';
-      const tag = document.createElement('div'); tag.textContent = 'z = a + bi   ablesen'; tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700;';
+      const tag = document.createElement('div'); tag.textContent = t('block.complex-question.previewTag', null, 'Read z = a + bi'); tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700;';
       wrap.appendChild(tag);
       const svg = document.createElementNS(ns, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -241,12 +251,12 @@
     }
   }
 
-  function complexQuestionText(config){
+  function complexQuestionText(config, u){
     switch(config.questionMode || 'all'){
-      case 'cartesian': return 'Lesen Sie Realteil und Imaginärteil der komplexen Zahl ab.';
-      case 'polar': return 'Bestimmen Sie Betrag |z| und Argument φ.';
-      case 'conjugate': return 'Bestimmen Sie die konjugierte komplexe Zahl z̄ = a - bi.';
-      default: return 'Lesen Sie kartesische und polare Darstellung der komplexen Zahl ab.';
+      case 'cartesian': return u.t('block.complex-question.questionText.cartesian');
+      case 'polar': return u.t('block.complex-question.questionText.polar');
+      case 'conjugate': return u.t('block.complex-question.questionText.conjugate');
+      default: return u.t('block.complex-question.questionText.all');
     }
   }
 

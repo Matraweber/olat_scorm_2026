@@ -20,7 +20,11 @@
     iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
     iframe.setAttribute('allowfullscreen', 'true');
     iframe.setAttribute('loading', 'lazy');
-    iframe.title = (opts && opts.title) || 'Eingebettetes Video';
+    var fallbackTitle = 'Embedded video';
+    if(window.BlockUtils && typeof window.BlockUtils.t === 'function'){
+      try { fallbackTitle = window.BlockUtils.t('block.video.embed.defaultTitle'); } catch(_e){}
+    }
+    iframe.title = (opts && opts.title) || fallbackTitle;
     if(srcInfo.kind === 'youtube'){
       // nocookie + rel=0: no related-videos grid at the end.
       iframe.src = 'https://www.youtube-nocookie.com/embed/' + srcInfo.id + '?rel=0';
@@ -34,34 +38,52 @@
   // Exposed for the builder form (form.js renderVideoField).
   Blocks.register('video', {
     label: 'Video',
+    labelKey: 'block.video.label',
     description: 'Videodatei oder YouTube-/Vimeo-URL einbetten. Datei-Upload oder Link.',
+    descKey: 'block.video.description',
     category: 'Medien & Inhalt',
+    categoryKey: 'block.category.content',
     icon: 'video',
     graded: false,
     detectVideoSource,
-    defaultConfig(){
-      return { src: '', poster: '', title: '', caption: '' };
+    defaultConfig(locale = 'de'){
+      return {
+        src: '',
+        poster: '',
+        title: '',
+        caption: ''
+      };
     },
-    previewConfig(){
+    previewConfig(locale = 'de'){
+      const en = locale === 'en';
       // _demo:true renders a mock frame in preview().
-      return { src: '', _demo: true, poster: '', title: 'Beispiel-Video', caption: 'Quelle: eigene Aufnahme' };
+      return {
+        src: '',
+        _demo: true,
+        poster: '',
+        title: en ? 'Sample video' : 'Beispiel-Video',
+        caption: en ? 'Source: own recording' : 'Quelle: eigene Aufnahme'
+      };
     },
     builderSchema(){
       return [
-        { key:'title', label:'Titel (über dem Player, optional)', type:'text' },
-        { key:'src', label:'Videoquelle (Datei, YouTube oder Vimeo)', type:'video', help:'Hochgeladene Dateien werden als Data-URL eingebettet. YouTube- und Vimeo-Links werden automatisch erkannt und als Embed eingebunden.' },
-        { key:'poster', label:'Vorschaubild (nur bei Datei-Upload sichtbar)', type:'image', help:'Bei YouTube/Vimeo verwendet der Embed seine eigene Vorschau.' },
-        { key:'caption', label:'Bildunterschrift (unter dem Player, optional)', type:'text' }
+        { key:'title', label:'Titel (über dem Player, optional)', labelKey:'block.video.field.title.label', type:'text' },
+        { key:'src', label:'Videoquelle (Datei, YouTube oder Vimeo)', labelKey:'block.video.field.src.label', type:'video', help:'Hochgeladene Dateien werden als Data-URL eingebettet. YouTube- und Vimeo-Links werden automatisch erkannt und als Embed eingebunden.', helpKey:'block.video.field.src.help' },
+        { key:'poster', label:'Vorschaubild (nur bei Datei-Upload sichtbar)', labelKey:'block.video.field.poster.label', type:'image', help:'Bei YouTube/Vimeo verwendet der Embed seine eigene Vorschau.', helpKey:'block.video.field.poster.help' },
+        { key:'caption', label:'Bildunterschrift (unter dem Player, optional)', labelKey:'block.video.field.caption.label', type:'text' }
       ];
     },
     mount(host, config, api){
+      const t = (api && api.utils && api.utils.t) ? api.utils.t : (k, p) => k;
+      const l = (api && api.utils && api.utils.l) ? api.utils.l : (v) => v;
       const wrap = document.createElement('figure');
       wrap.className = 'video-block';
       wrap.style.margin = '0';
-      if(config.title){
+      const titleText = l(config.title);
+      if(titleText){
         const title = document.createElement('div');
         title.className = 'video-block-title';
-        title.textContent = config.title;
+        title.textContent = titleText;
         title.style.cssText = 'font-weight:700; color:var(--primary); margin-bottom:0.4rem;';
         wrap.appendChild(title);
       }
@@ -69,7 +91,7 @@
         const ph = document.createElement('div');
         ph.className = 'block-placeholder';
         ph.style.cssText = 'aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; color:#888; font-style:italic; border:1px dashed #c7d3dc; border-radius:8px; background:#f7fafc;';
-        ph.textContent = '(Video noch nicht gesetzt)';
+        ph.textContent = t('block.video.placeholder.noVideo');
         wrap.appendChild(ph);
         host.appendChild(wrap);
         return {};
@@ -79,7 +101,7 @@
       frame.style.cssText = 'position:relative; width:100%; aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:' + (config.poster ? '#000' : 'linear-gradient(135deg, #0f567d 0%, #003b5c 60%, #08293d 100%)') + ';';
       const srcInfo = detectVideoSource(config.src);
       if(srcInfo && (srcInfo.kind === 'youtube' || srcInfo.kind === 'vimeo')){
-        frame.appendChild(buildEmbed(srcInfo, { title: config.title || 'Eingebettetes Video' }));
+        frame.appendChild(buildEmbed(srcInfo, { title: titleText || t('block.video.embed.defaultTitle') }));
       } else {
         const video = document.createElement('video');
         video.controls = true;
@@ -90,9 +112,10 @@
         frame.appendChild(video);
       }
       wrap.appendChild(frame);
-      if(config.caption){
+      const captionText = l(config.caption);
+      if(captionText){
         const cap = document.createElement('figcaption');
-        cap.textContent = config.caption;
+        cap.textContent = captionText;
         cap.style.cssText = 'font-size:0.85rem; color:var(--muted); margin-top:0.4rem;';
         wrap.appendChild(cap);
       }
@@ -100,13 +123,16 @@
       return {};
     },
     preview(host, config){
+      const t = (window.BlockUtils && window.BlockUtils.t) ? window.BlockUtils.t : (k, p) => k;
+      const l = (window.BlockUtils && window.BlockUtils.l) ? window.BlockUtils.l : (v) => v;
       const wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex; flex-direction:column; height:100%; padding:0.4rem; box-sizing:border-box; gap:0.3rem; overflow:hidden;';
-      if(config.title){
-        const t = document.createElement('div');
-        t.textContent = config.title;
-        t.style.cssText = 'font-weight:700; color:#003b5c; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
-        wrap.appendChild(t);
+      const titleText = l(config.title);
+      if(titleText){
+        const tEl = document.createElement('div');
+        tEl.textContent = titleText;
+        tEl.style.cssText = 'font-weight:700; color:#003b5c; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
+        wrap.appendChild(tEl);
       }
       if(config._demo){
         // 16:9 mock frame with play-button overlay for the welcome modal.
@@ -134,7 +160,7 @@
       } else if(!config.src){
         const ph = document.createElement('div');
         ph.style.cssText = 'flex:1; display:flex; align-items:center; justify-content:center; color:#888; font-style:italic; font-size:0.8rem; border:1px dashed #c7d3dc; border-radius:6px; background:#f7fafc; min-height:80px;';
-        ph.textContent = '(noch keine Videodatei)';
+        ph.textContent = t('block.video.preview.noVideoFile');
         wrap.appendChild(ph);
       } else {
         // Same gradient wrapper as mount().
@@ -142,7 +168,7 @@
         frame.style.cssText = 'position:relative; flex:1; min-height:0; width:100%; border-radius:4px; overflow:hidden; background:' + (config.poster ? '#000' : 'linear-gradient(135deg, #0f567d 0%, #003b5c 60%, #08293d 100%)') + ';';
         const srcInfo = detectVideoSource(config.src);
         if(srcInfo && (srcInfo.kind === 'youtube' || srcInfo.kind === 'vimeo')){
-          frame.appendChild(buildEmbed(srcInfo, { title: config.title || 'Eingebettetes Video' }));
+          frame.appendChild(buildEmbed(srcInfo, { title: titleText || t('block.video.embed.defaultTitle') }));
         } else {
           const video = document.createElement('video');
           video.controls = true;
@@ -154,9 +180,10 @@
         }
         wrap.appendChild(frame);
       }
-      if(config.caption){
+      const captionText = l(config.caption);
+      if(captionText){
         const cap = document.createElement('div');
-        cap.textContent = config.caption;
+        cap.textContent = captionText;
         cap.style.cssText = 'font-size:0.7rem; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
         wrap.appendChild(cap);
       }

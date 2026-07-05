@@ -2,8 +2,11 @@
   'use strict';
   Blocks.register('match-pairs', {
     label: 'Zuordnung (Drag & Drop)',
+    labelKey: 'block.match-pairs.label',
     description: 'Linke Begriffe per Drag-and-Drop mit den richtigen rechten verbinden.',
+    descKey: 'block.match-pairs.description',
     category: 'Frage',
+    categoryKey: 'block.category.question',
     icon: '⇄',
     graded: true,
     defaultConfig(){
@@ -17,36 +20,51 @@
       };
     },
     summary(cfg){
+      const t = (window.BlockUtils && window.BlockUtils.t) ? window.BlockUtils.t : function(k, p, fb){ return fb; };
       if(cfg.mode === 'categorize'){
-        return ((cfg.categories || []).length) + ' Kategorien, ' + ((cfg.items || []).length) + ' Begriffe';
+        return t('block.match-pairs.summary.categorize', {
+          cats: (cfg.categories || []).length,
+          items: (cfg.items || []).length
+        });
       }
-      return ((cfg.pairs || []).length) + ' Paare';
+      return t('block.match-pairs.summary.pairs', { count: (cfg.pairs || []).length });
     },
     validate(cfg){
       if(cfg.preset && cfg.preset !== 'custom') return [];
+      const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
       const w = [];
       if(cfg.mode === 'categorize'){
         const cats = cfg.categories || [];
         const items = cfg.items || [];
-        if(cats.length < 2) w.push('Mindestens zwei Kategorien erforderlich.');
-        if(items.length < 2) w.push('Mindestens zwei Begriffe erforderlich.');
+        if(cats.length < 2) w.push(t('block.match-pairs.validate.minTwoCategories'));
+        if(items.length < 2) w.push(t('block.match-pairs.validate.minTwoItems'));
         const ids = new Set(cats.map(c => c.id));
-        if(items.some(i => !ids.has(i.categoryId))) w.push('Mindestens ein Begriff hat keine gültige Kategorie.');
+        if(items.some(i => !ids.has(i.categoryId))) w.push(t('block.match-pairs.validate.itemMissingCategory'));
         return w;
       }
-      if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) w.push('Mindestens zwei Paare erforderlich.');
-      else if(cfg.pairs.some(p => !p.left || !p.right)) w.push('Mindestens ein Paar hat eine leere Seite.');
+      if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) w.push(t('block.match-pairs.validate.minTwoPairs'));
+      else if(cfg.pairs.some(p => !p.left || !p.right)) w.push(t('block.match-pairs.validate.pairEmptySide'));
       return w;
     },
     previewConfig(){
+      const u = window.BlockUtils || {};
+      const t = (typeof u.t === 'function') ? u.t : (k => k);
+      const locale = (u.getLocale && u.getLocale()) || 'de';
+      const en = locale === 'en';
       return {
         blockTitle: '', preset: 'custom',
-        question: 'Ordnen Sie die Hauptstädte den Ländern zu.',
-        pairs: [
-          { left: 'Deutschland', right: 'Berlin' },
-          { left: 'Frankreich',  right: 'Paris'  },
-          { left: 'Italien',     right: 'Rom'    }
-        ],
+        question: t('block.match-pairs.preview.defaultQuestion'),
+        pairs: en
+          ? [
+              { left: 'Germany', right: 'Berlin' },
+              { left: 'France',  right: 'Paris'  },
+              { left: 'Italy',   right: 'Rome'   }
+            ]
+          : [
+              { left: 'Deutschland', right: 'Berlin' },
+              { left: 'Frankreich',  right: 'Paris'  },
+              { left: 'Italien',     right: 'Rom'    }
+            ],
         imgHeight: 70, shuffle: true, maxPoints: 3
       };
     },
@@ -55,31 +73,36 @@
       const isPairs  = c => isCustom(c) && (c.mode || 'pairs') === 'pairs';
       const isCat    = c => isCustom(c) && c.mode === 'categorize';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Zuordnung' },
-        { key:'preset', label:'Vorlage', type:'select', options:[
-          {value:'custom',        label:'Manuell (leer)'},
-          {value:'chemistry',     label:'Beispiel: Chemie, Elemente & Symbole'},
-          {value:'units',         label:'Beispiel: Physik, Einheiten zuordnen'},
-          {value:'number-bases',  label:'Beispiel: Informatik, Zahlensysteme'},
-          {value:'math-symbols',  label:'Beispiel: Mathematik, Symbole & Bedeutungen'},
-          {value:'animals',       label:'Beispiel: Biologie, Tiere nach Klasse (Kategorisierung)'},
-          {value:'states',        label:'Beispiel: Chemie, Aggregatzustaende (Kategorisierung)'}
-        ], help:'Beispiele zeigen typische Zuordnungsaufgaben. Bei „Manuell" eigene Daten eingeben.' },
-        { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.match-pairs.field.blockTitle.label',
+          type:'text', placeholder:'Zuordnung', placeholderKey:'block.match-pairs.field.blockTitle.placeholder' },
+        { key:'preset', label:'Vorlage', labelKey:'block.match-pairs.field.preset.label', type:'select', options:[
+          {value:'custom',        label:'Manuell (leer)',                                        labelKey:'block.match-pairs.field.preset.option.custom'},
+          {value:'chemistry',     label:'Beispiel: Chemie, Elemente & Symbole',                  labelKey:'block.match-pairs.field.preset.option.chemistry'},
+          {value:'units',         label:'Beispiel: Physik, Einheiten zuordnen',                  labelKey:'block.match-pairs.field.preset.option.units'},
+          {value:'number-bases',  label:'Beispiel: Informatik, Zahlensysteme',                   labelKey:'block.match-pairs.field.preset.option.number-bases'},
+          {value:'math-symbols',  label:'Beispiel: Mathematik, Symbole & Bedeutungen',           labelKey:'block.match-pairs.field.preset.option.math-symbols'},
+          {value:'animals',       label:'Beispiel: Biologie, Tiere nach Klasse (Kategorisierung)', labelKey:'block.match-pairs.field.preset.option.animals'},
+          {value:'states',        label:'Beispiel: Chemie, Aggregatzustaende (Kategorisierung)',   labelKey:'block.match-pairs.field.preset.option.states'}
+        ], help:'Beispiele zeigen typische Zuordnungsaufgaben. Bei „Manuell" eigene Daten eingeben.',
+          helpKey:'block.match-pairs.field.preset.help' },
+        { type:'action', label:'↺ Zurücksetzen', labelKey:'block.match-pairs.field.reset.label', action:'reset', showIf: isCustom },
 
-        { type:'section', label:'Modus', key:'_sec_mode', showIf: isCustom },
-        { key:'mode', label:'Zuordnungs-Modus', type:'select', showIf: isCustom, options:[
-          {value:'pairs',      label:'1 zu 1 (jeder Begriff hat genau einen Partner)'},
-          {value:'categorize', label:'Kategorisierung (mehrere Begriffe pro Kategorie)'}
+        { type:'section', label:'Modus', labelKey:'block.match-pairs.field.sec_mode.label', key:'_sec_mode', showIf: isCustom },
+        { key:'mode', label:'Zuordnungs-Modus', labelKey:'block.match-pairs.field.mode.label',
+          type:'select', showIf: isCustom, options:[
+          {value:'pairs',      label:'1 zu 1 (jeder Begriff hat genau einen Partner)',      labelKey:'block.match-pairs.field.mode.option.pairs'},
+          {value:'categorize', label:'Kategorisierung (mehrere Begriffe pro Kategorie)',    labelKey:'block.match-pairs.field.mode.option.categorize'}
         ]},
 
         // Question
-        { type:'section', label:'Frage', key:'_sec_q', showIf: isCustom },
-        { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom },
+        { type:'section', label:'Frage', labelKey:'block.match-pairs.field.sec_q.label', key:'_sec_q', showIf: isCustom },
+        { key:'question', label:'Aufgabentext', labelKey:'block.match-pairs.field.question.label',
+          type:'math-textarea', rows:2, showIf: isCustom },
 
         // Pairs (1:1 mode)
-        { type:'section', label:'Paare  (links ↔ rechts)', key:'_sec_pairs', showIf: isPairs },
-        { key:'pairs', label:'Paare', type:'list', itemLabel:'Paar',
+        { type:'section', label:'Paare  (links ↔ rechts)', labelKey:'block.match-pairs.field.sec_pairs.label', key:'_sec_pairs', showIf: isPairs },
+        { key:'pairs', label:'Paare', labelKey:'block.match-pairs.field.pairs.label',
+          type:'list', itemLabel:'Paar', itemLabelKey:'block.match-pairs.field.pairs.itemLabel',
           showIf: isPairs,
           itemSummary: item => {
             const l = (item.left  || (item.leftImg  ? '(Bild)' : '')).slice(0, 35) || '…';
@@ -87,44 +110,58 @@
             return l + '  ↔  ' + r;
           },
           itemSchema:[
-            { type:'section', label:'Linke Seite',   key:'_sec_left'  },
-            { key:'left',    label:'Text',  type:'text',  fullWidth:true },
-            { key:'leftImg', label:'Bild',  type:'image', fullWidth:true },
-            { type:'section', label:'Rechte Seite',  key:'_sec_right' },
-            { key:'right',    label:'Text',  type:'text',  fullWidth:true },
-            { key:'rightImg', label:'Bild',  type:'image', fullWidth:true }
+            { type:'section', label:'Linke Seite', labelKey:'block.match-pairs.field.sec_left.label', key:'_sec_left'  },
+            { key:'left',    label:'Text', labelKey:'block.match-pairs.field.pair.left.label', type:'text',  fullWidth:true },
+            { key:'leftImg', label:'Bild', labelKey:'block.match-pairs.field.pair.leftImg.label', type:'image', fullWidth:true },
+            { type:'section', label:'Rechte Seite', labelKey:'block.match-pairs.field.sec_right.label', key:'_sec_right' },
+            { key:'right',    label:'Text', labelKey:'block.match-pairs.field.pair.right.label', type:'text',  fullWidth:true },
+            { key:'rightImg', label:'Bild', labelKey:'block.match-pairs.field.pair.rightImg.label', type:'image', fullWidth:true }
           ]},
 
         // Categorization (n:1 mode)
-        { type:'section', label:'Kategorien', key:'_sec_cats', showIf: isCat },
-        { key:'categories', label:'Kategorien', type:'list', itemLabel:'Kategorie',
+        { type:'section', label:'Kategorien', labelKey:'block.match-pairs.field.sec_cats.label', key:'_sec_cats', showIf: isCat },
+        { key:'categories', label:'Kategorien', labelKey:'block.match-pairs.field.categories.label',
+          type:'list', itemLabel:'Kategorie', itemLabelKey:'block.match-pairs.field.categories.itemLabel',
           showIf: isCat,
           itemSummary: item => (item.label || '...'),
           itemSchema:[
-            { key:'id',    label:'Interne ID', type:'text', placeholder:'c1' },
-            { key:'label', label:'Anzeige-Name', type:'text', placeholder:'z. B. Säugetiere' },
-            { key:'image', label:'Bild (optional)', type:'image', fullWidth:true }
+            { key:'id',    label:'Interne ID', labelKey:'block.match-pairs.field.category.id.label',
+              type:'text', placeholder:'c1', placeholderKey:'block.match-pairs.field.category.id.placeholder' },
+            { key:'label', label:'Anzeige-Name', labelKey:'block.match-pairs.field.category.label.label',
+              type:'text', placeholder:'z. B. Säugetiere', placeholderKey:'block.match-pairs.field.category.label.placeholder' },
+            { key:'image', label:'Bild (optional)', labelKey:'block.match-pairs.field.category.image.label',
+              type:'image', fullWidth:true }
           ]},
-        { type:'section', label:'Begriffe', key:'_sec_items', showIf: isCat },
-        { key:'items', label:'Begriffe', type:'list', itemLabel:'Begriff',
+        { type:'section', label:'Begriffe', labelKey:'block.match-pairs.field.sec_items.label', key:'_sec_items', showIf: isCat },
+        { key:'items', label:'Begriffe', labelKey:'block.match-pairs.field.items.label',
+          type:'list', itemLabel:'Begriff', itemLabelKey:'block.match-pairs.field.items.itemLabel',
           showIf: isCat,
           itemSummary: item => (item.text || (item.image ? '(Bild)' : '...')) + '  ->  ' + (item.categoryId || '?'),
           itemSchema:[
-            { key:'text',       label:'Text', type:'text', placeholder:'z. B. Hund' },
-            { key:'image',      label:'Bild (optional)', type:'image', fullWidth:true },
-            { key:'categoryId', label:'Zugehörige Kategorie-ID', type:'text', placeholder:'c1' }
+            { key:'text',       label:'Text', labelKey:'block.match-pairs.field.item.text.label',
+              type:'text', placeholder:'z. B. Hund', placeholderKey:'block.match-pairs.field.item.text.placeholder' },
+            { key:'image',      label:'Bild (optional)', labelKey:'block.match-pairs.field.item.image.label',
+              type:'image', fullWidth:true },
+            { key:'categoryId', label:'Zugehörige Kategorie-ID', labelKey:'block.match-pairs.field.item.categoryId.label',
+              type:'text', placeholder:'c1', placeholderKey:'block.match-pairs.field.item.categoryId.placeholder' }
           ]},
 
         // Settings
-        { type:'section', label:'Einstellungen', key:'_sec_opts' },
-        { key:'imgHeight', label:'Bild-Höhe in px', type:'number', step:10, min:20, max:400,
-          help:'Maximale Höhe für alle Bilder.' },
-        { key:'shuffle',   label:'Reihenfolge mischen', type:'boolean' },
-        { key:'poolSize',  label:'Anzahl Aufgaben pro Durchlauf  (0 = alle)', type:'number', step:1, min:0,
-          help:'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Begriffen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.' },
+        { type:'section', label:'Einstellungen', labelKey:'block.match-pairs.field.sec_opts.label', key:'_sec_opts' },
+        { key:'imgHeight', label:'Bild-Höhe in px', labelKey:'block.match-pairs.field.imgHeight.label',
+          type:'number', step:10, min:20, max:400,
+          help:'Maximale Höhe für alle Bilder.', helpKey:'block.match-pairs.field.imgHeight.help' },
+        { key:'shuffle',   label:'Reihenfolge mischen', labelKey:'block.match-pairs.field.shuffle.label',
+          type:'boolean' },
+        { key:'poolSize',  label:'Anzahl Aufgaben pro Durchlauf  (0 = alle)',
+          labelKey:'block.match-pairs.field.poolSize.label',
+          type:'number', step:1, min:0,
+          help:'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Begriffen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.',
+          helpKey:'block.match-pairs.field.poolSize.help' },
         // Scoring
-        { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
+        { type:'section', label:'Bewertung', labelKey:'block.match-pairs.field.sec_score.label', key:'_sec_score' },
+        { key:'maxPoints', label:'Punkte (gesamt)', labelKey:'block.match-pairs.field.maxPoints.label',
+          type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -140,12 +177,16 @@
 
       const card = document.createElement('section');
       card.className = 'section-card block-question';
-      const h = document.createElement('h3'); h.textContent = activeConfig.blockTitle || 'Aufgabe'; card.appendChild(h);
-      if(activeConfig.question && String(activeConfig.question).trim() !== ''){
+      const h = document.createElement('h3');
+      h.textContent = api.utils.l(activeConfig.blockTitle) || api.utils.t('block.match-pairs.defaultTitle');
+      card.appendChild(h);
+      const questionText = api.utils.l(activeConfig.question);
+      if(questionText && String(questionText).trim() !== ''){
         const qBox = document.createElement('div'); qBox.className = 'formula-box'; qBox.style.marginBottom = '1rem';
-        const qBoxTitle = document.createElement('div'); qBoxTitle.className = 'formula-title'; qBoxTitle.textContent = 'Frage';
+        const qBoxTitle = document.createElement('div'); qBoxTitle.className = 'formula-title';
+        qBoxTitle.textContent = api.utils.t('common.question');
         qBox.appendChild(qBoxTitle);
-        const qText = document.createElement('div'); qText.className = 'formula-text'; qText.textContent = activeConfig.question;
+        const qText = document.createElement('div'); qText.className = 'formula-text'; qText.textContent = questionText;
         qBox.appendChild(qText);
         card.appendChild(qBox);
       }
@@ -190,8 +231,8 @@
         Object.keys(rightEls).forEach(k => delete rightEls[k]);
 
         const pairs = pickPairs();
-        lefts  = pairs.map((p, i) => ({ id:'L'+i, text:p.left||'',  img:p.leftImg||''  }));
-        rights = pairs.map((p, i) => ({ id:'R'+i, text:p.right||'', img:p.rightImg||'', correctLeftId:'L'+i }));
+        lefts  = pairs.map((p, i) => ({ id:'L'+i, text: api.utils.l(p.left)  || '', img: p.leftImg  || '' }));
+        rights = pairs.map((p, i) => ({ id:'R'+i, text: api.utils.l(p.right) || '', img: p.rightImg || '', correctLeftId:'L'+i }));
         const rightOrder = activeConfig.shuffle ? window.BlockUtils.shuffle(rights.slice()) : rights.slice();
 
         const grid = document.createElement('div');
@@ -211,7 +252,7 @@
           const slot = document.createElement('span');
           slot.className = 'match-slot';
           slot.dataset.empty = 'true';
-          slot.textContent = 'Hier ablegen';
+          slot.textContent = api.utils.t('block.match-pairs.dropHere');
           cell.appendChild(textWrap);
           cell.appendChild(slot);
           cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
@@ -276,7 +317,7 @@
         Object.values(rightEls).forEach(c => c.classList.remove('used'));
         Object.values(leftEls).forEach(c => {
           const slot = c.querySelector('.match-slot');
-          slot.textContent = 'Hier ablegen';
+          slot.textContent = api.utils.t('block.match-pairs.dropHere');
           slot.dataset.empty = 'true';
           slot.draggable = false;
           slot.ondragstart = null;
@@ -297,7 +338,7 @@
             e.dataTransfer.setData('text/from-left', lid);
           };
           slot.onclick = (e) => { e.stopPropagation(); unassign(lid); };
-          slot.title = 'Klicken oder zurückziehen zum Entfernen';
+          slot.title = api.utils.t('block.match-pairs.slotRemoveHint');
         });
       }
 
@@ -310,15 +351,18 @@
       const btnRow = document.createElement('div');
       btnRow.className = 'button-cluster';
       const checkBtn = document.createElement('button');
-      checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary'; checkBtn.textContent = 'Korrektur';
+      checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
+      checkBtn.textContent = api.utils.t('common.check');
       const resetBtn = document.createElement('button');
-      resetBtn.type = 'button'; resetBtn.className = 'btn btn-secondary'; resetBtn.textContent = 'Zurücksetzen';
+      resetBtn.type = 'button'; resetBtn.className = 'btn btn-secondary';
+      resetBtn.textContent = api.utils.t('block.match-pairs.resetBtn');
       btnRow.appendChild(checkBtn); btnRow.appendChild(resetBtn);
       // Neu generieren only when a pool is configured.
       let newBtn = null;
       if(hasPool){
         newBtn = document.createElement('button');
-        newBtn.type = 'button'; newBtn.className = 'btn btn-secondary'; newBtn.textContent = 'Neu generieren';
+        newBtn.type = 'button'; newBtn.className = 'btn btn-secondary';
+        newBtn.textContent = api.utils.t('common.regenerate');
         btnRow.appendChild(newBtn);
       }
       card.appendChild(btnRow);
@@ -327,13 +371,13 @@
 
       checkBtn.addEventListener('click', () => {
         if(lefts.length === 0){
-          fb.neutral('Keine Paare definiert.');
+          fb.neutral(api.utils.t('block.match-pairs.noPairsDefined'));
           api.reportScore(0);
           return;
         }
         // Nothing assigned yet: prompt instead of recording a 0.
         if(Object.keys(currentMap).length === 0){
-          fb.bad('Bitte mindestens eine Zuordnung vornehmen.');
+          fb.bad(api.utils.t('block.match-pairs.pleaseAssignAtLeastOne'));
           return;
         }
         let correct = 0;
@@ -347,8 +391,8 @@
         });
         const ratio = correct / lefts.length;
         api.reportScore(Math.round(ratio * (activeConfig.maxPoints || 1) * 100) / 100);
-        if(correct === lefts.length) fb.ok('Alle Zuordnungen korrekt.');
-        else fb.bad(correct + ' von ' + lefts.length + ' korrekt.');
+        if(correct === lefts.length) fb.ok(api.utils.t('block.match-pairs.allCorrect'));
+        else fb.bad(api.utils.t('block.match-pairs.scoreLine', { correct: correct, total: lefts.length }));
       });
 
       resetBtn.addEventListener('click', () => {
@@ -356,13 +400,13 @@
         clearSelection();
         Object.values(leftEls).forEach(c => c.classList.remove('correct','incorrect'));
         renderAssignments();
-        fb.neutral('Zurückgesetzt.');
+        fb.neutral(api.utils.t('block.match-pairs.resetDone'));
       });
 
       if(newBtn){
         newBtn.addEventListener('click', () => {
           buildRound();
-          fb.neutral('Neue Aufgabe generiert.');
+          fb.neutral(api.utils.t('block.match-pairs.newTaskGenerated'));
         });
         window.BlockUtils.regenPolicy(newBtn, activeConfig, api);
       }
@@ -374,15 +418,17 @@
     },
 
     preview(host, config){
+      const t = window.BlockUtils.t;
+      const l = window.BlockUtils.l;
       const activeConfig = matchPresetConfig(config);
       const imgH = Math.min(Number(activeConfig.imgHeight) || 70, 50); // smaller in mini-preview
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.5rem 0.7rem; font-size:0.8rem; height:100%; overflow:hidden; display:flex; flex-direction:column;';
       const tag = document.createElement('div');
-      tag.textContent = '⇄  Drag & Drop-Zuordnung';
+      tag.textContent = '⇄  ' + t('block.match-pairs.previewTag');
       tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700; margin-bottom:0.3rem;';
       wrap.appendChild(tag);
-      const q = document.createElement('div'); q.textContent = activeConfig.question || '';
+      const q = document.createElement('div'); q.textContent = l(activeConfig.question) || '';
       q.style.cssText = 'color:#003b5c; font-weight:700; margin-bottom:0.4rem; font-size:0.82rem;';
       wrap.appendChild(q);
 
@@ -401,11 +447,11 @@
           if(text){ const s = document.createElement('span'); s.textContent = text; s.style.cssText='font-size:0.75rem;color:#003b5c;font-weight:700;text-align:center;'; d.appendChild(s); }
           return d;
         };
-        const l = mkSide(p.left, p.leftImg);
+        const l1 = mkSide(l(p.left), p.leftImg);
         const arr = document.createElement('div'); arr.textContent='↔'; arr.style.cssText='text-align:center;color:#84bf66;font-weight:700;line-height:2;font-size:0.7rem;';
-        const r = mkSide(p.right, p.rightImg);
+        const r = mkSide(l(p.right), p.rightImg);
         r.style.background = '#a1d884'; r.style.borderColor = '#84bf66';
-        grid.appendChild(l); grid.appendChild(arr); grid.appendChild(r);
+        grid.appendChild(l1); grid.appendChild(arr); grid.appendChild(r);
       });
       wrap.appendChild(grid);
       host.appendChild(wrap);
@@ -413,10 +459,86 @@
   });
 
 
-  function matchPresetConfig(config){
+  function matchPresetConfig(config, locale){
     if(!config || !config.preset || config.preset === 'custom') return config || {};
     const base = Object.assign({}, config);
-    const pairs = {
+    const u = window.BlockUtils || {};
+    const loc = locale || (u.getLocale && u.getLocale()) || 'de';
+    const en = loc === 'en';
+    const presets = en ? {
+      chemistry: {
+        question: 'Match the element symbols to the elements.',
+        pairs: [
+          { left:'Hydrogen', right:'H' },
+          { left:'Oxygen', right:'O' },
+          { left:'Carbon', right:'C' },
+          { left:'Sodium', right:'Na' }
+        ]
+      },
+      units: {
+        question: 'Match each unit to the corresponding quantity.',
+        pairs: [
+          { left:'Current', right:'Ampere (A)' },
+          { left:'Voltage', right:'Volt (V)' },
+          { left:'Resistance', right:'Ohm (Ω)' },
+          { left:'Power', right:'Watt (W)' }
+        ]
+      },
+      'number-bases': {
+        question: 'Match the notation to the number system.',
+        pairs: [
+          { left:'1010₂', right:'Binary' },
+          { left:'A₁₆', right:'Hexadecimal' },
+          { left:'10₁₀', right:'Decimal' },
+          { left:'17₈', right:'Octal' }
+        ]
+      },
+      'math-symbols': {
+        question: 'Match the math symbols to their meanings.',
+        pairs: [
+          { left:'∑', right:'Sum' },
+          { left:'√', right:'Root' },
+          { left:'≈', right:'approximately equal' },
+          { left:'∞', right:'infinity' }
+        ]
+      },
+      animals: {
+        mode: 'categorize',
+        question: 'Assign the animals to their classes.',
+        categories: [
+          { id:'mammals', label:'Mammals' },
+          { id:'birds',   label:'Birds' },
+          { id:'fish',    label:'Fish' }
+        ],
+        items: [
+          { text:'Dog',    categoryId:'mammals' },
+          { text:'Cat',    categoryId:'mammals' },
+          { text:'Eagle',  categoryId:'birds' },
+          { text:'Sparrow', categoryId:'birds' },
+          { text:'Shark',  categoryId:'fish' },
+          { text:'Salmon', categoryId:'fish' }
+        ],
+        maxPoints: 6
+      },
+      states: {
+        mode: 'categorize',
+        question: 'Assign the substances to their states of matter.',
+        categories: [
+          { id:'solid',  label:'Solid' },
+          { id:'liquid', label:'Liquid' },
+          { id:'gas',    label:'Gas' }
+        ],
+        items: [
+          { text:'Iron',    categoryId:'solid'  },
+          { text:'Granite', categoryId:'solid'  },
+          { text:'Water',   categoryId:'liquid' },
+          { text:'Mercury', categoryId:'liquid' },
+          { text:'Oxygen',  categoryId:'gas'    },
+          { text:'Helium',  categoryId:'gas'    }
+        ],
+        maxPoints: 6
+      }
+    } : {
       chemistry: {
         question: 'Ordne die Elementsymbole den Elementen zu.',
         pairs: [
@@ -476,8 +598,8 @@
         question: 'Ordnen Sie die Stoffe ihrem Aggregatzustand zu.',
         categories: [
           { id:'solid',  label:'Fest' },
-          { id:'liquid', label:'Fluessig' },
-          { id:'gas',    label:'Gasfoermig' }
+          { id:'liquid', label:'Flüssig' },
+          { id:'gas',    label:'Gasförmig' }
         ],
         items: [
           { text:'Eisen',       categoryId:'solid'  },
@@ -489,7 +611,8 @@
         ],
         maxPoints: 6
       }
-    }[config.preset];
+    };
+    const pairs = presets[config.preset];
     return pairs ? Object.assign(base, pairs) : config;
   }
   // Mount for categorization mode (n-to-1 drag&drop).
@@ -497,12 +620,16 @@
     const imgH = Number(cfg.imgHeight) || 70;
     const card = document.createElement('section');
     card.className = 'section-card block-question';
-    const h = document.createElement('h3'); h.textContent = cfg.blockTitle || 'Kategorisierung'; card.appendChild(h);
-    if(cfg.question && String(cfg.question).trim() !== ''){
+    const h = document.createElement('h3');
+    h.textContent = api.utils.l(cfg.blockTitle) || api.utils.t('block.match-pairs.defaultCategorizeTitle');
+    card.appendChild(h);
+    const questionText = api.utils.l(cfg.question);
+    if(questionText && String(questionText).trim() !== ''){
       const qBox = document.createElement('div'); qBox.className = 'formula-box'; qBox.style.marginBottom = '1rem';
-      const qBoxTitle = document.createElement('div'); qBoxTitle.className = 'formula-title'; qBoxTitle.textContent = 'Frage';
+      const qBoxTitle = document.createElement('div'); qBoxTitle.className = 'formula-title';
+      qBoxTitle.textContent = api.utils.t('common.question');
       qBox.appendChild(qBoxTitle);
-      const qText = document.createElement('div'); qText.className = 'formula-text'; qText.textContent = cfg.question;
+      const qText = document.createElement('div'); qText.className = 'formula-text'; qText.textContent = questionText;
       qBox.appendChild(qText);
       card.appendChild(qBox);
     }
@@ -511,7 +638,7 @@
     if(cats.length === 0 || allItems.length === 0){
       const ph = document.createElement('div');
       ph.style.cssText = 'color:var(--muted, #6a7986); font-style:italic;';
-      ph.textContent = '(Keine Kategorien oder Begriffe definiert.)';
+      ph.textContent = api.utils.t('block.match-pairs.noCategoriesOrItems');
       card.appendChild(ph);
       host.appendChild(card);
       api.initScore(Number(cfg.maxPoints) || 1);
@@ -569,7 +696,7 @@
       pool.className = 'cat-pool';
       const poolLabel = document.createElement('div');
       poolLabel.className = 'cat-pool-label';
-      poolLabel.textContent = 'Begriffe';
+      poolLabel.textContent = api.utils.t('block.match-pairs.poolLabel');
       pool.appendChild(poolLabel);
       poolList = document.createElement('div');
       poolList.className = 'cat-pool-list';
@@ -588,12 +715,12 @@
         lbl.className = 'cat-zone-label';
         if(c.image){
           const img = document.createElement('img');
-          img.src = c.image; img.alt = c.label || c.id;
+          img.src = c.image; img.alt = api.utils.l(c.label) || c.id;
           img.style.cssText = 'max-height:' + Math.round(imgH*0.6) + 'px; vertical-align:middle; margin-right:0.4rem;';
           lbl.appendChild(img);
         }
         const txt = document.createElement('span');
-        txt.textContent = c.label || c.id;
+        txt.textContent = api.utils.l(c.label) || c.id;
         lbl.appendChild(txt);
         zone.appendChild(lbl);
         const list = document.createElement('div');
@@ -612,15 +739,16 @@
         chip.className = 'cat-chip';
         chip.draggable = true;
         chip.dataset.itemIdx = String(idx);
+        const itText = api.utils.l(it.text);
         if(it.image){
           const img = document.createElement('img');
-          img.src = it.image; img.alt = it.text || '';
+          img.src = it.image; img.alt = itText || '';
           img.style.cssText = 'max-height:' + imgH + 'px; vertical-align:middle; margin-right:0.4rem;';
           chip.appendChild(img);
         }
-        if(it.text){
+        if(itText){
           const txt = document.createElement('span');
-          txt.textContent = it.text;
+          txt.textContent = itText;
           chip.appendChild(txt);
         }
         chip.addEventListener('dragstart', e => {
@@ -664,13 +792,13 @@
     btnRow.className = 'button-cluster';
     const checkBtn = document.createElement('button');
     checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-    checkBtn.textContent = 'Korrektur';
+    checkBtn.textContent = api.utils.t('common.check');
     btnRow.appendChild(checkBtn);
     let newBtn = null;
     if(hasPool){
       newBtn = document.createElement('button');
       newBtn.type = 'button'; newBtn.className = 'btn btn-secondary';
-      newBtn.textContent = 'Neu generieren';
+      newBtn.textContent = api.utils.t('common.regenerate');
       btnRow.appendChild(newBtn);
     }
     card.appendChild(btnRow);
@@ -680,7 +808,7 @@
     checkBtn.addEventListener('click', () => {
       // Nothing assigned to a category yet: prompt instead of recording a 0.
       if(assigned.every(a => a == null)){
-        fb.bad('Bitte mindestens einen Begriff zuordnen.');
+        fb.bad(api.utils.t('block.match-pairs.pleaseAssignAtLeastOneTerm'));
         return;
       }
       let correct = 0;
@@ -694,9 +822,13 @@
       const maxPoints = Number(cfg.maxPoints) || items.length;
       const pts = Math.round((correct / items.length) * maxPoints * 100) / 100;
       if(correct === items.length){
-        fb.ok('Alle ' + items.length + ' Begriffe richtig zugeordnet. ' + maxPoints + ' / ' + maxPoints + ' Punkte.');
+        fb.ok(api.utils.t('block.match-pairs.categorizeAllCorrect', {
+          total: items.length, pts: maxPoints, max: maxPoints
+        }));
       } else {
-        fb.bad(correct + ' von ' + items.length + ' richtig. ' + pts + ' / ' + maxPoints + ' Punkte.');
+        fb.bad(api.utils.t('block.match-pairs.categorizeScoreLine', {
+          correct: correct, total: items.length, pts: pts, max: maxPoints
+        }));
       }
       api.reportScore(pts);
     });
@@ -704,7 +836,7 @@
     if(newBtn){
       newBtn.addEventListener('click', () => {
         buildRound();
-        fb.neutral('Neue Aufgabe generiert.');
+        fb.neutral(api.utils.t('block.match-pairs.newTaskGenerated'));
       });
       window.BlockUtils.regenPolicy(newBtn, cfg, api);
     }

@@ -2,6 +2,7 @@
 import { uid, confirmDialog } from './util.js';
 import { renderTaskList } from './panes.js';
 import { pushHistory } from './state.js';
+import { t } from './i18n.js';
 
 export function bulkAlign(ctx, edge){
   const sel = ctx.selectedBlocks(); if(sel.length < 2) return;
@@ -67,11 +68,11 @@ export function bulkDuplicate(ctx){
 export async function bulkDelete(ctx){
   const sel = ctx.selectedBlocks(); if(sel.length === 0) return;
   const ok = await confirmDialog({
-    title: sel.length === 1 ? 'Block löschen?' : sel.length + ' Blöcke löschen?',
+    title: sel.length === 1 ? t('taskPane.bulk.deleteTitleSingular') : t('taskPane.bulk.deleteTitlePlural', { n: sel.length }),
     message: sel.length === 1
-      ? 'Der markierte Block wird von der Canvas entfernt.'
-      : 'Alle ' + sel.length + ' markierten Blöcke werden von der Canvas entfernt.',
-    confirmLabel: 'Löschen',
+      ? t('taskPane.bulk.deleteMessageSingular')
+      : t('taskPane.bulk.deleteMessagePlural', { n: sel.length }),
+    confirmLabel: t('common.delete'),
     danger: true
   });
   if(!ok) return;

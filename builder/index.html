@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SCORM Builder | Umwelt-Campus Birkenfeld</title>
+  <title data-i18n="html.docTitle">SCORM Builder | Umwelt-Campus Birkenfeld</title>
   <link rel="stylesheet" href="builder.css?v=138" />
   <link rel="stylesheet" href="lib/katex/katex.min.css" />
   <script defer src="lib/katex/katex.min.js"></script>
@@ -12,74 +12,83 @@
 <body>
   <div class="builder-shell">
     <header class="builder-header">
-      <button id="btnSidebarToggle" class="header-icon-btn sidebar-toggle" type="button" aria-label="Aufgabenleiste ein-/ausblenden" title="Aufgabenleiste ein-/ausblenden">
+      <button id="btnSidebarToggle" class="header-icon-btn sidebar-toggle" type="button" aria-label="Aufgabenleiste ein-/ausblenden" title="Aufgabenleiste ein-/ausblenden" data-i18n-aria="html.header.sidebarToggleAria" data-i18n-title="html.header.sidebarToggleAria">
         <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M13 4 L7 10 L13 16" />
         </svg>
       </button>
       <div class="builder-brand">
-        <button id="btnHomeBrand" class="builder-brand-home" type="button" aria-label="Zur Willkommen-Seite">
-          <span class="builder-kicker">SCORM Builder</span>
+        <button id="btnHomeBrand" class="builder-brand-home" type="button" aria-label="Zur Willkommen-Seite" data-i18n-aria="header.home">
+          <span class="builder-kicker" data-i18n="header.brand">SCORM Builder</span>
         </button>
-        <button id="btnCourseHead" class="builder-brand-title" type="button" aria-label="Kopfdaten bearbeiten">
-          <h1 id="courseTitleDisplay">OLAT-Lerneinheiten erstellen</h1>
+        <button id="btnCourseHead" class="builder-brand-title" type="button" aria-label="Kopfdaten bearbeiten" data-i18n-aria="header.editCourseInfo">
+          <h1 id="courseTitleDisplay" data-i18n="header.brandTitle">OLAT-Lerneinheiten erstellen</h1>
         </button>
       </div>
       <div class="builder-actions">
         <!-- File-menu dropdown groups all secondary file ops in one place. -->
         <div class="header-menu" id="fileMenu">
           <button id="btnFileMenu" class="btn btn-secondary header-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-            Datei
+            <span data-i18n="header.dataMenu">Datei</span>
             <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5 8 L10 13 L15 8" />
             </svg>
           </button>
           <div class="header-menu-popover" role="menu" aria-labelledby="btnFileMenu" hidden>
             <div class="header-menu-section" role="presentation">
-              <div class="header-menu-section-label">Lerneinheit</div>
+              <div class="header-menu-section-label" data-i18n="header.dataMenuSection.course">Lerneinheit</div>
               <button id="btnNew" class="header-menu-item" type="button" role="menuitem">
-                <span class="header-menu-label">Neu</span>
-                <span class="header-menu-hint">Leere Lerneinheit beginnen</span>
+                <span class="header-menu-label" data-i18n="header.new">Neu</span>
+                <span class="header-menu-hint" data-i18n="header.newHint">Leere Lerneinheit beginnen</span>
               </button>
             </div>
             <div class="header-menu-divider" role="presentation"></div>
             <div class="header-menu-section" role="presentation">
-              <div class="header-menu-section-label">Öffnen</div>
+              <div class="header-menu-section-label" data-i18n="header.dataMenuSection.open">Öffnen</div>
               <label class="header-menu-item" for="fileLoadZip" role="menuitem" tabindex="0">
-                <span class="header-menu-label">SCORM-ZIP laden …</span>
-                <span class="header-menu-hint">.zip aus früherem Export öffnen</span>
+                <span class="header-menu-label" data-i18n="header.loadZip">SCORM-ZIP laden …</span>
+                <span class="header-menu-hint" data-i18n="html.header.loadZipHintAlt">.zip aus früherem Export öffnen</span>
               </label>
               <input id="fileLoadZip" type="file" accept=".zip" hidden />
               <label class="header-menu-item" for="fileLoadJson" role="menuitem" tabindex="0">
-                <span class="header-menu-label">JSON laden …</span>
-                <span class="header-menu-hint">Konfigurationsdatei öffnen</span>
+                <span class="header-menu-label" data-i18n="header.loadJson">JSON laden …</span>
+                <span class="header-menu-hint" data-i18n="header.loadJsonHint">Konfigurationsdatei öffnen</span>
               </label>
               <input id="fileLoadJson" type="file" accept=".json" hidden />
             </div>
             <div class="header-menu-divider" role="presentation"></div>
             <div class="header-menu-section" role="presentation">
-              <div class="header-menu-section-label">Exportieren</div>
+              <div class="header-menu-section-label" data-i18n="header.dataMenuSection.export">Exportieren</div>
               <button id="btnExportJson" class="header-menu-item" type="button" role="menuitem">
-                <span class="header-menu-label">Als JSON exportieren</span>
-                <span class="header-menu-hint">Roh-Konfiguration herunterladen</span>
+                <span class="header-menu-label" data-i18n="header.exportJson">Als JSON exportieren</span>
+                <span class="header-menu-hint" data-i18n="html.header.exportJsonHintAlt">Roh-Konfiguration herunterladen</span>
               </button>
             </div>
           </div>
         </div>
-        <button id="btnCheatsheet" class="header-icon-btn header-help-btn" type="button" aria-label="Tastaturkürzel anzeigen" title="Tastaturkürzel (?)">
+        <button id="btnCheatsheet" class="header-icon-btn header-help-btn" type="button" aria-label="Tastaturkürzel anzeigen" title="Tastaturkürzel (?)" data-i18n-aria="html.header.cheatsheetAria" data-i18n-title="header.helpTitle">
           <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="10" cy="10" r="7.5"/>
             <path d="M7.8 7.7 C 7.8 6, 9 5.2, 10 5.2 C 11.6 5.2, 12.4 6.2, 12.4 7.3 C 12.4 8.4, 11.4 8.9, 10.4 9.5 C 10 9.8, 10 10.2, 10 10.6"/>
             <circle cx="10" cy="14" r="0.6" fill="currentColor"/>
           </svg>
         </button>
-        <button id="btnOpenFolder" class="btn btn-secondary" type="button" title="Ordner mit SCORM-ZIPs öffnen">
+        <div class="header-menu" id="langMenu">
+          <button id="btnLangMenu" class="header-icon-btn header-lang-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Anzeigesprache wechseln" data-i18n-title="lang.switchTitle">
+            <span class="header-lang-label" id="langMenuLabel">DE</span>
+            <svg viewBox="0 0 20 20" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 8 L10 13 L15 8" />
+            </svg>
+          </button>
+          <div class="header-menu-popover header-lang-popover" role="menu" aria-labelledby="btnLangMenu" hidden></div>
+        </div>
+        <button id="btnOpenFolder" class="btn btn-secondary" type="button" title="Ordner mit SCORM-ZIPs öffnen" data-i18n-title="header.openFolderTitle">
           <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:0.3rem;vertical-align:-0.15em">
             <path d="M2 5 L8 5 L9.5 7 L18 7 L18 16 L2 16 Z"/>
-          </svg>Ordner
+          </svg><span data-i18n="header.openFolder">Ordner</span>
         </button>
-        <button id="btnPreview" class="btn btn-secondary" type="button">Vorschau</button>
-        <button id="btnDownload" class="btn btn-primary" type="button">SCORM-ZIP erzeugen</button>
+        <button id="btnPreview" class="btn btn-secondary" type="button" data-i18n="header.preview">Vorschau</button>
+        <button id="btnDownload" class="btn btn-primary" type="button" data-i18n="header.download">SCORM-ZIP erzeugen</button>
       </div>
     </header>
 
@@ -87,30 +96,30 @@
       <aside class="builder-sidebar">
         <section class="sidebar-section">
           <div class="section-head">
-            <h2>Aufgaben</h2>
-            <button id="btnAddTask" class="btn btn-primary btn-sm" type="button">+ Aufgabe</button>
+            <h2 data-i18n="sidebar.tasks">Aufgaben</h2>
+            <button id="btnAddTask" class="btn btn-primary btn-sm" type="button" data-i18n="sidebar.addTask">+ Aufgabe</button>
           </div>
           <ol id="taskList" class="task-list"></ol>
         </section>
 
         <section class="sidebar-section">
-          <h2>Allgemein</h2>
-          <button class="sidebar-link" data-target="welcome" type="button">Willkommen / Hilfe</button>
-          <button class="sidebar-link" data-target="course" type="button">Kopfdaten</button>
-          <button class="sidebar-link" data-target="theme" type="button">Branding / Theme</button>
+          <h2 data-i18n="sidebar.general">Allgemein</h2>
+          <button class="sidebar-link" data-target="welcome" type="button" data-i18n="html.sidebar.welcomeAndHelp">Willkommen / Hilfe</button>
+          <button class="sidebar-link" data-target="course" type="button" data-i18n="sidebar.courseInfoLink">Kopfdaten</button>
+          <button class="sidebar-link" data-target="theme" type="button" data-i18n="sidebar.themeLink">Branding / Theme</button>
         </section>
 
         <section class="sidebar-section">
-          <h2>Modus</h2>
-          <label class="toggle"><input id="jsonModeToggle" type="checkbox" /> JSON-Editor</label>
+          <h2 data-i18n="sidebar.mode">Modus</h2>
+          <label class="toggle"><input id="jsonModeToggle" type="checkbox" /> <span data-i18n="sidebar.jsonEditor">JSON-Editor</span></label>
         </section>
       </aside>
 
       <section class="builder-pane">
         <div id="formPane"></div>
         <div id="jsonPane" class="hidden">
-          <h2>JSON-Editor</h2>
-          <p class="hint">Das gesamte Paket als JSON bearbeiten. Gültiges JSON wird sofort übernommen.</p>
+          <h2 data-i18n="sidebar.jsonEditor">JSON-Editor</h2>
+          <p class="hint" data-i18n="html.jsonPane.hint">Das gesamte Paket als JSON bearbeiten. Gültiges JSON wird sofort übernommen.</p>
           <textarea id="jsonEditor" class="json-editor" spellcheck="false"></textarea>
           <div class="json-status" id="jsonStatus"></div>
         </div>
@@ -118,59 +127,59 @@
     </main>
 
     <footer class="builder-footer">
-      <span>SCORM 1.2 · Browser-only · läuft offline · Stand 2026</span>
+      <span data-i18n="html.footer.tagline">SCORM 1.2 · Browser-only · läuft offline · Stand 2026</span>
     </footer>
   </div>
 
   <div id="blockTypeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card block-picker-card">
-      <h2 id="modalTitle">Block hinzufügen</h2>
+      <h2 id="modalTitle" data-i18n="taskPane.addBlockTitle">Block hinzufügen</h2>
       <div class="block-picker-search">
         <span class="block-picker-search-icon" aria-hidden="true">
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 L14 14"/>
           </svg>
         </span>
-        <input id="blockPickerSearch" type="search" placeholder="Block-Typ suchen (z. B. Bild, Frage, Code)" autocomplete="off" />
+        <input id="blockPickerSearch" type="search" placeholder="Block-Typ suchen (z. B. Bild, Frage, Code)" autocomplete="off" data-i18n-ph="html.modal.blockPicker.searchPlaceholder" />
       </div>
       <div class="block-picker-layout">
-        <nav id="blockCatNav" class="block-cat-nav" aria-label="Kategorien"></nav>
+        <nav id="blockCatNav" class="block-cat-nav" aria-label="Kategorien" data-i18n-aria="html.modal.blockPicker.categoriesAria"></nav>
         <div id="blockTypeList" class="block-type-list"></div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" type="button" data-modal-close>Abbrechen</button>
+        <button class="btn btn-secondary" type="button" data-modal-close data-i18n="common.cancel">Abbrechen</button>
       </div>
     </div>
   </div>
 
   <div id="taskCreateModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="taskCreateTitle">
     <div class="modal-card task-create-card">
-      <h2 id="taskCreateTitle">Neue Aufgabe</h2>
+      <h2 id="taskCreateTitle" data-i18n="html.modal.taskCreate.title">Neue Aufgabe</h2>
       <button id="btnCreateEmpty" class="task-create-empty-row" type="button">
         <span class="task-create-icon">+</span>
         <span class="task-create-text">
-          <strong>Leere Aufgabe</strong>
-          <span>Blöcke frei zusammenstellen</span>
+          <strong data-i18n="html.modal.taskCreate.emptyTitle">Leere Aufgabe</strong>
+          <span data-i18n="html.modal.taskCreate.emptyHint">Blöcke frei zusammenstellen</span>
         </span>
       </button>
-      <div class="modal-separator">oder Vorlage wählen</div>
+      <div class="modal-separator" data-i18n="html.modal.taskCreate.orTemplate">oder Vorlage wählen</div>
       <div id="templateList" class="template-list"></div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" type="button" data-modal-close>Abbrechen</button>
+        <button class="btn btn-secondary" type="button" data-modal-close data-i18n="common.cancel">Abbrechen</button>
       </div>
     </div>
   </div>
 
   <div id="saveTemplateModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-card" style="max-width:520px">
-      <h2>Aufgabe als Vorlage speichern</h2>
-      <p class="hint">Vorlagen werden lokal in Ihrem Browser gespeichert (localStorage) und stehen für künftige SCORM-Pakete zur Verfügung.</p>
-      <div class="field"><label>Name der Vorlage</label><input id="saveTplName" type="text" /></div>
-      <div class="field"><label>Beschreibung (optional)</label><input id="saveTplDesc" type="text" /></div>
-      <div class="field"><label>Kategorie</label><input id="saveTplCat" type="text" placeholder="z. B. Mathematik" /></div>
+      <h2 data-i18n="taskPane.saveTemplateTitle">Aufgabe als Vorlage speichern</h2>
+      <p class="hint" data-i18n="html.modal.saveTemplate.hint">Vorlagen werden lokal in Ihrem Browser gespeichert (localStorage) und stehen für künftige SCORM-Pakete zur Verfügung.</p>
+      <div class="field"><label data-i18n="html.modal.saveTemplate.nameLabel">Name der Vorlage</label><input id="saveTplName" type="text" /></div>
+      <div class="field"><label data-i18n="taskPane.canvas.saveTemplateDialog.descriptionLabel">Beschreibung (optional)</label><input id="saveTplDesc" type="text" /></div>
+      <div class="field"><label data-i18n="html.modal.saveTemplate.categoryLabel">Kategorie</label><input id="saveTplCat" type="text" placeholder="z. B. Mathematik" data-i18n-ph="html.modal.saveTemplate.categoryPlaceholder" /></div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" type="button" data-modal-close>Abbrechen</button>
-        <button id="btnSaveTplConfirm" class="btn btn-primary" type="button">Speichern</button>
+        <button class="btn btn-secondary" type="button" data-modal-close data-i18n="common.cancel">Abbrechen</button>
+        <button id="btnSaveTplConfirm" class="btn btn-primary" type="button" data-i18n="common.save">Speichern</button>
       </div>
     </div>
   </div>
@@ -180,8 +189,8 @@
   <div id="cheatsheetModal" class="modal hidden cheatsheet" role="dialog" aria-modal="true" aria-labelledby="cheatsheetTitle">
     <div class="modal-card cheatsheet-card">
       <div class="cheatsheet-head">
-        <h2 id="cheatsheetTitle">Tastaturkürzel</h2>
-        <button id="cheatsheetClose" class="header-icon-btn cheatsheet-close" type="button" aria-label="Schließen">
+        <h2 id="cheatsheetTitle" data-i18n="header.help">Tastaturkürzel</h2>
+        <button id="cheatsheetClose" class="header-icon-btn cheatsheet-close" type="button" aria-label="Schließen" data-i18n-aria="common.close">
           <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
             <path d="M5 5 L15 15 M15 5 L5 15"/>
           </svg>
@@ -189,49 +198,49 @@
       </div>
       <div class="cheatsheet-body" tabindex="0">
         <section class="cheatsheet-group">
-          <h3>Allgemein</h3>
+          <h3 data-i18n="sidebar.general">Allgemein</h3>
           <dl>
-            <dt><kbd>?</kbd></dt>                                         <dd>Diese Übersicht ein-/ausblenden</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>S</kbd></dt>                     <dd>Sofort speichern (Autosave-Flush)</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>⇧</kbd> + <kbd>S</kbd></dt>      <dd>SCORM-ZIP exportieren</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>Z</kbd></dt>                     <dd>Rückgängig</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>⇧</kbd> + <kbd>Z</kbd></dt>      <dd>Wiederherstellen</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>Y</kbd></dt>                     <dd>Wiederherstellen (alternativ)</dd>
+            <dt><kbd>?</kbd></dt>                                         <dd data-i18n="html.cheatsheet.general.toggle">Diese Übersicht ein-/ausblenden</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>S</kbd></dt>                     <dd data-i18n="html.cheatsheet.general.save">Sofort speichern (Autosave-Flush)</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>⇧</kbd> + <kbd>S</kbd></dt>      <dd data-i18n="html.cheatsheet.general.exportZip">SCORM-ZIP exportieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>Z</kbd></dt>                     <dd data-i18n="html.cheatsheet.general.undo">Rückgängig</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>⇧</kbd> + <kbd>Z</kbd></dt>      <dd data-i18n="html.cheatsheet.general.redo">Wiederherstellen</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>Y</kbd></dt>                     <dd data-i18n="html.cheatsheet.general.redoAlt">Wiederherstellen (alternativ)</dd>
           </dl>
         </section>
         <section class="cheatsheet-group">
-          <h3>Aufgaben-Canvas</h3>
+          <h3 data-i18n="html.cheatsheet.canvas.heading">Aufgaben-Canvas</h3>
           <dl>
-            <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></dt>  <dd>Markierte Blöcke 1 px verschieben</dd>
-            <dt><kbd>⇧</kbd> + Pfeil</dt>                                 <dd>Blöcke 10 px verschieben</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>A</kbd></dt>                     <dd>Alle Blöcke markieren</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>C</kbd></dt>                     <dd>Markierte Blöcke kopieren</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>V</kbd></dt>                     <dd>Blöcke einfügen</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>D</kbd></dt>                     <dd>Blöcke duplizieren</dd>
-            <dt><kbd>⌫</kbd> / <kbd>Entf</kbd></dt>                       <dd>Markierte Blöcke löschen</dd>
-            <dt><kbd>Esc</kbd></dt>                                       <dd>Auswahl aufheben</dd>
+            <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></dt>  <dd data-i18n="html.cheatsheet.canvas.move1">Markierte Blöcke 1 px verschieben</dd>
+            <dt><kbd>⇧</kbd> + <span data-i18n="html.cheatsheet.canvas.arrowLabel">Pfeil</span></dt>                                 <dd data-i18n="html.cheatsheet.canvas.move10">Blöcke 10 px verschieben</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>A</kbd></dt>                     <dd data-i18n="html.cheatsheet.canvas.selectAll">Alle Blöcke markieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>C</kbd></dt>                     <dd data-i18n="html.cheatsheet.canvas.copy">Markierte Blöcke kopieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>V</kbd></dt>                     <dd data-i18n="html.cheatsheet.canvas.paste">Blöcke einfügen</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>D</kbd></dt>                     <dd data-i18n="html.cheatsheet.canvas.duplicate">Blöcke duplizieren</dd>
+            <dt><kbd>⌫</kbd> / <kbd>Entf</kbd></dt>                       <dd data-i18n="html.cheatsheet.canvas.delete">Markierte Blöcke löschen</dd>
+            <dt><kbd>Esc</kbd></dt>                                       <dd data-i18n="html.cheatsheet.canvas.deselect">Auswahl aufheben</dd>
           </dl>
         </section>
         <section class="cheatsheet-group">
-          <h3>Komposition (innerhalb des Editors)</h3>
+          <h3 data-i18n="html.cheatsheet.composition.heading">Komposition (innerhalb des Editors)</h3>
           <dl>
-            <dt><kbd>V</kbd></dt>                                          <dd>Verschieben-Werkzeug</dd>
-            <dt><kbd>S</kbd></dt>                                          <dd>Auswahl-Werkzeug (Rahmen aufziehen)</dd>
-            <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></dt>   <dd>Form 1 px verschieben</dd>
-            <dt><kbd>⇧</kbd> + Pfeil</dt>                                  <dd>Form 10 px verschieben</dd>
-            <dt><kbd>⌘/Strg</kbd> + Ziehen an Eckpunkt</dt>                <dd>Proportional skalieren (Ellipse, Rechteck, Polygon)</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>D</kbd></dt>                      <dd>Form duplizieren</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>C</kbd></dt>                      <dd>Form in Komposition-Clipboard kopieren</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>V</kbd></dt>                      <dd>Form aus Clipboard einfügen</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>A</kbd></dt>                      <dd>Alle Formen markieren</dd>
-            <dt><kbd>⌫</kbd> / <kbd>Entf</kbd></dt>                        <dd>Markierte Formen löschen</dd>
-            <dt><kbd>Esc</kbd></dt>                                        <dd>Auswahl aufheben</dd>
-            <dt><kbd>⌘/Strg</kbd> + <kbd>Z</kbd></dt>                      <dd>Innerhalb der Komposition rückgängig</dd>
+            <dt><kbd>V</kbd></dt>                                          <dd data-i18n="html.cheatsheet.composition.moveTool">Verschieben-Werkzeug</dd>
+            <dt><kbd>S</kbd></dt>                                          <dd data-i18n="html.cheatsheet.composition.selectTool">Auswahl-Werkzeug (Rahmen aufziehen)</dd>
+            <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></dt>   <dd data-i18n="html.cheatsheet.composition.move1">Form 1 px verschieben</dd>
+            <dt><kbd>⇧</kbd> + <span data-i18n="html.cheatsheet.canvas.arrowLabel">Pfeil</span></dt>                                  <dd data-i18n="html.cheatsheet.composition.move10">Form 10 px verschieben</dd>
+            <dt><kbd>⌘/Strg</kbd> + <span data-i18n="html.cheatsheet.composition.dragCorner">Ziehen an Eckpunkt</span></dt>                <dd data-i18n="html.cheatsheet.composition.scaleProportional">Proportional skalieren (Ellipse, Rechteck, Polygon)</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>D</kbd></dt>                      <dd data-i18n="html.cheatsheet.composition.duplicate">Form duplizieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>C</kbd></dt>                      <dd data-i18n="html.cheatsheet.composition.copy">Form in Komposition-Clipboard kopieren</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>V</kbd></dt>                      <dd data-i18n="html.cheatsheet.composition.paste">Form aus Clipboard einfügen</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>A</kbd></dt>                      <dd data-i18n="html.cheatsheet.composition.selectAll">Alle Formen markieren</dd>
+            <dt><kbd>⌫</kbd> / <kbd>Entf</kbd></dt>                        <dd data-i18n="html.cheatsheet.composition.delete">Markierte Formen löschen</dd>
+            <dt><kbd>Esc</kbd></dt>                                        <dd data-i18n="html.cheatsheet.canvas.deselect">Auswahl aufheben</dd>
+            <dt><kbd>⌘/Strg</kbd> + <kbd>Z</kbd></dt>                      <dd data-i18n="html.cheatsheet.composition.undo">Innerhalb der Komposition rückgängig</dd>
           </dl>
         </section>
       </div>
       <div class="cheatsheet-foot">
-        <span>Tipp: <kbd>?</kbd> öffnet diese Übersicht jederzeit</span>
+        <span data-i18n-html="html.cheatsheet.footTip">Tipp: <kbd>?</kbd> öffnet diese Übersicht jederzeit</span>
       </div>
     </div>
   </div>
@@ -239,17 +248,19 @@
   <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-card preview-card">
       <div class="preview-head">
-        <h2>Vorschau</h2>
-        <button class="btn btn-secondary" type="button" data-modal-close>Schließen</button>
+        <h2 data-i18n="preview.title">Vorschau</h2>
+        <button class="btn btn-secondary" type="button" data-modal-close data-i18n="preview.close">Schließen</button>
       </div>
-      <iframe id="previewFrame" title="SCORM-Vorschau"></iframe>
+      <iframe id="previewFrame" title="SCORM-Vorschau" data-i18n-title="preview.frameTitle"></iframe>
     </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
 
   <script src="lib/jszip.min.js"></script>
-  <script src="template/utils.js?v=74"></script>
+  <script src="template/utils.js?v=75"></script>
+  <script src="template/i18n/de.js?v=2"></script>
+  <script src="template/i18n/en.js?v=2"></script>
   <script src="template/block-icons.js?v=94"></script>
   <script src="template/blocks/_registry.js?v=67"></script>
   <script src="template/blocks/heading.js?v=67"></script>

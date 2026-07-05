@@ -154,8 +154,12 @@
     return Math.abs((a - b) / b) <= tol;
   }
 
-  function fillTemplate(tpl, value, fromUnit, toUnit){
-    return String(tpl || 'Rechnen Sie {value} {fromUnit} in {toUnit} um.')
+  function fillTemplate(tpl, value, fromUnit, toUnit, fallback){
+    const u = window.BlockUtils || {};
+    const defaultFallback = (typeof u.t === 'function')
+      ? u.t('block.unit-convert.questionTemplateFallback')
+      : '{value} {fromUnit} -> {toUnit}';
+    return String(tpl || fallback || defaultFallback)
       .replace(/\{value\}/g,    fmtNum(value))
       .replace(/\{fromUnit\}/g, fromUnit || '?')
       .replace(/\{toUnit\}/g,   toUnit || '?');
@@ -175,105 +179,127 @@
     {value:'ex-mixed',   label:'Beispiel: Gemischt, alle Kategorien'}
   ];
 
-  const EXAMPLE_PRESETS = {
-    'ex-speed': {
-      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'km/h', toUnit:'m/s',  valueMin:30, valueMax:200, integer:true },
-        { fromUnit:'m/s',  toUnit:'km/h', valueMin:10, valueMax:50,  integer:true },
-        { fromUnit:'kn',   toUnit:'km/h', valueMin:5,  valueMax:50,  integer:true }
-      ],
-      randomSwap: false, tolerance: 0.02
-    },
-    'ex-temp': {
-      questionTemplate: 'Wandeln Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'°C', toUnit:'K',  valueMin:-50, valueMax:200, integer:true },
-        { fromUnit:'°C', toUnit:'°F', valueMin:-40, valueMax:120, integer:true },
-        { fromUnit:'K',  toUnit:'°C', valueMin:200, valueMax:400, integer:true }
-      ],
-      randomSwap: false, tolerance: 0.02
-    },
-    'ex-energy': {
-      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'kWh',  toUnit:'MJ',  valueMin:1,    valueMax:10,   integer:false },
-        { fromUnit:'kcal', toUnit:'kJ',  valueMin:50,   valueMax:1000, integer:true },
-        { fromUnit:'J',    toUnit:'cal', valueMin:100,  valueMax:5000, integer:true }
-      ],
-      randomSwap: true, tolerance: 0.02
-    },
-    'ex-pressure': {
-      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'bar',  toUnit:'kPa',  valueMin:0.5, valueMax:10,  integer:false },
-        { fromUnit:'hPa',  toUnit:'atm',  valueMin:900, valueMax:1100,integer:true },
-        { fromUnit:'mmHg', toUnit:'kPa',  valueMin:300, valueMax:800, integer:true },
-        { fromUnit:'MPa',  toUnit:'bar',  valueMin:1,   valueMax:50,  integer:false }
-      ],
-      randomSwap: true, tolerance: 0.02
-    },
-    'ex-data': {
-      questionTemplate: 'Wie viele {toUnit} sind {value} {fromUnit}?',
-      variants: [
-        { fromUnit:'GiB', toUnit:'GB',  valueMin:1,   valueMax:10,   integer:true },
-        { fromUnit:'MiB', toUnit:'MB',  valueMin:1,   valueMax:1000, integer:true },
-        { fromUnit:'KiB', toUnit:'MiB', valueMin:512, valueMax:5120, integer:true }
-      ],
-      randomSwap: true, tolerance: 0.005
-    },
-    'ex-power': {
-      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'PS', toUnit:'kW', valueMin:50,  valueMax:500,  integer:true },
-        { fromUnit:'kW', toUnit:'W',  valueMin:0.5, valueMax:20,   integer:false },
-        { fromUnit:'MW', toUnit:'kW', valueMin:1,   valueMax:20,   integer:false }
-      ],
-      randomSwap: true, tolerance: 0.02
-    },
-    'ex-length': {
-      questionTemplate: 'Wandeln Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'km', toUnit:'m',  valueMin:1, valueMax:100, integer:false },
-        { fromUnit:'cm', toUnit:'mm', valueMin:1, valueMax:50,  integer:true },
-        { fromUnit:'m',  toUnit:'cm', valueMin:1, valueMax:100, integer:true },
-        { fromUnit:'nm', toUnit:'μm', valueMin:100, valueMax:10000, integer:true }
-      ],
-      randomSwap: true, tolerance: 0.02
-    },
-    'ex-density': {
-      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        // Material densities in the typical range:
-        // water 1, aluminium 2.7, iron 7.87, lead 11.3 g/cm³.
-        { fromUnit:'g/cm³', toUnit:'kg/m³', valueMin:1,    valueMax:12,    integer:false },
-        { fromUnit:'kg/m³', toUnit:'g/cm³', valueMin:500,  valueMax:11000, integer:true  },
-        { fromUnit:'g/cm³', toUnit:'kg/L',  valueMin:1,    valueMax:10,    integer:false },
-        { fromUnit:'g/mL',  toUnit:'kg/m³', valueMin:1,    valueMax:5,     integer:false },
-        { fromUnit:'t/m³',  toUnit:'g/cm³', valueMin:1,    valueMax:10,    integer:false }
-      ],
-      randomSwap: false, tolerance: 0.02
-    },
-    'ex-mixed': {
-      questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
-      variants: [
-        { fromUnit:'km/h', toUnit:'m/s', valueMin:30, valueMax:200, integer:true },
-        { fromUnit:'°C',   toUnit:'K',   valueMin:0,  valueMax:100, integer:true },
-        { fromUnit:'bar',  toUnit:'kPa', valueMin:1,  valueMax:10,  integer:true },
-        { fromUnit:'kWh',  toUnit:'MJ',  valueMin:1,  valueMax:10,  integer:false },
-        { fromUnit:'PS',   toUnit:'kW',  valueMin:50, valueMax:300, integer:true },
-        { fromUnit:'GiB',  toUnit:'GB',  valueMin:1,  valueMax:10,  integer:true },
-        { fromUnit:'N',    toUnit:'kN',  valueMin:100,valueMax:5000,integer:true },
-        { fromUnit:'g/cm³',toUnit:'kg/m³', valueMin:1, valueMax:10, integer:false }
-      ],
-      randomSwap: true, tolerance: 0.02
-    }
+  // Option-key mapping for preset select (used to add labelKey entries below).
+  const PRESET_OPTION_KEYS = {
+    'custom':      'block.unit-convert.field.preset.option.custom',
+    'ex-speed':    'block.unit-convert.field.preset.option.ex-speed',
+    'ex-temp':     'block.unit-convert.field.preset.option.ex-temp',
+    'ex-energy':   'block.unit-convert.field.preset.option.ex-energy',
+    'ex-pressure': 'block.unit-convert.field.preset.option.ex-pressure',
+    'ex-data':     'block.unit-convert.field.preset.option.ex-data',
+    'ex-power':    'block.unit-convert.field.preset.option.ex-power',
+    'ex-length':   'block.unit-convert.field.preset.option.ex-length',
+    'ex-density':  'block.unit-convert.field.preset.option.ex-density',
+    'ex-mixed':    'block.unit-convert.field.preset.option.ex-mixed'
   };
+
+  function getExamplePresets(locale){
+    const u = window.BlockUtils || {};
+    const loc = locale || (u.getLocale && u.getLocale()) || 'de';
+    const en = loc === 'en';
+    const qConvert = en ? 'Convert {value} {fromUnit} to {toUnit}.' : 'Rechnen Sie {value} {fromUnit} in {toUnit} um.';
+    const qTransform = en ? 'Convert {value} {fromUnit} to {toUnit}.' : 'Wandeln Sie {value} {fromUnit} in {toUnit} um.';
+    const qHowMany = en ? 'How many {toUnit} are {value} {fromUnit}?' : 'Wie viele {toUnit} sind {value} {fromUnit}?';
+    return {
+      'ex-speed': {
+        questionTemplate: qConvert,
+        variants: [
+          { fromUnit:'km/h', toUnit:'m/s',  valueMin:30, valueMax:200, integer:true },
+          { fromUnit:'m/s',  toUnit:'km/h', valueMin:10, valueMax:50,  integer:true },
+          { fromUnit:'kn',   toUnit:'km/h', valueMin:5,  valueMax:50,  integer:true }
+        ],
+        randomSwap: false, tolerance: 0.02
+      },
+      'ex-temp': {
+        questionTemplate: qTransform,
+        variants: [
+          { fromUnit:'°C', toUnit:'K',  valueMin:-50, valueMax:200, integer:true },
+          { fromUnit:'°C', toUnit:'°F', valueMin:-40, valueMax:120, integer:true },
+          { fromUnit:'K',  toUnit:'°C', valueMin:200, valueMax:400, integer:true }
+        ],
+        randomSwap: false, tolerance: 0.02
+      },
+      'ex-energy': {
+        questionTemplate: qConvert,
+        variants: [
+          { fromUnit:'kWh',  toUnit:'MJ',  valueMin:1,    valueMax:10,   integer:false },
+          { fromUnit:'kcal', toUnit:'kJ',  valueMin:50,   valueMax:1000, integer:true },
+          { fromUnit:'J',    toUnit:'cal', valueMin:100,  valueMax:5000, integer:true }
+        ],
+        randomSwap: true, tolerance: 0.02
+      },
+      'ex-pressure': {
+        questionTemplate: qConvert,
+        variants: [
+          { fromUnit:'bar',  toUnit:'kPa',  valueMin:0.5, valueMax:10,  integer:false },
+          { fromUnit:'hPa',  toUnit:'atm',  valueMin:900, valueMax:1100,integer:true },
+          { fromUnit:'mmHg', toUnit:'kPa',  valueMin:300, valueMax:800, integer:true },
+          { fromUnit:'MPa',  toUnit:'bar',  valueMin:1,   valueMax:50,  integer:false }
+        ],
+        randomSwap: true, tolerance: 0.02
+      },
+      'ex-data': {
+        questionTemplate: qHowMany,
+        variants: [
+          { fromUnit:'GiB', toUnit:'GB',  valueMin:1,   valueMax:10,   integer:true },
+          { fromUnit:'MiB', toUnit:'MB',  valueMin:1,   valueMax:1000, integer:true },
+          { fromUnit:'KiB', toUnit:'MiB', valueMin:512, valueMax:5120, integer:true }
+        ],
+        randomSwap: true, tolerance: 0.005
+      },
+      'ex-power': {
+        questionTemplate: qConvert,
+        variants: [
+          { fromUnit:'PS', toUnit:'kW', valueMin:50,  valueMax:500,  integer:true },
+          { fromUnit:'kW', toUnit:'W',  valueMin:0.5, valueMax:20,   integer:false },
+          { fromUnit:'MW', toUnit:'kW', valueMin:1,   valueMax:20,   integer:false }
+        ],
+        randomSwap: true, tolerance: 0.02
+      },
+      'ex-length': {
+        questionTemplate: qTransform,
+        variants: [
+          { fromUnit:'km', toUnit:'m',  valueMin:1, valueMax:100, integer:false },
+          { fromUnit:'cm', toUnit:'mm', valueMin:1, valueMax:50,  integer:true },
+          { fromUnit:'m',  toUnit:'cm', valueMin:1, valueMax:100, integer:true },
+          { fromUnit:'nm', toUnit:'μm', valueMin:100, valueMax:10000, integer:true }
+        ],
+        randomSwap: true, tolerance: 0.02
+      },
+      'ex-density': {
+        questionTemplate: qConvert,
+        variants: [
+          // Material densities in the typical range:
+          // water 1, aluminium 2.7, iron 7.87, lead 11.3 g/cm³.
+          { fromUnit:'g/cm³', toUnit:'kg/m³', valueMin:1,    valueMax:12,    integer:false },
+          { fromUnit:'kg/m³', toUnit:'g/cm³', valueMin:500,  valueMax:11000, integer:true  },
+          { fromUnit:'g/cm³', toUnit:'kg/L',  valueMin:1,    valueMax:10,    integer:false },
+          { fromUnit:'g/mL',  toUnit:'kg/m³', valueMin:1,    valueMax:5,     integer:false },
+          { fromUnit:'t/m³',  toUnit:'g/cm³', valueMin:1,    valueMax:10,    integer:false }
+        ],
+        randomSwap: false, tolerance: 0.02
+      },
+      'ex-mixed': {
+        questionTemplate: qConvert,
+        variants: [
+          { fromUnit:'km/h', toUnit:'m/s', valueMin:30, valueMax:200, integer:true },
+          { fromUnit:'°C',   toUnit:'K',   valueMin:0,  valueMax:100, integer:true },
+          { fromUnit:'bar',  toUnit:'kPa', valueMin:1,  valueMax:10,  integer:true },
+          { fromUnit:'kWh',  toUnit:'MJ',  valueMin:1,  valueMax:10,  integer:false },
+          { fromUnit:'PS',   toUnit:'kW',  valueMin:50, valueMax:300, integer:true },
+          { fromUnit:'GiB',  toUnit:'GB',  valueMin:1,  valueMax:10,  integer:true },
+          { fromUnit:'N',    toUnit:'kN',  valueMin:100,valueMax:5000,integer:true },
+          { fromUnit:'g/cm³',toUnit:'kg/m³', valueMin:1, valueMax:10, integer:false }
+        ],
+        randomSwap: true, tolerance: 0.02
+      }
+    };
+  }
 
   function unitPresetConfig(config){
     const p = config.preset || 'custom';
     if(p === 'custom') return config;
-    const ex = EXAMPLE_PRESETS[p];
+    const ex = getExamplePresets()[p];
     if(!ex) return config;
     return Object.assign({}, config, ex);
   }
@@ -281,16 +307,23 @@
   // Block registration
   Blocks.register('unit-convert', {
     label: 'Einheitenumrechnung',
+    labelKey: 'block.unit-convert.label',
     description: 'Physikalische Einheiten umrechnen mit zufälligen Werten.',
+    descKey: 'block.unit-convert.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: '⇌',
     graded: true,
 
     defaultConfig(){
+      const u = window.BlockUtils || {};
+      const template = (typeof u.t === 'function')
+        ? u.t('block.unit-convert.questionTemplateFallback')
+        : '{value} {fromUnit} -> {toUnit}';
       return {
         blockTitle: '',
         preset: 'custom',
-        questionTemplate: '',
+        questionTemplate: template,
         variants: [],
         randomize: true,
         randomSwap: false,
@@ -300,10 +333,12 @@
     },
     validate(cfg){
       if(cfg.preset && cfg.preset !== 'custom') return [];
+      const u = window.BlockUtils || {};
+      const t = (typeof u.t === 'function') ? u.t : (k => k);
       const w = [];
       const variants = (cfg.variants || []).filter(v => v && v.fromUnit && v.toUnit);
       if(!variants.length){
-        w.push('Mindestens eine Umrechnung konfigurieren.');
+        w.push(t('block.unit-convert.validate.minOneConversion'));
         return w;
       }
       variants.forEach((v, i) => {
@@ -312,18 +347,22 @@
         const fromCat = fromIsCat ? v.fromUnit.slice(2) : (UREG[v.fromUnit] && UREG[v.fromUnit].cat);
         const toCat   = toIsCat   ? v.toUnit.slice(2)   : (UREG[v.toUnit]   && UREG[v.toUnit].cat);
         if(!fromCat || !toCat){
-          w.push('Umrechnung ' + (i+1) + ': unbekannte Einheit.');
+          w.push(t('block.unit-convert.validate.unknownUnit', { index: (i+1) }));
         } else if(fromCat !== toCat){
-          w.push('Umrechnung ' + (i+1) + ': ' + fromCat + ' nach ' + toCat + ' ist nicht möglich.');
+          w.push(t('block.unit-convert.validate.categoryMismatch', { index: (i+1), from: fromCat, to: toCat }));
         }
       });
       return w;
     },
     previewConfig(){
+      const u = window.BlockUtils || {};
+      const template = (typeof u.t === 'function')
+        ? u.t('block.unit-convert.preview.questionTemplate')
+        : '{value} {fromUnit} -> {toUnit}';
       // Minutes -> seconds: intuitive without prior unit knowledge.
       return {
         blockTitle: '', preset: 'custom',
-        questionTemplate: 'Rechnen Sie {value} {fromUnit} in {toUnit} um.',
+        questionTemplate: template,
         variants: [
           { valueMin: 2, valueMax: 10, integer: true, fromUnit: 'min', toUnit: 's', factor: 60 }
         ],
@@ -335,15 +374,28 @@
     builderSchema(){
       const isCustom = c => (c.preset || 'custom') === 'custom';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Einheitenumrechnung' },
-        { key:'preset', label:'Vorlage', type:'select', options: PRESET_OPTIONS,
-          help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.' },
-        { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
-        { type:'section', label:'Frage', key:'_sec_q' },
-        { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {value}, {fromUnit}, {toUnit})', type:'text', showIf: isCustom,
-          help:'Beispiel: „Rechnen Sie {value} {fromUnit} in {toUnit} um." Variablen werden bei jeder neuen Aufgabe belegt.' },
-        { type:'section', label:'Zufallsvariablen', key:'_sec_vars' },
-        { key:'variants', label:'Umrechnungen', type:'list', itemLabel:'Umrechnung',
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.unit-convert.field.blockTitle.label',
+          type:'text', placeholder:'Einheitenumrechnung',
+          placeholderKey:'block.unit-convert.field.blockTitle.placeholder' },
+        { key:'preset', label:'Vorlage', labelKey:'block.unit-convert.field.preset.label',
+          type:'select',
+          options: PRESET_OPTIONS.map(opt => Object.assign({}, opt, {
+            labelKey: PRESET_OPTION_KEYS[opt.value]
+          })),
+          help:'Beispiele zeigen alle Möglichkeiten des Blocks. „Manuell" für eigene Fragen.',
+          helpKey:'block.unit-convert.field.preset.help' },
+        { type:'action', label:'↺ Zurücksetzen', labelKey:'block.unit-convert.field.reset.label',
+          action:'reset', showIf: isCustom },
+        { type:'section', label:'Frage', labelKey:'block.unit-convert.field.sec_q.label', key:'_sec_q' },
+        { key:'questionTemplate', label:'Frage-Vorlage  (Variablen als {value}, {fromUnit}, {toUnit})',
+          labelKey:'block.unit-convert.field.questionTemplate.label',
+          type:'text', showIf: isCustom,
+          help:'Beispiel: „Rechnen Sie {value} {fromUnit} in {toUnit} um." Variablen werden bei jeder neuen Aufgabe belegt.',
+          helpKey:'block.unit-convert.field.questionTemplate.help' },
+        { type:'section', label:'Zufallsvariablen', labelKey:'block.unit-convert.field.sec_vars.label', key:'_sec_vars' },
+        { key:'variants', label:'Umrechnungen', labelKey:'block.unit-convert.field.variants.label',
+          type:'list', itemLabel:'Umrechnung',
+          itemLabelKey:'block.unit-convert.field.variants.itemLabel',
           showIf: isCustom,
           itemSummary: item => {
             if(!item) return '…';
@@ -355,20 +407,30 @@
           },
           itemSchema:[
             { key:'_dir', type:'unit-from-to', label:'Richtung',
+              labelKey:'block.unit-convert.field.dir.label',
               fromKey:'fromUnit', toKey:'toUnit',
               defaultFrom:'km/h', defaultTo:'m/s',
               units: UREG },
-            { key:'valueMin', label:'von', type:'number', step:'any', default: 0 },
-            { key:'valueMax', label:'bis', type:'number', step:'any', default: 100 },
-            { key:'integer',  label:'Nur Ganzzahlen',  type:'boolean' }
+            { key:'valueMin', label:'von', labelKey:'block.unit-convert.field.valueMin.label',
+              type:'number', step:'any', default: 0 },
+            { key:'valueMax', label:'bis', labelKey:'block.unit-convert.field.valueMax.label',
+              type:'number', step:'any', default: 100 },
+            { key:'integer',  label:'Nur Ganzzahlen', labelKey:'block.unit-convert.field.integer.label',
+              type:'boolean' }
           ]},
-        { key:'randomize',  label:'Variante zufällig wählen',     type:'boolean' },
-        { key:'randomSwap', label:'Richtung zufällig vertauschen', type:'boolean' },
-        { type:'section', label:'Lösung', key:'_sec_solution' },
-        { key:'tolerance', label:'Toleranz  (±, relativ)', type:'number', step:'any',
-          help:'Abweichung, die noch als korrekt gilt. 0.01 = ±1 %.' },
-        { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 },
+        { key:'randomize',  label:'Variante zufällig wählen',
+          labelKey:'block.unit-convert.field.randomize.label', type:'boolean' },
+        { key:'randomSwap', label:'Richtung zufällig vertauschen',
+          labelKey:'block.unit-convert.field.randomSwap.label', type:'boolean' },
+        { type:'section', label:'Lösung', labelKey:'block.unit-convert.field.sec_solution.label', key:'_sec_solution' },
+        { key:'tolerance', label:'Toleranz  (±, relativ)',
+          labelKey:'block.unit-convert.field.tolerance.label',
+          type:'number', step:'any',
+          help:'Abweichung, die noch als korrekt gilt. 0.01 = ±1 %.',
+          helpKey:'block.unit-convert.field.tolerance.help' },
+        { type:'section', label:'Bewertung', labelKey:'block.unit-convert.field.sec_score.label', key:'_sec_score' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.unit-convert.field.maxPoints.label',
+          type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -380,10 +442,10 @@
       const tol = Number(ac.tolerance) || 0.01;
 
       const ui = u.questionCard(host, {
-        h3: ac.blockTitle || 'Aufgabe',
-        qBoxTitle: 'Frage',
-        inputLabel: 'Antwort',
-        inputPlaceholder: 'Zahl eingeben'
+        h3: u.l(ac.blockTitle) || u.t('common.task'),
+        qBoxTitle: u.t('common.question'),
+        inputLabel: u.t('common.answer'),
+        inputPlaceholder: u.t('block.unit-convert.inputPlaceholder')
       });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
 
@@ -462,7 +524,7 @@
       function chooseNew(showMsg){
         let next = genInstance();
         if(!next){
-          qText.innerHTML = '<em>Keine Aufgaben definiert.</em>';
+          qText.innerHTML = '<em>' + u.t('block.unit-convert.noTasksDefined') + '</em>';
           unitLbl.textContent = '';
           inp.value = '';
           current = null;
@@ -473,19 +535,23 @@
         }
         current = next;
         inp.value = '';
-        qText.textContent = fillTemplate(ac.questionTemplate, current.value, current.from, current.to);
+        qText.textContent = fillTemplate(u.l(ac.questionTemplate), current.value, current.from, current.to,
+          u.t('block.unit-convert.questionTemplateFallback'));
         unitLbl.textContent = current.to;
-        if(showMsg) fb.neutral('Neue Aufgabe generiert.');
+        if(showMsg) fb.neutral(u.t('block.unit-convert.newTaskGenerated'));
       }
       function grade(){
-        if(!current || current.expected == null){ fb.bad('Lösung nicht verfügbar.'); return; }
+        if(!current || current.expected == null){ fb.bad(u.t('block.unit-convert.solutionUnavailable')); return; }
         const got = u.parseNum(inp.value);
-        if(got == null){ fb.bad('Bitte eine gültige Zahl eingeben.'); return; }
+        if(got == null){ fb.bad(u.t('block.unit-convert.enterValidNumber')); return; }
         if(nearlyEqual(got, current.expected, tol)){
-          fb.ok('Korrekt. (Lösung: ' + fmtNum(current.expected) + ' ' + current.to + ')');
+          fb.ok(u.t('block.unit-convert.correctWithSolution', {
+            value: fmtNum(current.expected),
+            unit: current.to
+          }));
           api.reportScore(ac.maxPoints || 1);
         } else {
-          fb.bad('Nicht korrekt.');
+          fb.bad(u.t('common.wrong'));
           api.reportScore(0);
         }
       }
@@ -499,6 +565,8 @@
     },
 
     preview(host, config){
+      const t = window.BlockUtils.t;
+      const l = window.BlockUtils.l;
       const ac = unitPresetConfig(config);
       const variants = (ac.variants || []).filter(v => v && v.fromUnit && v.toUnit);
       const first = variants[0];
@@ -508,7 +576,8 @@
         const lo = Number(first.valueMin), hi = Number(first.valueMax);
         if(!Number.isNaN(lo) && !Number.isNaN(hi)) value = Math.round((lo + hi) / 2);
       }
-      const questionText = (ac.questionTemplate || 'Rechnen Sie {value} {fromUnit} in {toUnit} um.')
+      const template = l(ac.questionTemplate) || t('block.unit-convert.questionTemplateFallback');
+      const questionText = template
         .replace('{value}', value)
         .replace('{fromUnit}', first?.fromUnit || '?')
         .replace('{toUnit}',   first?.toUnit   || '?');
@@ -518,7 +587,7 @@
       const card = document.createElement('div');
       card.className = 'bp-card';
       const h3 = document.createElement('h3');
-      h3.textContent = 'Frage';
+      h3.textContent = t('common.question');
       card.appendChild(h3);
       const q = document.createElement('p');
       q.textContent = questionText;
@@ -527,7 +596,7 @@
       inpRow.className = 'bp-input-row';
       const inp = document.createElement('div');
       inp.className = 'bp-input';
-      inp.textContent = 'Zahl eingeben…';
+      inp.textContent = t('block.unit-convert.inputPlaceholder');
       inpRow.appendChild(inp);
       if(first?.toUnit){
         const u = document.createElement('span');
@@ -537,13 +606,13 @@
       }
       card.appendChild(inpRow);
       const btn = document.createElement('span');
-      btn.textContent = 'Korrektur';
+      btn.textContent = t('common.check');
       btn.className = 'bp-btn';
       card.appendChild(btn);
       if(solution != null){
         const hint = document.createElement('div');
         hint.className = 'bp-hint';
-        hint.innerHTML = '<div class="bp-hint-title">Beispiel-Lösung</div>' +
+        hint.innerHTML = '<div class="bp-hint-title">' + t('block.unit-convert.exampleSolution') + '</div>' +
           '<div class="bp-hint-body">' + value + ' ' + first.fromUnit + ' = ' + solution + ' ' + first.toUnit + '</div>';
         card.appendChild(hint);
       }

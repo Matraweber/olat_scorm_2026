@@ -11,6 +11,26 @@ import { openTaskCreateModal } from './modals.js';
 import { downloadZip, exportJson, loadJsonFile, loadZipFile, showPreview, syncJsonEditor, applyJsonEditor } from './io.js';
 import { toast, confirmDialog, escapeHtml } from './util.js';
 import { getActiveTaskCtx } from './task-pane.js';
+import * as i18n from './i18n.js';
+import { t as tI18n } from './i18n.js';
+
+import deBundle from '../i18n/de.js';
+import enBundle from '../i18n/en.js';
+import { setupLangMenu } from './lang-menu.js';
+
+// Register bundles and restore the last chosen locale. Also mirror the
+// active locale into BlockUtils so the preview iframe (which shares the
+// runtime code path) picks up the switch immediately.
+i18n.register('de', deBundle, deBundle.meta || { name: 'Deutsch', label: 'DE' });
+i18n.register('en', enBundle, enBundle.meta || { name: 'English', label: 'EN' });
+i18n.setDefaultLocale('de');
+i18n.initFromStorage('de');
+if(window.BlockUtils && typeof window.BlockUtils.setLocale === 'function'){
+  window.BlockUtils.setLocale(i18n.getLocale());
+  window.BlockUtils.setDefaultLocale(i18n.getDefaultLocale());
+}
+// Expose for devtools poking.
+window.i18n = i18n;
 
 function render(){
   renderTaskList();
@@ -28,9 +48,9 @@ function init(){
   applyThemeToBuilder(state.theme);
   document.getElementById('btnNew').addEventListener('click', async () => {
     if(!await confirmDialog({
-      title: 'Neue Lerneinheit?',
-      message: 'Aktuellen Stand verwerfen und mit einer leeren Lerneinheit beginnen? Nicht gespeicherte Änderungen gehen verloren.',
-      confirmLabel: 'Verwerfen und neu',
+      title: tI18n('main.newCourseConfirm.title'),
+      message: tI18n('main.newCourseConfirm.message'),
+      confirmLabel: tI18n('main.newCourseConfirm.confirm'),
       danger: true
     })) return;
     state.course = defaultCourse();
@@ -97,10 +117,12 @@ function init(){
     state.selected = { kind: 'course' };
     render();
   });
-  // Keep the header title in sync with state.course.courseTitle.
+  // Keep the header title in sync with state.course.courseTitle. Route the
+  // value through i18n.l() so multilingual wrappers render as text for the
+  // active chrome locale instead of collapsing to '[object Object]'.
   function syncHeaderTitle(){
-    const t = document.getElementById('courseTitleDisplay');
-    if(t) t.textContent = state.course.courseTitle || 'Neue Lerneinheit';
+    const el = document.getElementById('courseTitleDisplay');
+    if(el) el.textContent = i18n.l(state.course.courseTitle) || tI18n('main.header.newCourseTitle');
   }
   syncHeaderTitle();
   window.scormBuilderSyncHeaderTitle = syncHeaderTitle;
@@ -147,7 +169,7 @@ function init(){
           io.saveToLoadedHandle();
         } else {
           flushAutosave();
-          toast('Lerneinheit gespeichert.');
+          toast(tI18n('main.toast.saved'));
         }
       });
       return;
@@ -207,6 +229,28 @@ function init(){
   state.blockUsage = loadBlockUsage();
 
   setupFileMenu();
+
+  // Language switcher. onLocaleChange re-renders the whole shell, translates
+  // every [data-i18n*] attribute in the static HTML, and syncs BlockUtils so
+  // the preview iframe reflects the new locale immediately.
+  const langMenu = setupLangMenu((code) => {
+    if(window.BlockUtils && typeof window.BlockUtils.setLocale === 'function'){
+      window.BlockUtils.setLocale(code);
+    }
+    document.documentElement.setAttribute('lang', code);
+    if(langMenu){
+      langMenu.refreshLabelAndTooltip();
+      langMenu.renderPopover();
+    }
+    i18n.applyDataI18n(document);
+    render();
+    if(typeof window.scormBuilderSyncHeaderTitle === 'function'){
+      window.scormBuilderSyncHeaderTitle();
+    }
+  });
+  document.documentElement.setAttribute('lang', i18n.getLocale());
+  // Initial pass so the static HTML picks up whatever locale we restored.
+  i18n.applyDataI18n(document);
 
   setupAutosaveIndicator();
   // After "Neu", clear autosave too so the next reload doesn't offer recovery.
@@ -296,8 +340,8 @@ function setupAutosaveIndicator(){
   const pill = document.createElement('span');
   pill.id = 'autosaveStatus';
   pill.className = 'autosave-status';
-  pill.title = 'Automatisch im Browser gespeichert';
-  pill.textContent = 'Nicht gespeichert';
+  pill.title = tI18n('main.autosave.title');
+  pill.textContent = tI18n('main.autosave.notSaved');
   pill.dataset.state = 'idle';
   actions.insertBefore(pill, actions.firstChild);
 
@@ -305,17 +349,17 @@ function setupAutosaveIndicator(){
   let pulseTimer = null;
   function update(){
     if(pill.dataset.state === 'saving') return;
-    if(!lastTs){ pill.textContent = 'Nicht gespeichert'; pill.dataset.state = 'idle'; return; }
+    if(!lastTs){ pill.textContent = tI18n('main.autosave.notSaved'); pill.dataset.state = 'idle'; return; }
     const dt = Math.round((Date.now() - lastTs) / 1000);
     pill.dataset.state = 'saved';
-    pill.textContent = dt < 5  ? 'Gespeichert'
-                    : dt < 60 ? 'Gespeichert · vor ' + dt + ' s'
-                              : 'Gespeichert · vor ' + Math.floor(dt / 60) + ' min';
+    pill.textContent = dt < 5  ? tI18n('main.autosave.saved')
+                    : dt < 60 ? tI18n('main.autosave.savedSecondsAgo', { n: dt })
+                              : tI18n('main.autosave.savedMinutesAgo', { n: Math.floor(dt / 60) });
   }
 
   setAutosavePendingListener(() => {
     pill.dataset.state = 'saving';
-    pill.textContent = 'Wird gespeichert …';
+    pill.textContent = tI18n('main.autosave.saving');
     pill.classList.remove('just-saved');
   });
   setAutosaveListener(({ ts }) => {
@@ -347,21 +391,27 @@ function maybeOfferRecovery(){
   overlay.setAttribute('aria-modal', 'true');
   const tasksN = Array.isArray(saved.tasks) ? saved.tasks.length : 0;
   const ageMin = meta && meta.ts ? Math.max(1, Math.round((Date.now() - meta.ts) / 60000)) : null;
-  const ageLine = ageMin
-    ? '<p class="hint">Zuletzt geändert vor ' + (ageMin < 60 ? ageMin + ' Minuten' : Math.round(ageMin/60) + ' Stunden') + '.</p>'
+  const ageText = ageMin
+    ? (ageMin < 60
+        ? tI18n('main.recovery.lastEditedMinutes', { n: ageMin })
+        : tI18n('main.recovery.lastEditedHours', { n: Math.round(ageMin/60) }))
     : '';
+  const ageLine = ageText ? '<p class="hint">' + escapeHtml(ageText) + '</p>' : '';
+  const taskCountText = tasksN === 1
+    ? tI18n('main.recovery.taskCountSingular', { n: tasksN })
+    : tI18n('main.recovery.taskCountPlural', { n: tasksN });
   overlay.innerHTML = `
     <div class="modal-card" style="max-width:480px">
-      <h2>Vorherige Sitzung wiederherstellen?</h2>
-      <p>Es wurde eine ungespeicherte Lerneinheit gefunden:</p>
+      <h2>${escapeHtml(tI18n('main.recovery.title'))}</h2>
+      <p>${escapeHtml(tI18n('main.recovery.body'))}</p>
       <div class="autosave-summary">
-        <strong>${escapeHtml(saved.courseTitle || 'Lerneinheit')}</strong>
-        <span>${tasksN} Aufgabe${tasksN === 1 ? '' : 'n'}</span>
+        <strong>${escapeHtml(saved.courseTitle || tI18n('main.recovery.untitledCourse'))}</strong>
+        <span>${escapeHtml(taskCountText)}</span>
       </div>
       ${ageLine}
       <div class="modal-actions">
-        <button id="autosaveDiscard" class="btn btn-secondary" type="button">Verwerfen</button>
-        <button id="autosaveRestore" class="btn btn-primary" type="button">Wiederherstellen</button>
+        <button id="autosaveDiscard" class="btn btn-secondary" type="button">${escapeHtml(tI18n('main.recovery.discard'))}</button>
+        <button id="autosaveRestore" class="btn btn-primary" type="button">${escapeHtml(tI18n('main.recovery.restore'))}</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);

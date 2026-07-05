@@ -3,6 +3,12 @@
 
   const EPS = 1e-9;
 
+  function tt(key, params){
+    const u = window.BlockUtils;
+    if(u && typeof u.t === 'function') return u.t(key, params);
+    return key;
+  }
+
   // Parser: linear expression -> {coeffs[], constant}. Accepts 2x, -3y, +0.5z, x, -x.
   function parseLinear(str, varNames){
     let s = String(str || '').replace(/\s+/g, '').replace(/\*/g, '');
@@ -12,7 +18,7 @@
     let constant = 0;
     let i = 0;
     while(i < s.length){
-      if(s[i] !== '+' && s[i] !== '-') return { ok: false, err: 'unerwartetes Zeichen "' + s[i] + '"' };
+      if(s[i] !== '+' && s[i] !== '-') return { ok: false, err: tt('block.equation-system.parser.unexpectedChar', { char: s[i] }) };
       const sign = s[i] === '-' ? -1 : 1;
       i++;
       let numStr = '';
@@ -21,16 +27,16 @@
       while(i < s.length && /[a-zA-Z_]/.test(s[i])){ varStr += s[i]; i++; }
       let num;
       if(numStr === '' || numStr === '.'){
-        if(!varStr) return { ok: false, err: 'leerer Term nach Vorzeichen' };
+        if(!varStr) return { ok: false, err: tt('block.equation-system.parser.emptyTermAfterSign') };
         num = 1;
       } else {
-        if(numStr.split('.').length > 2) return { ok: false, err: 'ungültige Zahl "' + numStr + '"' };
+        if(numStr.split('.').length > 2) return { ok: false, err: tt('block.equation-system.parser.invalidNumber', { num: numStr }) };
         num = parseFloat(numStr);
-        if(!isFinite(num)) return { ok: false, err: 'ungültige Zahl "' + numStr + '"' };
+        if(!isFinite(num)) return { ok: false, err: tt('block.equation-system.parser.invalidNumber', { num: numStr }) };
       }
       if(varStr){
         const idx = varNames.indexOf(varStr);
-        if(idx < 0) return { ok: false, err: 'unbekannte Variable "' + varStr + '"' };
+        if(idx < 0) return { ok: false, err: tt('block.equation-system.parser.unknownVariable', { name: varStr }) };
         coeffs[idx] += sign * num;
       } else {
         constant += sign * num;
@@ -41,14 +47,14 @@
 
   function parseEquation(eqStr, varNames){
     const s = String(eqStr || '').trim();
-    if(!s) return { ok: false, err: 'leere Gleichung' };
+    if(!s) return { ok: false, err: tt('block.equation-system.parser.emptyEquation') };
     const idx = s.indexOf('=');
-    if(idx < 0) return { ok: false, err: 'kein "=" gefunden' };
-    if(s.indexOf('=', idx + 1) >= 0) return { ok: false, err: 'mehr als ein "=", bitte eine Gleichung pro Zeile' };
+    if(idx < 0) return { ok: false, err: tt('block.equation-system.parser.noEquals') };
+    if(s.indexOf('=', idx + 1) >= 0) return { ok: false, err: tt('block.equation-system.parser.multipleEquals') };
     const lhs = parseLinear(s.slice(0, idx), varNames);
-    if(!lhs.ok) return { ok: false, err: 'linke Seite: ' + lhs.err };
+    if(!lhs.ok) return { ok: false, err: tt('block.equation-system.parser.leftSide', { err: lhs.err }) };
     const rhs = parseLinear(s.slice(idx + 1), varNames);
-    if(!rhs.ok) return { ok: false, err: 'rechte Seite: ' + rhs.err };
+    if(!rhs.ok) return { ok: false, err: tt('block.equation-system.parser.rightSide', { err: rhs.err }) };
     const coeffs = varNames.map((_, i) => lhs.coeffs[i] - rhs.coeffs[i]);
     const constant = rhs.constant - lhs.constant;
     return { ok: true, coeffs, rhs: constant };
@@ -110,28 +116,31 @@
   // High-level: parse a variant and return either parsed-system or err
   function analyzeVariant(equationsText, namesText){
     const names = String(namesText || '').split(',').map(s => s.trim()).filter(Boolean);
-    if(names.length < 1) return { ok: false, err: 'keine Variablen definiert' };
-    if(names.length > 4) return { ok: false, err: 'höchstens 4 Variablen unterstützt' };
-    if(new Set(names).size !== names.length) return { ok: false, err: 'doppelte Variablennamen' };
+    if(names.length < 1) return { ok: false, err: tt('block.equation-system.parser.noVariables') };
+    if(names.length > 4) return { ok: false, err: tt('block.equation-system.parser.tooManyVariables') };
+    if(new Set(names).size !== names.length) return { ok: false, err: tt('block.equation-system.parser.duplicateVariables') };
     for(const v of names){
-      if(!/^[a-zA-Z_]\w*$/.test(v)) return { ok: false, err: 'ungültiger Variablenname "' + v + '"' };
+      if(!/^[a-zA-Z_]\w*$/.test(v)) return { ok: false, err: tt('block.equation-system.parser.invalidVariableName', { name: v }) };
     }
     const lines = String(equationsText || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    if(!lines.length) return { ok: false, err: 'keine Gleichung angegeben' };
+    if(!lines.length) return { ok: false, err: tt('block.equation-system.parser.noEquation') };
     // Don't reject m < n; solveSystem detects underdetermined cases by rank.
     const A = [], b = [], rawLines = [];
     for(let i = 0; i < lines.length; i++){
       const parsed = parseEquation(lines[i], names);
-      if(!parsed.ok) return { ok: false, err: 'Zeile ' + (i+1) + ': ' + parsed.err };
+      if(!parsed.ok) return { ok: false, err: tt('block.equation-system.parser.linePrefix', { line: (i+1), err: parsed.err }) };
       A.push(parsed.coeffs);
       b.push(parsed.rhs);
       rawLines.push(lines[i]);
     }
     const result = solveSystem(A, b);
-    if(result.kind === 'invalid') return { ok: false, err: 'System ungültig' };
-    if(result.kind === 'inconsistent') return { ok: false, err: 'Widerspruch in den Gleichungen; System ist nicht lösbar' };
+    if(result.kind === 'invalid') return { ok: false, err: tt('block.equation-system.parser.systemInvalid') };
+    if(result.kind === 'inconsistent') return { ok: false, err: tt('block.equation-system.parser.systemInconsistent') };
     if(result.kind === 'underdetermined'){
-      return { ok: false, err: 'nicht eindeutig lösbar (' + result.freeCount + ' freie Variable' + (result.freeCount === 1 ? '' : 'n') + ')' };
+      const key = result.freeCount === 1
+        ? 'block.equation-system.parser.underdeterminedOne'
+        : 'block.equation-system.parser.underdeterminedMany';
+      return { ok: false, err: tt(key, { count: result.freeCount }) };
     }
     return { ok: true, names, A, b, solution: result.solution, rawLines };
   }
@@ -170,8 +179,11 @@
   // Block registration
   Blocks.register('equation-system', {
     label: 'Gleichungssystem',
+    labelKey: 'block.equation-system.label',
     description: 'Lineares Gleichungssystem, zufällig generiert oder mit eigenen Varianten.',
+    descKey: 'block.equation-system.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: 'equation-system',
     graded: true,
     defaultConfig(){
@@ -196,37 +208,40 @@
     summary(cfg){
       if(cfg.mode === 'manual'){
         const c = (cfg.variants || []).length;
-        return c + ' Variante' + (c === 1 ? '' : 'n');
+        const key = c === 1
+          ? 'block.equation-system.summary.variantsCountOne'
+          : 'block.equation-system.summary.variantsCountMany';
+        return tt(key, { count: c });
       }
-      return (cfg.variableCount || 2) + ' Variablen, zufällig';
+      return tt('block.equation-system.summary.randomWithVars', { count: (cfg.variableCount || 2) });
     },
     validate(cfg){
       const w = [];
       if(cfg.mode === 'manual'){
         const variants = Array.isArray(cfg.variants) ? cfg.variants : [];
         if(!variants.length){
-          w.push('Manueller Modus: keine Variante angelegt.');
+          w.push(tt('block.equation-system.validate.manualNoVariants'));
           return w;
         }
         variants.forEach((v, i) => {
           const r = analyzeVariant(v.equations, v.variableNames);
-          if(!r.ok) w.push('Variante ' + (i+1) + ': ' + r.err);
+          if(!r.ok) w.push(tt('block.equation-system.validate.variantPrefix', { index: (i+1), err: r.err }));
         });
         return w;
       }
       // Random
       const n = Number(cfg.variableCount) || 2;
-      if(n < 2 || n > 3) w.push('Anzahl Variablen muss 2 oder 3 sein.');
+      if(n < 2 || n > 3) w.push(tt('block.equation-system.validate.varCountRange'));
       const lo = Number(cfg.coeffMin), hi = Number(cfg.coeffMax);
       if(cfg.coeffMin == null || cfg.coeffMax == null || !Number.isFinite(lo) || !Number.isFinite(hi) || lo >= hi){
-        w.push('Koeffizienten-Bereich ungültig.');
+        w.push(tt('block.equation-system.validate.coeffRangeInvalid'));
       }
       return w;
     },
     previewConfig(){
       return {
         blockTitle: '', mode: 'random', preset: 'custom',
-        question: 'Lösen Sie das folgende Gleichungssystem.',
+        question: tt('block.equation-system.preview.defaultQuestion'),
         variableCount: 2,
         variableNames: 'x,y',
         coeffMin: -5, coeffMax: 5,
@@ -241,66 +256,68 @@
       const isManual = c => (c.mode || 'random') === 'manual';
       const isCustom = c => isRandom(c) && (c.preset || 'custom') === 'custom';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Gleichungssystem' },
-        { key:'mode', label:'Modus', type:'select', options:[
-          { value:'random', label:'Zufällige Werte (Builder erzeugt das System)' },
-          { value:'manual', label:'Eigene Varianten (Sie schreiben das System)' }
-        ], help:'„Zufällig" generiert bei jedem Start neue Koeffizienten. „Eigene Varianten" wählt aus von Ihnen definierten Systemen.' },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.equation-system.field.blockTitle.label', type:'text', placeholder:'Gleichungssystem', placeholderKey:'block.equation-system.field.blockTitle.placeholder' },
+        { key:'mode', label:'Modus', labelKey:'block.equation-system.field.mode.label', type:'select', options:[
+          { value:'random', label:'Zufällige Werte (Builder erzeugt das System)', labelKey:'block.equation-system.field.mode.option.random' },
+          { value:'manual', label:'Eigene Varianten (Sie schreiben das System)', labelKey:'block.equation-system.field.mode.option.manual' }
+        ], help:'„Zufällig" generiert bei jedem Start neue Koeffizienten. „Eigene Varianten" wählt aus von Ihnen definierten Systemen.', helpKey:'block.equation-system.field.mode.help' },
 
         // Random mode
-        { key:'preset', label:'Vorlage', type:'select', options:[
-          { value:'custom',     label:'Manuell (leer)' },
-          { value:'simple-2',   label:'Beispiel: 2 Variablen, kleine Zahlen' },
-          { value:'standard-2', label:'Beispiel: 2 Variablen, Standard-Bereich' },
-          { value:'standard-3', label:'Beispiel: 3 Variablen' }
+        { key:'preset', label:'Vorlage', labelKey:'block.equation-system.field.preset.label', type:'select', options:[
+          { value:'custom',     label:'Manuell (leer)', labelKey:'block.equation-system.field.preset.option.custom' },
+          { value:'simple-2',   label:'Beispiel: 2 Variablen, kleine Zahlen', labelKey:'block.equation-system.field.preset.option.simple-2' },
+          { value:'standard-2', label:'Beispiel: 2 Variablen, Standard-Bereich', labelKey:'block.equation-system.field.preset.option.standard-2' },
+          { value:'standard-3', label:'Beispiel: 3 Variablen', labelKey:'block.equation-system.field.preset.option.standard-3' }
         ], showIf: isRandom },
-        { type:'action', label:'Zurücksetzen', action:'reset', showIf: isCustom },
+        { type:'action', label:'Zurücksetzen', labelKey:'block.equation-system.field.reset.label', action:'reset', showIf: isCustom },
 
-        { type:'section', label:'Frage', key:'_sec_q' },
-        { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2 },
+        { type:'section', label:'Frage', labelKey:'block.equation-system.field._sec_q.label', key:'_sec_q' },
+        { key:'question', label:'Aufgabentext', labelKey:'block.equation-system.field.question.label', type:'math-textarea', rows:2 },
 
-        { type:'section', label:'System (zufällig)', key:'_sec_sys', showIf: isCustom },
-        { key:'variableCount', label:'Anzahl Variablen (2 oder 3)', type:'number', step:1, min:2, max:3, showIf: isCustom },
-        { key:'variableNames', label:'Variablennamen (Komma-getrennt)', type:'text', placeholder:'x,y oder x,y,z', showIf: isCustom },
+        { type:'section', label:'System (zufällig)', labelKey:'block.equation-system.field._sec_sys.label', key:'_sec_sys', showIf: isCustom },
+        { key:'variableCount', label:'Anzahl Variablen (2 oder 3)', labelKey:'block.equation-system.field.variableCount.label', type:'number', step:1, min:2, max:3, showIf: isCustom },
+        { key:'variableNames', label:'Variablennamen (Komma-getrennt)', labelKey:'block.equation-system.field.variableNames.label', type:'text', placeholder:'x,y oder x,y,z', placeholderKey:'block.equation-system.field.variableNames.placeholder', showIf: isCustom },
 
-        { type:'section', label:'Wertebereiche', key:'_sec_ranges', showIf: isCustom },
-        { key:'coeffMin', label:'Koeffizient Min', type:'number', step:1, showIf: isCustom },
-        { key:'coeffMax', label:'Koeffizient Max', type:'number', step:1, showIf: isCustom },
-        { key:'solutionMin', label:'Lösung Min', type:'number', step:1, showIf: isCustom },
-        { key:'solutionMax', label:'Lösung Max', type:'number', step:1, showIf: isCustom },
-        { key:'integerSolution', label:'Lösungen sind ganzzahlig', type:'boolean', showIf: isCustom },
+        { type:'section', label:'Wertebereiche', labelKey:'block.equation-system.field._sec_ranges.label', key:'_sec_ranges', showIf: isCustom },
+        { key:'coeffMin', label:'Koeffizient Min', labelKey:'block.equation-system.field.coeffMin.label', type:'number', step:1, showIf: isCustom },
+        { key:'coeffMax', label:'Koeffizient Max', labelKey:'block.equation-system.field.coeffMax.label', type:'number', step:1, showIf: isCustom },
+        { key:'solutionMin', label:'Lösung Min', labelKey:'block.equation-system.field.solutionMin.label', type:'number', step:1, showIf: isCustom },
+        { key:'solutionMax', label:'Lösung Max', labelKey:'block.equation-system.field.solutionMax.label', type:'number', step:1, showIf: isCustom },
+        { key:'integerSolution', label:'Lösungen sind ganzzahlig', labelKey:'block.equation-system.field.integerSolution.label', type:'boolean', showIf: isCustom },
 
         // Manual mode
-        { type:'section', label:'Varianten', key:'_sec_var', showIf: isManual,
-          help:'Pro „Neu generieren" wird zufällig eine Variante gewählt. Jede Variante wird live geprüft. Die Zusammenfassung zeigt die berechnete Lösung oder eine Warnung, falls das System nicht eindeutig lösbar ist.' },
-        { key:'variants', type:'list', itemLabel:'Variante', showIf: isManual,
+        { type:'section', label:'Varianten', labelKey:'block.equation-system.field._sec_var.label', key:'_sec_var', showIf: isManual,
+          help:'Pro „Neu generieren" wird zufällig eine Variante gewählt. Jede Variante wird live geprüft. Die Zusammenfassung zeigt die berechnete Lösung oder eine Warnung, falls das System nicht eindeutig lösbar ist.', helpKey:'block.equation-system.field._sec_var.help' },
+        { key:'variants', type:'list', itemLabel:'Variante', itemLabelKey:'block.equation-system.field.variants.itemLabel', labelKey:'block.equation-system.field.variants.label', label:'Varianten', showIf: isManual,
           itemSummary: item => {
             const r = analyzeVariant(item && item.equations, item && item.variableNames);
             if(r.ok) return '✓  ' + formatSolution(r.names, r.solution);
             return '⚠  ' + r.err;
           },
           itemSchema: [
-            { key:'variableNames', label:'Variablen (Komma-getrennt)', type:'text', placeholder:'x,y', default:'x,y' },
-            { key:'equations', label:'Gleichungen (eine pro Zeile)', type:'textarea', rows:4,
-              placeholder:'2x + 3y = 7\nx - y = 1',
-              help:'Beispiele: „2x + 3y = 7", „x = 5", „-0.5x + y = 2", „2x = y + 1". Multiplikation muss nicht mit * geschrieben werden.' }
+            { key:'variableNames', label:'Variablen (Komma-getrennt)', labelKey:'block.equation-system.field.variants.item.variableNames.label', type:'text', placeholder:'x,y', placeholderKey:'block.equation-system.field.variants.item.variableNames.placeholder', default:'x,y' },
+            { key:'equations', label:'Gleichungen (eine pro Zeile)', labelKey:'block.equation-system.field.variants.item.equations.label', type:'textarea', rows:4,
+              placeholder:'2x + 3y = 7\nx - y = 1', placeholderKey:'block.equation-system.field.variants.item.equations.placeholder',
+              help:'Beispiele: „2x + 3y = 7", „x = 5", „-0.5x + y = 2", „2x = y + 1". Multiplikation muss nicht mit * geschrieben werden.', helpKey:'block.equation-system.field.variants.item.equations.help' }
           ]
         },
 
-        { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'tolerance', label:'Toleranz pro Variable', type:'number', step:0.01 },
-        { key:'maxPoints', label:'Punkte (gesamt)', type:'number', step:1, min:1 },
+        { type:'section', label:'Bewertung', labelKey:'block.equation-system.field._sec_score.label', key:'_sec_score' },
+        { key:'tolerance', label:'Toleranz pro Variable', labelKey:'block.equation-system.field.tolerance.label', type:'number', step:0.01 },
+        { key:'maxPoints', label:'Punkte (gesamt)', labelKey:'block.equation-system.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
     mount(host, config, api){
       const u = window.BlockUtils;
+      const t = api.utils.t;
+      const l = api.utils.l;
       const mode = (config.mode || 'random');
       if(mode === 'random') config = applyPreset(config);
 
       const ui = u.simpleQuestionCard(host, {
-        title: config.blockTitle || 'Gleichungssystem',
-        question: config.question || ''
+        title: l(config.blockTitle) || t('block.equation-system.defaultTitle'),
+        question: l(config.question) || ''
       });
       const { content, buttons, fb } = ui;
 
@@ -358,7 +375,7 @@
         }
         // No non-singular matrix in the configured range (e.g. coeffMin =
         // coeffMax = 0): mark the system as empty so renderSystem shows the
-        // "Kein gültiges Gleichungssystem konfiguriert"-warning.
+        // "no valid system configured" warning.
         if(!foundA){
           A = []; b = []; solution = []; names = [];
           return;
@@ -387,7 +404,7 @@
         });
         if(!valid.length){
           A = []; b = []; solution = []; names = [];
-          return { ok: false, err: 'Keine gültige Variante konfiguriert.' };
+          return { ok: false, err: t('block.equation-system.noValidVariant') };
         }
         const pick = valid[Math.floor(Math.random() * valid.length)];
         A = pick.A; b = pick.b; solution = pick.solution; names = pick.names;
@@ -400,7 +417,7 @@
         if(!A.length){
           const warn = document.createElement('div');
           warn.className = 'eqsys-warn';
-          warn.textContent = extraMsg || 'Kein gültiges Gleichungssystem konfiguriert.';
+          warn.textContent = extraMsg || t('block.equation-system.noValidSystem');
           warn.style.cssText = 'padding:0.6rem 0.8rem; background:#fff3cd; border:1px solid #ffc107; border-radius:6px; color:#856404;';
           content.appendChild(warn);
           return;
@@ -426,7 +443,7 @@
           const inp = document.createElement('input');
           inp.type = 'text';
           inp.className = 'text-input eqsys-input';
-          inp.placeholder = 'Zahl oder Bruch';
+          inp.placeholder = t('block.equation-system.inputPlaceholder');
           row.appendChild(lbl); row.appendChild(inp);
           inputWrap.appendChild(row);
           inputs.push(inp);
@@ -453,17 +470,17 @@
       const tol = Number(config.tolerance) || 0.01;
       const checkBtn = document.createElement('button');
       checkBtn.type = 'button'; checkBtn.className = 'btn btn-primary';
-      checkBtn.textContent = 'Korrektur';
+      checkBtn.textContent = t('common.check');
       const newBtn = document.createElement('button');
       newBtn.type = 'button'; newBtn.className = 'btn btn-secondary';
-      newBtn.textContent = 'Neu generieren';
+      newBtn.textContent = t('common.regenerate');
       buttons.appendChild(checkBtn); buttons.appendChild(newBtn);
 
       checkBtn.addEventListener('click', () => {
         if(!inputs.length) return;
         // No variable entered at all: prompt instead of recording a 0.
         if(inputs.every(inp => String(inp.value || '').trim() === '')){
-          fb.bad('Bitte mindestens eine Variable eingeben.');
+          fb.bad(t('block.equation-system.enterAtLeastOne'));
           return;
         }
         let correct = 0;
@@ -481,15 +498,15 @@
         const max = Number(config.maxPoints) || n;
         const pts = Math.round((correct / n) * max * 100) / 100;
         if(correct === n){
-          fb.ok('Alle Variablen korrekt. ' + max + ' / ' + max + ' Punkte. Lösung: ' + formatSolution(names, solution));
+          fb.ok(t('block.equation-system.allCorrect', { max: max, solution: formatSolution(names, solution) }));
         } else {
-          fb.bad(correct + ' von ' + n + ' korrekt. ' + pts + ' / ' + max + ' Punkte. Erwartet: ' + formatSolution(names, solution));
+          fb.bad(t('block.equation-system.partialCorrect', { correct: correct, total: n, pts: pts, max: max, solution: formatSolution(names, solution) }));
         }
         api.reportScore(pts);
       });
       newBtn.addEventListener('click', () => {
         const ok = generate();
-        if(ok) fb.neutral('Neues System generiert.');
+        if(ok) fb.neutral(t('block.equation-system.newSystemGenerated'));
       });
       window.BlockUtils.regenPolicy(newBtn, config, api);
 
@@ -498,13 +515,16 @@
       return {};
     },
     preview(host, config){
+      const u = window.BlockUtils;
+      const t = u.t;
+      const l = u.l;
       const card = document.createElement('div');
       card.className = 'bp-card';
       const h3 = document.createElement('h3');
-      h3.textContent = 'Frage';
+      h3.textContent = t('common.question');
       card.appendChild(h3);
       const q = document.createElement('p');
-      q.textContent = config.question || 'Lösen Sie das folgende Gleichungssystem.';
+      q.textContent = l(config.question) || t('block.equation-system.defaultQuestion');
       card.appendChild(q);
 
       // Static example (x=4, y=1). Inline styles so preview works without runtime CSS.
@@ -528,7 +548,7 @@
       card.appendChild(inputs);
 
       const btn = document.createElement('span');
-      btn.textContent = 'Korrektur';
+      btn.textContent = t('common.check');
       btn.className = 'bp-btn';
       btn.style.marginTop = '0.8rem';
       btn.style.display = 'inline-block';

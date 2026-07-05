@@ -2,8 +2,11 @@
   'use strict';
   Blocks.register('vector-question', {
     label: 'Vektor 2D ablesen',
+    labelKey: 'block.vector-question.label',
     description: '2D-Vektor: Komponenten, Betrag, Winkel ablesen.',
+    descKey: 'block.vector-question.description',
     category: 'MINT',
+    categoryKey: 'block.category.mint',
     icon: '→',
     graded: true,
     defaultConfig(){
@@ -19,50 +22,55 @@
         maxPoints: 1
       };
     },
-    summary(cfg){ return ((cfg.pool || []).length) + ' Vektoren im Pool'; },
+    summary(cfg){
+      const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
+      return t('block.vector-question.summary', { count: (cfg.pool || []).length });
+    },
     builderSchema(){
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Vektor-Aufgabe' },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.vector-question.field.blockTitle.label', type:'text', placeholder:'Vektor-Aufgabe', placeholderKey:'block.vector-question.field.blockTitle.placeholder' },
         // Vektor-Pool
-        { key:'pool', label:'Vektor-Pool', type:'list', itemLabel:'Vektor',
+        { key:'pool', label:'Vektor-Pool', labelKey:'block.vector-question.field.pool.label', type:'list', itemLabel:'Vektor', itemLabelKey:'block.vector-question.field.pool.itemLabel',
           itemSummary: item => 'v = (' + (item.x ?? '?') + ',  ' + (item.y ?? '?') + ')',
           itemSchema:[
-            { key:'x', label:'x-Komponente', type:'number', step:'any' },
-            { key:'y', label:'y-Komponente', type:'number', step:'any' }
+            { key:'x', label:'x-Komponente', labelKey:'block.vector-question.field.pool.item.x.label', type:'number', step:'any' },
+            { key:'y', label:'y-Komponente', labelKey:'block.vector-question.field.pool.item.y.label', type:'number', step:'any' }
           ]},
-        { key:'randomize', label:'Vektor zufällig wählen', type:'boolean' },
+        { key:'randomize', label:'Vektor zufällig wählen', labelKey:'block.vector-question.field.randomize.label', type:'boolean' },
         // Query options
-        { type:'section', label:'Abfrage', key:'_sec_query' },
-        { key:'questionMode', label:'Was wird gefragt?', type:'select', options:[
-          {value:'all',         label:'Komponenten, Betrag und Winkel'},
-          {value:'components',  label:'Nur Komponenten  (x, y)'},
-          {value:'magnitude',   label:'Nur Betrag  |v|'},
-          {value:'angle',       label:'Nur Winkel  φ'},
-          {value:'unit-vector', label:'Einheitsvektor  v̂  (v / |v|)'}
+        { type:'section', label:'Abfrage', labelKey:'block.vector-question.field._sec_query.label', key:'_sec_query' },
+        { key:'questionMode', label:'Was wird gefragt?', labelKey:'block.vector-question.field.questionMode.label', type:'select', options:[
+          {value:'all',         label:'Komponenten, Betrag und Winkel', labelKey:'block.vector-question.field.questionMode.option.all'},
+          {value:'components',  label:'Nur Komponenten  (x, y)',        labelKey:'block.vector-question.field.questionMode.option.components'},
+          {value:'magnitude',   label:'Nur Betrag  |v|',                labelKey:'block.vector-question.field.questionMode.option.magnitude'},
+          {value:'angle',       label:'Nur Winkel  φ',                  labelKey:'block.vector-question.field.questionMode.option.angle'},
+          {value:'unit-vector', label:'Einheitsvektor  v̂  (v / |v|)',   labelKey:'block.vector-question.field.questionMode.option.unit-vector'}
         ]},
         // Felder & Toleranzen
-        { type:'section', label:'Felder & Toleranzen', key:'_sec_fields' },
-        { key:'fields', label:'Felder individuell ein-/ausblenden',
+        { type:'section', label:'Felder & Toleranzen', labelKey:'block.vector-question.field._sec_fields.label', key:'_sec_fields' },
+        { key:'fields', label:'Felder individuell ein-/ausblenden', labelKey:'block.vector-question.field.fields.label',
           help:'Nur bei „Komponenten, Betrag und Winkel" relevant. Alle anderen Modi legen die Felder fest.',
+          helpKey:'block.vector-question.field.fields.help',
           type:'group', schema:[
-            { key:'x',     label:'x',      type:'boolean' },
-            { key:'y',     label:'y',      type:'boolean' },
-            { key:'mag',   label:'|v|',    type:'boolean' },
-            { key:'angle', label:'Winkel', type:'boolean' }
+            { key:'x',     label:'x',      labelKey:'block.vector-question.field.fields.item.x.label',     type:'boolean' },
+            { key:'y',     label:'y',      labelKey:'block.vector-question.field.fields.item.y.label',     type:'boolean' },
+            { key:'mag',   label:'|v|',    labelKey:'block.vector-question.field.fields.item.mag.label',   type:'boolean' },
+            { key:'angle', label:'Winkel', labelKey:'block.vector-question.field.fields.item.angle.label', type:'boolean' }
           ], showIf: c => (c.questionMode || 'all') === 'all' },
-        { key:'angleUnit', label:'Winkel-Einheit', type:'select', options:[
-          {value:'deg', label:'Grad (°)'}, {value:'rad', label:'Radiant (rad)'}
+        { key:'angleUnit', label:'Winkel-Einheit', labelKey:'block.vector-question.field.angleUnit.label', type:'select', options:[
+          {value:'deg', label:'Grad (°)',      labelKey:'block.vector-question.field.angleUnit.option.deg'},
+          {value:'rad', label:'Radiant (rad)', labelKey:'block.vector-question.field.angleUnit.option.rad'}
         ], showIf: c => ['all','angle'].includes(c.questionMode || 'all') },
-        { key:'tolerances', label:'Toleranzen  (±)', type:'group', schema:[
-          { key:'x',     label:'x',      type:'number', step:'any' },
-          { key:'y',     label:'y',      type:'number', step:'any' },
-          { key:'mag',   label:'|v|',    type:'number', step:'any' },
-          { key:'angle', label:'Winkel', type:'number', step:'any' }
+        { key:'tolerances', label:'Toleranzen  (±)', labelKey:'block.vector-question.field.tolerances.label', type:'group', schema:[
+          { key:'x',     label:'x',      labelKey:'block.vector-question.field.tolerances.item.x.label',     type:'number', step:'any' },
+          { key:'y',     label:'y',      labelKey:'block.vector-question.field.tolerances.item.y.label',     type:'number', step:'any' },
+          { key:'mag',   label:'|v|',    labelKey:'block.vector-question.field.tolerances.item.mag.label',   type:'number', step:'any' },
+          { key:'angle', label:'Winkel', labelKey:'block.vector-question.field.tolerances.item.angle.label', type:'number', step:'any' }
         ]},
         // Display & scoring
-        { type:'section', label:'Darstellung & Bewertung', key:'_sec_score' },
-        { key:'plotRange', label:'Plot-Bereich (±)', type:'number', step:'any' },
-        { key:'maxPoints', label:'Punkte',            type:'number', step:1, min:1 },
+        { type:'section', label:'Darstellung & Bewertung', labelKey:'block.vector-question.field._sec_score.label', key:'_sec_score' },
+        { key:'plotRange', label:'Plot-Bereich (±)', labelKey:'block.vector-question.field.plotRange.label', type:'number', step:'any' },
+        { key:'maxPoints', label:'Punkte',           labelKey:'block.vector-question.field.maxPoints.label', type:'number', step:1, min:1 },
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -74,9 +82,10 @@
 
       const grid = document.createElement('section'); grid.className = 'content-grid';
       const plotCard = document.createElement('article'); plotCard.className = 'section-card plot-card';
-      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(config.blockTitle || 'Vektor-Plot') + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>v</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">Frage</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
+      const plotTitle = u.l(config.blockTitle) || u.t('block.vector-question.plotTitle');
+      plotCard.innerHTML = '<div class="card-header"><h3>' + u.escapeHtml(plotTitle) + '</h3><div class="legend"><span class="legend-item"><span class="swatch swatch-blue"></span>v</span></div></div><div class="plot-host-wrap square-plot-wrap"><div class="plot-host" id="' + api.blockId + '_plot" role="img"></div></div><div class="formula-box" style="margin-top:1rem"><div class="formula-title">' + u.escapeHtml(u.t('common.question')) + '</div><div class="formula-text" id="' + api.blockId + '_q"></div></div>';
       const controls = document.createElement('aside'); controls.className = 'section-card controls-card';
-      controls.appendChild(Object.assign(document.createElement('h3'), {textContent:'Eingabe'}));
+      controls.appendChild(Object.assign(document.createElement('h3'), {textContent: u.t('block.vector-question.inputHeading')}));
       const stack = document.createElement('div'); stack.className = 'input-stack';
       controls.appendChild(stack);
       const inputs = {};
@@ -89,14 +98,20 @@
         grp.appendChild(inp); stack.appendChild(grp); inputs[key] = inp;
       }
       const isUnit = config.questionMode === 'unit-vector';
-      if(fields.x) addInput('x', isUnit ? 'v̂ₓ' : 'x', isUnit ? 'z. B. 0.832' : 'z. B. 3');
-      if(fields.y) addInput('y', isUnit ? 'v̂ᵧ' : 'y', isUnit ? 'z. B. 0.555' : 'z. B. 2');
-      if(fields.mag) addInput('mag', '|v|', 'z. B. 3.61');
-      if(fields.angle) addInput('angle', 'α' + (config.angleUnit==='deg'?' (Grad)':' (rad)'), config.angleUnit==='deg' ? 'z. B. 33.7' : 'z. B. pi/6');
+      const angleLabel = config.angleUnit === 'deg'
+        ? u.t('block.vector-question.input.angleDeg')
+        : u.t('block.vector-question.input.angleRad');
+      const anglePlaceholder = config.angleUnit === 'deg'
+        ? u.t('block.vector-question.placeholder.angleDeg')
+        : u.t('block.vector-question.placeholder.angleRad');
+      if(fields.x) addInput('x', isUnit ? 'v̂ₓ' : 'x', isUnit ? u.t('block.vector-question.placeholder.unitX') : u.t('block.vector-question.placeholder.x'));
+      if(fields.y) addInput('y', isUnit ? 'v̂ᵧ' : 'y', isUnit ? u.t('block.vector-question.placeholder.unitY') : u.t('block.vector-question.placeholder.y'));
+      if(fields.mag) addInput('mag', '|v|', u.t('block.vector-question.placeholder.mag'));
+      if(fields.angle) addInput('angle', angleLabel, anglePlaceholder);
 
       const btnRow = document.createElement('div'); btnRow.className = 'button-cluster';
-      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
-      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent='Neu generieren';
+      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent = u.t('common.check');
+      const newBtn = document.createElement('button'); newBtn.type='button'; newBtn.className='btn btn-secondary'; newBtn.textContent = u.t('common.regenerate');
       btnRow.appendChild(checkBtn); btnRow.appendChild(newBtn);
       controls.appendChild(btnRow);
       const fb = u.feedbackBox(controls);
@@ -122,19 +137,19 @@
           lines: [{x1:0,y1:0,x2:current.x,y2:current.y, stroke:'#1565ff', strokeWidth:4}],
           points: [{x:current.x, y:current.y, label:'v'}]
         });
-        plotCard.querySelector('#' + api.blockId + '_q').textContent = vectorQuestionText(config);
+        plotCard.querySelector('#' + api.blockId + '_q').textContent = vectorQuestionText(config, u);
       }
       function chooseNew(){
         current = pickInstance();
         Object.values(inputs).forEach(i => i.value = '');
-        fb.neutral('Neue Aufgabe generiert.');
+        fb.neutral(u.t('block.vector-question.feedback.newGenerated'));
         renderPlot();
       }
       function grade(){
         // No input at all: prompt instead of recording a 0.
         const activeKeys = ['x','y','mag','angle'].filter(k => fields[k]);
         if(activeKeys.every(k => String(inputs[k].value || '').trim() === '')){
-          fb.bad('Bitte mindestens ein Feld ausfüllen.');
+          fb.bad(u.t('block.vector-question.feedback.fillAtLeastOne'));
           return;
         }
         const parts = []; let okCount = 0, totalActive = 0;
@@ -142,12 +157,12 @@
           if(!fields[key]) return;
           totalActive++;
           const v = parser(inputs[key].value);
-          if(v == null || !Number.isFinite(v)){ parts.push(label + ' fehlt.'); return; }
+          if(v == null || !Number.isFinite(v)){ parts.push(u.t('block.vector-question.feedback.fieldMissing', { field: label })); return; }
           let ok;
           if(key === 'angle' && config.angleUnit !== 'deg') ok = u.angleEqual(v, expected, tolerance);
           else if(key === 'angle') ok = Math.abs(((v - expected + 540) % 360) - 180) <= tolerance;
           else ok = u.nearlyEqual(v, expected, tolerance);
-          parts.push(ok ? (label + ' richtig.') : (label + ' noch nicht richtig.'));
+          parts.push(ok ? u.t('block.vector-question.feedback.fieldCorrect', { field: label }) : u.t('block.vector-question.feedback.fieldWrong', { field: label }));
           if(ok) okCount++;
         }
         const expectedX = config.questionMode === 'unit-vector' ? current.unitX : current.x;
@@ -155,14 +170,14 @@
         check('x', u.parseNum, expectedX, tol.x, 'x');
         check('y', u.parseNum, expectedY, tol.y, 'y');
         check('mag', u.parseNum, current.mag, tol.mag, '|v|');
-        check('angle', config.angleUnit === 'deg' ? u.parseNum : u.parseAngle, current.angle, tol.angle, 'Winkel');
+        check('angle', config.angleUnit === 'deg' ? u.parseNum : u.parseAngle, current.angle, tol.angle, u.t('block.vector-question.label.angle'));
         const maxPoints = config.maxPoints || 1;
         const ratio = totalActive > 0 ? okCount / totalActive : 0;
         const pts = Math.round(ratio * maxPoints * 100) / 100;
         api.reportScore(pts);
-        if(okCount === totalActive) fb.ok('Korrekt. ' + pts + ' / ' + maxPoints + ' Punkte.');
-        else if(okCount > 0) fb.neutral('Teilweise richtig (' + okCount + ' von ' + totalActive + '): ' + pts + ' / ' + maxPoints + ' Punkte. ' + parts.join(' '));
-        else fb.bad('0 / ' + maxPoints + ' Punkte. ' + parts.join(' '));
+        if(okCount === totalActive) fb.ok(u.t('feedback.correctScored', { pts: pts, max: maxPoints }));
+        else if(okCount > 0) fb.neutral(u.t('block.vector-question.feedback.partialDetailed', { ok: okCount, total: totalActive, pts: pts, max: maxPoints, details: parts.join(' ') }));
+        else fb.bad(u.t('block.vector-question.feedback.zeroDetailed', { max: maxPoints, details: parts.join(' ') }));
       }
       checkBtn.addEventListener('click', grade);
       newBtn.addEventListener('click', chooseNew);
@@ -172,6 +187,7 @@
       return {};
     },
     preview(host, config){
+      const BU = window.BlockUtils;
       const v = (config.pool || [])[0] || {x:3, y:2};
       const R = config.plotRange || 5.5;
       const W = 300, H = 220, P = 22;
@@ -187,9 +203,9 @@
       const ns = 'http://www.w3.org/2000/svg';
       const wrap = document.createElement('div');
       wrap.style.cssText = 'padding:0.4rem 0.7rem; font-size:0.78rem; display:flex; flex-direction:column; height:100%; gap:0.25rem; overflow:hidden;';
-      const tag = document.createElement('div'); tag.textContent = '→  Vektor 2D ablesen'; tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700;';
+      const tag = document.createElement('div'); tag.textContent = '→  ' + BU.t('block.vector-question.label'); tag.style.cssText = 'color:#84bf66; font-size:0.72rem; font-weight:700;';
       wrap.appendChild(tag);
-      const qline = document.createElement('div'); qline.textContent = vectorQuestionText(config); qline.style.cssText = 'color:#003b5c; font-size:0.75rem; font-weight:600; margin-bottom:0.15rem;';
+      const qline = document.createElement('div'); qline.textContent = vectorQuestionText(config, BU); qline.style.cssText = 'color:#003b5c; font-size:0.75rem; font-weight:600; margin-bottom:0.15rem;';
       wrap.appendChild(qline);
       const svg = document.createElementNS(ns, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -230,13 +246,14 @@
     }
   }
 
-  function vectorQuestionText(config){
+  function vectorQuestionText(config, u){
+    const src = u || window.BlockUtils;
     switch(config.questionMode || 'all'){
-      case 'components': return 'Lesen Sie die Komponenten x und y des Vektors ab.';
-      case 'magnitude': return 'Bestimmen Sie den Betrag |v| des Vektors.';
-      case 'angle': return 'Bestimmen Sie den Winkel des Vektors zur positiven x-Achse.';
-      case 'unit-vector': return 'Bestimmen Sie den Einheitsvektor v̂ = v / |v|.';
-      default: return 'Lesen Sie Komponenten, Betrag und Winkel des Vektors ab.';
+      case 'components': return src.t('block.vector-question.question.components');
+      case 'magnitude': return src.t('block.vector-question.question.magnitude');
+      case 'angle': return src.t('block.vector-question.question.angle');
+      case 'unit-vector': return src.t('block.vector-question.question.unitVector');
+      default: return src.t('block.vector-question.question.all');
     }
   }
 })();

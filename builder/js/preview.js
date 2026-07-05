@@ -2,6 +2,7 @@
 // Falls back to def.preview() or a text summary when mount() isn't usable.
 import { state } from './state.js';
 import { blockSummary } from './canvas.js';
+import { t } from './i18n.js';
 
 // Cached runtime stylesheet, injected into each shadow root.
 let _runtimeStylesText = null;
@@ -10,7 +11,7 @@ let _runtimeStylesPromise = null;
 async function fetchTextRelOnce(path){
   const url = 'template/' + path + '?t=' + Date.now();
   const r = await fetch(url);
-  if(!r.ok) throw new Error('Konnte Template-Datei nicht laden: ' + path);
+  if(!r.ok) throw new Error(t('io.error.templateLoad', { path }));
   return r.text();
 }
 

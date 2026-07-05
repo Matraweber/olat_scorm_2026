@@ -2348,3 +2348,88 @@ select.comp-formula-btn { font-size: 0.78rem; }
 }
 /* Help button styled like the sidebar-toggle */
 .header-help-btn { margin-right: 0.15rem; }
+
+/* Editor-locale toggle in the block-config pane (multi-language content). */
+.editor-locale-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  margin: 0.35rem 0 0.8rem;
+  background: var(--panel-soft, #f5f8fa);
+  border: 1px solid var(--line, #d8e0e6);
+  border-radius: 8px;
+}
+.editor-locale-toggle-label {
+  font-size: 0.78rem;
+  color: var(--muted, #5d6872);
+  font-weight: 600;
+}
+.editor-locale-btn {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--line, #d8e0e6);
+  background: #fff;
+  color: var(--primary, #003b5c);
+  border-radius: 6px;
+  font: inherit;
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.editor-locale-btn.active {
+  background: var(--primary, #003b5c);
+  border-color: var(--primary, #003b5c);
+  color: #fff;
+}
+.editor-locale-btn:hover:not(.active) {
+  background: rgba(0,59,92,0.06);
+}
+
+/* Placeholder hint below a field showing the source-locale value while the
+   author edits the second locale. */
+.field-i18n-hint {
+  font-size: 0.72rem;
+  color: var(--muted, #5d6872);
+  margin: 0.25rem 0 0;
+  padding: 0.25rem 0.4rem;
+  border-left: 2px solid var(--accent, #a1d884);
+  background: rgba(161,216,132,0.08);
+  border-radius: 3px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Language switcher in the header. Icon-button shape with a two-letter code
+   label plus a small chevron, popover mirrors the file-menu look. */
+.header-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.55rem;
+  min-width: 3.2rem;
+  height: 2rem;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+.header-lang-label { line-height: 1; }
+.header-lang-popover { min-width: 12rem; }
+.header-lang-popover .header-menu-section-label {
+  margin: 0 0 0.35rem;
+}
+.header-lang-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0.7rem;
+}
+.header-lang-item.active {
+  background: rgba(0,59,92,0.08);
+  color: var(--primary);
+}
+.header-lang-item.active .header-menu-label::before {
+  content: "\2713\00a0";
+  color: var(--primary);
+}

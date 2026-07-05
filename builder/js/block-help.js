@@ -10,298 +10,300 @@
 // All texts in German for end users. Keep them short. If a block has no
 // entry the help box simply does not render.
 
+import { t } from './i18n.js';
+
 export const BLOCK_HELP = {
   // Medien & Inhalt
-  'heading': {
-    summary: 'Überschrift. Strukturiert die Aufgabe und gibt thematische Kapitel an.',
+  get 'heading'(){ return {
+    summary: t('blockHelp.heading.summary'),
     steps: [
-      'Text in das Feld eintragen.',
-      'Größe nach Bedarf wählen (H2 ist Standard für Unterabschnitte).'
+      t('blockHelp.heading.steps.1'),
+      t('blockHelp.heading.steps.2')
     ]
-  },
-  'rich-text': {
-    summary: 'Fließtext mit einfachen Formatierungen (Fett, Kursiv, Listen, Links).',
+  }; },
+  get 'rich-text'(){ return {
+    summary: t('blockHelp.richText.summary'),
     steps: [
-      'Inhalt in den Editor schreiben.',
-      'Formatierungs-Toolbar oben für Hervorhebungen verwenden.'
+      t('blockHelp.richText.steps.1'),
+      t('blockHelp.richText.steps.2')
     ],
     tips: [
-      'Für Formeln innerhalb des Textes Dollarzeichen wie in LaTeX nutzen, z. B. $a^2 + b^2 = c^2$.'
+      t('blockHelp.richText.tips.1')
     ]
-  },
-  'note-box': {
-    summary: 'Farbig hinterlegter Hinweis-Kasten, um wichtige Punkte vom Fließtext abzuheben.',
+  }; },
+  get 'note-box'(){ return {
+    summary: t('blockHelp.noteBox.summary'),
     steps: [
-      'Stil wählen: Info, Warnung, Tipp oder Definition.',
-      'Text eintragen.'
+      t('blockHelp.noteBox.steps.1'),
+      t('blockHelp.noteBox.steps.2')
     ]
-  },
-  'image': {
-    summary: 'Eingebettetes Bild. Wird als Data-URL ins SCORM-Paket aufgenommen.',
+  }; },
+  get 'image'(){ return {
+    summary: t('blockHelp.image.summary'),
     steps: [
-      'Datei auswählen oder per Drag-and-Drop auf die Canvas ziehen.',
-      'Alt-Text für Barrierefreiheit eintragen.'
+      t('blockHelp.image.steps.1'),
+      t('blockHelp.image.steps.2')
     ],
     tips: [
-      'Bilder über 2 MB sollten vorher komprimiert werden, sonst wächst das ZIP unnötig.'
+      t('blockHelp.image.tips.1')
     ]
-  },
-  'audio': {
-    summary: 'Audio-Player mit Standard-Browser-Controls.',
+  }; },
+  get 'audio'(){ return {
+    summary: t('blockHelp.audio.summary'),
     steps: [
-      'Audio-Datei hochladen (mp3, ogg, wav).',
-      'Optional: Beschriftung eintragen.'
+      t('blockHelp.audio.steps.1'),
+      t('blockHelp.audio.steps.2')
     ]
-  },
-  'video': {
-    summary: 'Video-Player. Lokale Datei oder YouTube/Vimeo-Embed.',
+  }; },
+  get 'video'(){ return {
+    summary: t('blockHelp.video.summary'),
     steps: [
-      'Bei lokalem Video: Datei hochladen (mp4 empfohlen).',
-      'Bei YouTube/Vimeo: kompletten Link einfügen, der Builder erkennt das Format automatisch.'
+      t('blockHelp.video.steps.1'),
+      t('blockHelp.video.steps.2')
     ],
     tips: [
-      'Lokale Videos über 10 MB blähen das SCORM-ZIP stark auf. YouTube/Vimeo-Links sind in der Größe unbegrenzt.'
+      t('blockHelp.video.tips.1')
     ]
-  },
-  'file-download': {
-    summary: 'Liste herunterladbarer Dateien (PDFs, Arbeitsblätter, Code-Beispiele).',
+  }; },
+  get 'file-download'(){ return {
+    summary: t('blockHelp.fileDownload.summary'),
     steps: [
-      'Pro Datei eine Zeile anlegen, Datei hochladen, Beschriftung eintragen.'
+      t('blockHelp.fileDownload.steps.1')
     ]
-  },
-  'divider': {
-    summary: 'Horizontale Trennlinie als visueller Abschnittsabschluss.',
+  }; },
+  get 'divider'(){ return {
+    summary: t('blockHelp.divider.summary'),
     steps: [
-      'Einfach platzieren. Keine weitere Konfiguration.'
+      t('blockHelp.divider.steps.1')
     ]
-  },
-  'code': {
-    summary: 'Quellcode-Block mit Syntax-Hervorhebung.',
+  }; },
+  get 'code'(){ return {
+    summary: t('blockHelp.code.summary'),
     steps: [
-      'Sprache wählen.',
-      'Code in das Textfeld einfügen, Einrückung bleibt erhalten.'
+      t('blockHelp.code.steps.1'),
+      t('blockHelp.code.steps.2')
     ]
-  },
-  'summary': {
-    summary: 'Zusammenfassungs-Block mit Titel und Stichpunkten. Eignet sich für Schluss-Kapitel.',
+  }; },
+  get 'summary'(){ return {
+    summary: t('blockHelp.summary.summary'),
     steps: [
-      'Titel angeben.',
-      'Pro Punkt eine Überschrift und einen Erklärungstext eintragen.'
+      t('blockHelp.summary.steps.1'),
+      t('blockHelp.summary.steps.2')
     ]
-  },
-  'survey': {
-    summary: 'Unbenotete Umfrage. Wird beim Lernenden angezeigt, fließt aber nicht in die Punkte ein.',
+  }; },
+  get 'survey'(){ return {
+    summary: t('blockHelp.survey.summary'),
     steps: [
-      'Frage formulieren.',
-      'Antwortoptionen anlegen. Keine Markierung als richtig oder falsch.'
+      t('blockHelp.survey.steps.1'),
+      t('blockHelp.survey.steps.2')
     ],
     tips: [
-      'Sinnvoll für Selbsteinschätzungen oder Stimmungsabfragen am Anfang oder Ende einer Einheit.'
+      t('blockHelp.survey.tips.1')
     ]
-  },
+  }; },
 
   // Frage
-  'multiple-choice': {
-    summary: 'Multiple-Choice-Frage mit einer oder mehreren richtigen Antworten.',
+  get 'multiple-choice'(){ return {
+    summary: t('blockHelp.multipleChoice.summary'),
     steps: [
-      'Frage formulieren.',
-      'Antwortoptionen anlegen, richtige mit Häkchen markieren.'
+      t('blockHelp.multipleChoice.steps.1'),
+      t('blockHelp.multipleChoice.steps.2')
     ],
     tips: [
-      'Bei mehreren richtigen Antworten gibt es automatisch Teilpunkte (z. B. 1 von 2 richtigen Antworten = 50 %).',
-      'Optionen werden für jeden Lernenden gemischt angezeigt.',
-      '„Falsche bestrafen" zieht für jede falsche Auswahl Punkte ab.'
+      t('blockHelp.multipleChoice.tips.1'),
+      t('blockHelp.multipleChoice.tips.2'),
+      t('blockHelp.multipleChoice.tips.3')
     ]
-  },
-  'cloze': {
-    summary: 'Lückentext: Wörter im Fließtext werden durch Eingabefelder oder Dropdowns ersetzt.',
+  }; },
+  get 'cloze'(){ return {
+    summary: t('blockHelp.cloze.summary'),
     steps: [
-      'Text mit Lücken in die Vorlage schreiben.',
-      'Lücke einbauen: <code>{{Antwort}}</code> für freie Eingabe, <code>{{a|b|c}}</code> für Alternativen, <code>{{=richtig|falsch1|falsch2}}</code> für Dropdown.'
+      t('blockHelp.cloze.steps.1'),
+      t('blockHelp.cloze.steps.2')
     ],
     tips: [
-      '„Groß/Klein ignorieren" lässt zu, dass „berlin" als „Berlin" gewertet wird.',
-      'Mehrere richtige Schreibweisen mit | trennen, z. B. <code>{{Hund|dog|chien}}</code>.'
+      t('blockHelp.cloze.tips.1'),
+      t('blockHelp.cloze.tips.2')
     ]
-  },
-  'text-input': {
-    summary: 'Frei einzugebende Text-Antwort. Vergleichsmodus regelt die Strenge.',
+  }; },
+  get 'text-input'(){ return {
+    summary: t('blockHelp.textInput.summary'),
     steps: [
-      'Frage formulieren.',
-      'Richtige Antworten eintragen.',
-      'Vergleichsmodus wählen.'
+      t('blockHelp.textInput.steps.1'),
+      t('blockHelp.textInput.steps.2'),
+      t('blockHelp.textInput.steps.3')
     ],
     tips: [
-      '„Groß/Klein ignorieren" ist Standard. „Genau" nur bei Code oder kontextsensitiven Schreibweisen.',
-      '„Regex" für Muster wie <code>\\d{4}</code> (Jahreszahl).',
-      '„Stichworte" gibt Teilpunkte für jedes gefundene Stichwort.'
+      t('blockHelp.textInput.tips.1'),
+      t('blockHelp.textInput.tips.2'),
+      t('blockHelp.textInput.tips.3')
     ]
-  },
-  'match-pairs': {
-    summary: 'Zuordnung per Drag-and-Drop. 1:1 für klassische Paare, Kategorisierung für mehrere Begriffe pro Kategorie.',
+  }; },
+  get 'match-pairs'(){ return {
+    summary: t('blockHelp.matchPairs.summary'),
     steps: [
-      'Modus wählen: Paare oder Kategorisierung.',
-      'Bei Paaren: links und rechts paarweise eintragen.',
-      'Bei Kategorisierung: Kategorien anlegen, dann Begriffe der jeweiligen Kategorie zuordnen.'
+      t('blockHelp.matchPairs.steps.1'),
+      t('blockHelp.matchPairs.steps.2'),
+      t('blockHelp.matchPairs.steps.3')
     ],
     tips: [
-      'Bilder und Text lassen sich mischen. Bilder über 1 MB komprimieren.',
-      'Punkte werden anteilig vergeben: 3 von 4 richtigen Zuordnungen = 75 %.'
+      t('blockHelp.matchPairs.tips.1'),
+      t('blockHelp.matchPairs.tips.2')
     ]
-  },
-  'sort-list': {
-    summary: 'Sortierliste: Lernender bringt Begriffe per Drag-and-Drop in die richtige Reihenfolge.',
+  }; },
+  get 'sort-list'(){ return {
+    summary: t('blockHelp.sortList.summary'),
     steps: [
-      'Elemente in der korrekten Reihenfolge eintragen.',
-      'Der Lernende sieht sie gemischt und muss sie sortieren.'
+      t('blockHelp.sortList.steps.1'),
+      t('blockHelp.sortList.steps.2')
     ],
     tips: [
-      'Punkte pro Element in korrekter Position. Bei 4 Elementen und 2 korrekt = 2 Punkte.'
+      t('blockHelp.sortList.tips.1')
     ]
-  },
-  'hotzone': {
-    summary: 'Klick-auf-Bild-Aufgabe. Der Lernende klickt richtige Bereiche im Bild an.',
+  }; },
+  get 'hotzone'(){ return {
+    summary: t('blockHelp.hotzone.summary'),
     steps: [
-      'Bild hochladen.',
-      'Rechteckige Zonen über die richtigen Bildbereiche legen.'
+      t('blockHelp.hotzone.steps.1'),
+      t('blockHelp.hotzone.steps.2')
     ],
     tips: [
-      'Zonen-Koordinaten sind normiert (0 bis 1). Bei Bildwechsel mit gleichem Seitenverhältnis bleiben sie gültig.',
-      'Mehrere Zonen pro Bild möglich; Punkte werden anteilig vergeben.'
+      t('blockHelp.hotzone.tips.1'),
+      t('blockHelp.hotzone.tips.2')
     ]
-  },
+  }; },
 
   // MINT
-  'numeric-input': {
-    summary: 'Numerische Eingabe mit Toleranz, Variablen und automatisch generierter Aufgabe.',
+  get 'numeric-input'(){ return {
+    summary: t('blockHelp.numericInput.summary'),
     steps: [
-      'Frage-Vorlage mit Platzhaltern wie <code>{a}</code> formulieren.',
-      'Variablen mit Min/Max-Bereich anlegen.',
-      'Lösungs-Formel eintragen, z. B. <code>a*b</code> oder <code>sqrt(a^2+b^2)</code>.'
+      t('blockHelp.numericInput.steps.1'),
+      t('blockHelp.numericInput.steps.2'),
+      t('blockHelp.numericInput.steps.3')
     ],
     tips: [
-      'Bei jedem „Neu generieren" zieht der Builder neue Werte aus den Variablenbereichen.',
-      'Toleranz definiert die akzeptierte Abweichung vom Sollwert.',
-      'Mit „Term vereinfachen" wird die Antwort als gekürzter Bruch erwartet.'
+      t('blockHelp.numericInput.tips.1'),
+      t('blockHelp.numericInput.tips.2'),
+      t('blockHelp.numericInput.tips.3')
     ]
-  },
-  'unit-convert': {
-    summary: 'Einheiten-Umrechnung (Länge, Zeit, Masse, Geschwindigkeit, Energie, etc.).',
+  }; },
+  get 'unit-convert'(){ return {
+    summary: t('blockHelp.unitConvert.summary'),
     steps: [
-      'Größenart wählen (z. B. Länge).',
-      'Quell- und Ziel-Einheiten festlegen.',
-      'Wertebereich definieren.'
+      t('blockHelp.unitConvert.steps.1'),
+      t('blockHelp.unitConvert.steps.2'),
+      t('blockHelp.unitConvert.steps.3')
     ],
     tips: [
-      'Bei „Mit Bruch" sind auch gebrochene Zahlen als Antwort zulässig.',
-      'Dezimaltrennzeichen ist Komma; der Builder akzeptiert aber auch Punkt.'
+      t('blockHelp.unitConvert.tips.1'),
+      t('blockHelp.unitConvert.tips.2')
     ]
-  },
-  'table': {
-    summary: 'Tabelle mit variablen Spalten und Eingabefeldern. Für mehrere Berechnungen in einer Aufgabe.',
+  }; },
+  get 'table'(){ return {
+    summary: t('blockHelp.table.summary'),
     steps: [
-      'Spalten anlegen, pro Spalte Typ wählen: Zufallswert, Formel oder Freitext-Eingabe.',
-      'Zeilenanzahl und Variablenbereich festlegen.'
+      t('blockHelp.table.steps.1'),
+      t('blockHelp.table.steps.2')
     ],
     tips: [
-      'Formel-Spalten verwenden die Werte der vorherigen Spalten in derselben Zeile.',
-      'Schrittweiten bestimmen, ob Werte in 1er-, 0.5er- oder anderen Sprüngen gewürfelt werden.'
+      t('blockHelp.table.tips.1'),
+      t('blockHelp.table.tips.2')
     ]
-  },
-  'equation-system': {
-    summary: 'Lineares Gleichungssystem mit 2 oder 3 Variablen, zufällig oder mit eigenen Varianten.',
+  }; },
+  get 'equation-system'(){ return {
+    summary: t('blockHelp.equationSystem.summary'),
     steps: [
-      'Modus wählen: zufällig generiert oder eigene Varianten.',
-      'Bei „Zufällig": Variablen, Koeffizienten- und Lösungsbereich festlegen.',
-      'Bei „Manuell": Gleichungen direkt eingeben, z. B. <code>2x + y = 5</code>.'
+      t('blockHelp.equationSystem.steps.1'),
+      t('blockHelp.equationSystem.steps.2'),
+      t('blockHelp.equationSystem.steps.3')
     ],
     tips: [
-      'Im manuellen Modus prüft der Builder, ob das System eindeutig lösbar ist.',
-      'Punkte werden pro richtig gelöster Variable vergeben.'
+      t('blockHelp.equationSystem.tips.1'),
+      t('blockHelp.equationSystem.tips.2')
     ]
-  },
-  'function-question': {
-    summary: 'Funktions-Graph mit Frage zu Funktionswerten, Nullstellen, Schnittpunkten oder Extrema.',
+  }; },
+  get 'function-question'(){ return {
+    summary: t('blockHelp.functionQuestion.summary'),
     steps: [
-      'Funktion eingeben, z. B. <code>x^2 - 3</code> oder <code>sin(x)</code>.',
-      'Frage-Modus wählen: Funktionswert, Nullstellen, y-Achsenabschnitt, Extrempunkte, oder eigene Frage.',
-      'Sichtbaren Bereich (x/y) festlegen.'
+      t('blockHelp.functionQuestion.steps.1'),
+      t('blockHelp.functionQuestion.steps.2'),
+      t('blockHelp.functionQuestion.steps.3')
     ],
     tips: [
-      'Bei mehreren Nullstellen werden alle erwartet; die Reihenfolge ist egal.',
-      'Für Extrempunkte werden die Koordinaten als (x; y) eingegeben.'
+      t('blockHelp.functionQuestion.tips.1'),
+      t('blockHelp.functionQuestion.tips.2')
     ]
-  },
-  'complex-question': {
-    summary: 'Komplexe Zahl aus einem Plot in der Gaußschen Zahlenebene ablesen.',
+  }; },
+  get 'complex-question'(){ return {
+    summary: t('blockHelp.complexQuestion.summary'),
     steps: [
-      'Pool von Punkten anlegen.',
-      'Modus wählen: kartesisch (Re, Im), polar (|z|, φ), beides oder konjugiert.'
+      t('blockHelp.complexQuestion.steps.1'),
+      t('blockHelp.complexQuestion.steps.2')
     ]
-  },
-  'complex-input': {
-    summary: 'Komplexe Zahl als Antwort. Wie numerische Eingabe, aber mit Operationen auf komplexen Zahlen.',
+  }; },
+  get 'complex-input'(){ return {
+    summary: t('blockHelp.complexInput.summary'),
     steps: [
-      'Frage-Vorlage formulieren, z. B. <code>$(a + bi)(c - di)</code>.',
-      'Variablen mit Bereichen anlegen.',
-      'Lösungs-Formel eintragen, z. B. <code>(a + b*i) * (c - d*i)</code>.'
+      t('blockHelp.complexInput.steps.1'),
+      t('blockHelp.complexInput.steps.2'),
+      t('blockHelp.complexInput.steps.3')
     ],
     tips: [
-      'Eingabeformate für Lernende: <code>3+4i</code>, <code>-i</code>, <code>1/2+3/4i</code>.'
+      t('blockHelp.complexInput.tips.1')
     ]
-  },
-  'vector-question': {
-    summary: 'Vektor aus einem 2D-Plot ablesen. Frage nach Komponenten, Betrag oder Winkel.',
+  }; },
+  get 'vector-question'(){ return {
+    summary: t('blockHelp.vectorQuestion.summary'),
     steps: [
-      'Pool von Vektoren anlegen.',
-      'Frage-Modus wählen: Komponenten, Betrag, Winkel, Einheitsvektor oder alle.',
-      'Winkel-Einheit setzen (Grad oder Radiant).'
+      t('blockHelp.vectorQuestion.steps.1'),
+      t('blockHelp.vectorQuestion.steps.2'),
+      t('blockHelp.vectorQuestion.steps.3')
     ]
-  },
-  'truth-table': {
-    summary: 'Boolesche Wahrheitstabelle. Lernender füllt Spalte aus, der Builder vergleicht jeden Zeilenwert.',
+  }; },
+  get 'truth-table'(){ return {
+    summary: t('blockHelp.truthTable.summary'),
     steps: [
-      'Ausdruck eingeben, z. B. <code>a and b</code>, <code>not (a or b)</code>.',
-      'Variablennamen mit Komma trennen.'
+      t('blockHelp.truthTable.steps.1'),
+      t('blockHelp.truthTable.steps.2')
     ],
     tips: [
-      'Erlaubte Operatoren: and, or, not, xor (sowie &&, ||, !).',
-      'Jede Zeile gibt einen Punkt; 2^N Zeilen für N Variablen.'
+      t('blockHelp.truthTable.tips.1'),
+      t('blockHelp.truthTable.tips.2')
     ]
-  },
-  'number-base': {
-    summary: 'Zahlensystem-Umrechnung: Binär, Oktal, Dezimal und Hexadezimal.',
+  }; },
+  get 'number-base'(){ return {
+    summary: t('blockHelp.numberBase.summary'),
     steps: [
-      'Richtungs-Preset wählen oder eigene Richtungen festlegen.',
-      'Wertebereich angeben (dezimal).'
+      t('blockHelp.numberBase.steps.1'),
+      t('blockHelp.numberBase.steps.2')
     ],
     tips: [
-      'Hex-Antworten werden case-insensitive geprüft; Prefix <code>0x</code> ist erlaubt.'
+      t('blockHelp.numberBase.tips.1')
     ]
-  },
+  }; },
 
   // Visualisierung
-  'composition': {
-    summary: 'Vektor-Editor für eigene geometrische Konstruktionen und Beschriftungen. Optional mit Lücken zur Eingabe.',
+  get 'composition'(){ return {
+    summary: t('blockHelp.composition.summary'),
     steps: [
-      'Eine Vorlage einfügen (Rechteck, Dreieck, Pythagoras, Kreis), oder Formen einzeln über die Toolbar hinzufügen.',
-      'Beschriftungen mit <code>{a}</code> für Variablen und <code>{1}</code> für Antwortfelder einfügen.',
-      'Bewertungs-Modus wählen: Anzeige, Verstanden-Button oder Mit Lösung.'
+      t('blockHelp.composition.steps.1'),
+      t('blockHelp.composition.steps.2'),
+      t('blockHelp.composition.steps.3')
     ],
     tips: [
-      'Variablen werden bei jedem Start neu gewürfelt; die Lösungs-Formel rechnet damit.',
-      'Mehrere Slots in einem Label: <code>{1}</code>, <code>{2}</code>, … können untereinander verrechnet werden (<code>{1*}</code> als Antwort von Slot 1 in einer anderen Formel).'
+      t('blockHelp.composition.tips.1'),
+      t('blockHelp.composition.tips.2')
     ]
-  },
-  'function-sandbox': {
-    summary: 'Interaktiver Funktionsplot zum Erkunden. Lernende ändern Parameter und sehen den Effekt sofort.',
+  }; },
+  get 'function-sandbox'(){ return {
+    summary: t('blockHelp.functionSandbox.summary'),
     steps: [
-      'Funktion mit Platzhaltern für Parameter eintragen.',
-      'Parameter mit Min/Max/Schrittweite anlegen.',
-      'Sichtbaren x/y-Bereich festlegen.'
+      t('blockHelp.functionSandbox.steps.1'),
+      t('blockHelp.functionSandbox.steps.2'),
+      t('blockHelp.functionSandbox.steps.3')
     ],
     tips: [
-      'Keine Bewertung, reines Lernwerkzeug. Ergänzt eine Funktionsfrage gut.'
+      t('blockHelp.functionSandbox.tips.1')
     ]
-  }
+  }; }
 };

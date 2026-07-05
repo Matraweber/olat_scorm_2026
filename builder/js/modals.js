@@ -1,7 +1,8 @@
 // modals.js: Block-type picker, task-create, save-template, preview modal.
-import { el, uid, toast, confirmDialog } from './util.js';
+import { el, uid, toast, confirmDialog, tProp } from './util.js';
 import { state, pushHistory, render } from './state.js';
 import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates } from './tasks.js';
+import { t, l } from './i18n.js';
 
 // Task-create modal
 export function openTaskCreateModal(){
@@ -21,12 +22,12 @@ function renderTemplateList(){
   const host = document.getElementById('templateList');
   host.innerHTML = '';
 
-  const builtin = (window.BUILTIN_TEMPLATES || []).slice();
+  const builtin = (typeof window.getBuiltinTemplates === 'function' ? window.getBuiltinTemplates() : (window.BUILTIN_TEMPLATES || []).slice());
   builtin.sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.label.localeCompare(b.label));
 
   const cats = {};
   builtin.forEach(tpl => {
-    const cat = tpl.category || 'Allgemein';
+    const cat = tpl.category || t('modals.categoryGeneral');
     (cats[cat] = cats[cat] || []).push(tpl);
   });
 
@@ -36,12 +37,12 @@ function renderTemplateList(){
   });
 
   if (state.userTemplates.length > 0) {
-    host.appendChild(el('div', { className: 'tpl-section-head', text: 'Eigene Vorlagen' }));
+    host.appendChild(el('div', { className: 'tpl-section-head', text: t('modals.userTemplatesHead') }));
     state.userTemplates.forEach(tpl => host.appendChild(makeTplRow(tpl, true)));
   }
 
   if (builtin.length === 0 && state.userTemplates.length === 0) {
-    host.appendChild(el('div', { className: 'template-empty', text: 'Keine Vorlagen verfügbar.' }));
+    host.appendChild(el('div', { className: 'template-empty', text: t('modals.noTemplates') }));
   }
 }
 
@@ -53,7 +54,7 @@ function makeTplRow(tpl, isUser){
   if (tpl.description) main.appendChild(el('span', { className: 'tpl-row-desc', text: tpl.description }));
   row.appendChild(main);
 
-  const insertBtn = el('button', { className: 'btn btn-primary btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Einfügen' });
+  const insertBtn = el('button', { className: 'btn btn-primary btn-sm tpl-row-action', attrs: { type: 'button' }, text: t('modals.insert') });
   insertBtn.addEventListener('click', e => {
     e.stopPropagation();
     pushHistory();
@@ -66,28 +67,28 @@ function makeTplRow(tpl, isUser){
     state.selected = { kind: 'task', idx: state.course.tasks.length - 1 };
     document.getElementById('taskCreateModal').classList.add('hidden');
     render();
-    toast('Vorlage "' + tpl.label + '" eingefügt.');
+    toast(t('modals.templateInserted', { name: tpl.label }));
   });
   row.appendChild(insertBtn);
 
   if (isUser) {
-    const renameBtn = el('button', { className: 'btn btn-secondary btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Umbenennen' });
+    const renameBtn = el('button', { className: 'btn btn-secondary btn-sm tpl-row-action', attrs: { type: 'button' }, text: t('common.rename') });
     renameBtn.addEventListener('click', e => {
       e.stopPropagation();
-      const newName = prompt('Neuer Name:', tpl.label);
+      const newName = prompt(t('modals.renamePrompt'), tpl.label);
       if (!newName) return;
       tpl.label = newName.trim();
       saveUserTemplates();
       renderTemplateList();
     });
 
-    const delBtn = el('button', { className: 'btn btn-danger btn-sm tpl-row-action', attrs: { type: 'button' }, text: 'Löschen' });
+    const delBtn = el('button', { className: 'btn btn-danger btn-sm tpl-row-action', attrs: { type: 'button' }, text: t('common.delete') });
     delBtn.addEventListener('click', async e => {
       e.stopPropagation();
       if(!await confirmDialog({
-        title: 'Vorlage löschen?',
-        message: '„' + tpl.label + '" wird endgültig aus den Aufgaben-Vorlagen entfernt.',
-        confirmLabel: 'Löschen',
+        title: t('modals.deleteTemplateTitle'),
+        message: t('modals.deleteTemplateMessage', { name: tpl.label }),
+        confirmLabel: t('common.delete'),
         danger: true
       })) return;
       const i = state.userTemplates.findIndex(x => x.id === tpl.id);
@@ -106,25 +107,25 @@ function makeTplRow(tpl, isUser){
 // Save-template modal
 export function openSaveTemplateModal(task){
   const blocks = task.blocks || [];
-  if (blocks.length === 0) { toast('Diese Aufgabe enthält keine Blöcke.', 'warn'); return; }
+  if (blocks.length === 0) { toast(t('modals.noBlocksInTask'), 'warn'); return; }
   const m = document.getElementById('saveTemplateModal');
-  document.getElementById('saveTplName').value = task.title || 'Meine Vorlage';
+  document.getElementById('saveTplName').value = l(task.title) || t('modals.defaultTemplateName');
   document.getElementById('saveTplDesc').value = '';
-  document.getElementById('saveTplCat').value = 'Eigene';
+  document.getElementById('saveTplCat').value = t('modals.defaultTemplateCategory');
   document.getElementById('btnSaveTplConfirm').onclick = () => {
     const name = document.getElementById('saveTplName').value.trim();
-    if (!name) { toast('Name darf nicht leer sein.', 'error'); return; }
+    if (!name) { toast(t('modals.nameRequired'), 'error'); return; }
     const tpl = {
       id: uid('utpl_'),
       label: name,
       description: document.getElementById('saveTplDesc').value.trim(),
-      category: document.getElementById('saveTplCat').value.trim() || 'Eigene',
+      category: document.getElementById('saveTplCat').value.trim() || t('modals.defaultTemplateCategory'),
       task: captureTaskAsTemplateData(task)
     };
     state.userTemplates.push(tpl);
     saveUserTemplates();
     m.classList.add('hidden');
-    toast('Vorlage "' + name + '" gespeichert.');
+    toast(t('modals.templateSaved', { name: name }));
   };
   m.classList.remove('hidden');
 }
@@ -143,27 +144,27 @@ export function openBlockTypeModal(onPick){
   const usage = (state.blockUsage && typeof state.blockUsage === 'object') ? state.blockUsage : {};
   const useCount = (def) => usage[def.id] || 0;
   const all = window.Blocks.all().slice().sort((a, b) =>
-    (a.category || '').localeCompare(b.category || '')
+    (tProp(a, 'category') || '').localeCompare(tProp(b, 'category') || '')
     || (useCount(b) - useCount(a))
-    || a.label.localeCompare(b.label)
+    || tProp(a, 'label').localeCompare(tProp(b, 'label'))
   );
   const byCat = {};
   all.forEach(def => {
-    const cat = def.category || 'Allgemein';
+    const cat = tProp(def, 'category') || t('modals.categoryGeneral');
     (byCat[cat] = byCat[cat] || []).push(def);
   });
 
   // User block-templates: synthesize a def with isTemplate=true; renderRow routes onPick.
   const userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
   if(userBlockTemplates.length > 0){
-    byCat['Eigene Vorlagen'] = userBlockTemplates.map(tpl => {
+    byCat[t('modals.userTemplatesHead')] = userBlockTemplates.map(tpl => {
       const baseDef = window.Blocks.get(tpl.blockType);
       return {
         id: tpl.id,
         label: tpl.label,
-        description: tpl.description || ('Vorlage basiert auf: ' + (baseDef ? baseDef.label : tpl.blockType)),
+        description: tpl.description || t('modals.templateBasedOn', { base: baseDef ? tProp(baseDef, 'label') : tpl.blockType }),
         icon: baseDef ? baseDef.icon : null,
-        category: 'Eigene Vorlagen',
+        category: t('modals.userTemplatesHead'),
         isTemplate: true,
         tpl: tpl
       };
@@ -171,7 +172,16 @@ export function openBlockTypeModal(onPick){
   }
 
   // Stable category order; unknown categories sort alphabetically at the end.
-  const CAT_ORDER = ['Medien & Inhalt', 'Frage', 'MINT', 'Visualisierung', 'Eigene Vorlagen'];
+  // Categories are resolved via t('block.category.*'), so CAT_ORDER holds the
+  // translated strings that tProp(def, 'category') returns.
+  const tCat = (key) => (window.BlockUtils && window.BlockUtils.t) ? window.BlockUtils.t(key) : key;
+  const CAT_ORDER = [
+    tCat('block.category.content'),
+    tCat('block.category.question'),
+    tCat('block.category.mint'),
+    tCat('block.category.visualization'),
+    t('modals.userTemplatesHead')
+  ];
   const cats = Object.keys(byCat).sort((a, b) => {
     const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
     if(ia !== -1 && ib !== -1) return ia - ib;
@@ -193,28 +203,29 @@ export function openBlockTypeModal(onPick){
     else { ico.textContent = def.icon || '?'; }
     row.appendChild(ico);
     const body = el('div', { className: 'block-type-body' });
-    const labelEl = el('span', { className: 'block-type-label', text: def.label });
+    const labelEl = el('span', { className: 'block-type-label', text: tProp(def, 'label') });
     if(def.isTemplate){
-      labelEl.appendChild(el('span', { className: 'block-type-badge block-type-badge-template', text: 'Vorlage' }));
+      labelEl.appendChild(el('span', { className: 'block-type-badge block-type-badge-template', text: t('modals.templateBadge') }));
     } else if(def.graded){
-      labelEl.appendChild(el('span', { className: 'block-type-badge', text: 'gewertet' }));
+      labelEl.appendChild(el('span', { className: 'block-type-badge', text: t('modals.gradedBadge') }));
     }
     body.appendChild(labelEl);
-    if (def.description) body.appendChild(el('span', { className: 'block-type-desc', text: def.description }));
+    const desc = tProp(def, 'description');
+    if(desc) body.appendChild(el('span', { className: 'block-type-desc', text: desc }));
     row.appendChild(body);
 
     if(def.isTemplate){
       const del = el('button', {
         className: 'block-type-template-delete',
-        attrs: { type:'button', title:'Vorlage löschen', 'aria-label':'Vorlage löschen' },
+        attrs: { type:'button', title: t('modals.deleteTemplateAction'), 'aria-label': t('modals.deleteTemplateAction') },
         text: '✕'
       });
       del.addEventListener('click', async e => {
         e.stopPropagation();
         if(!await confirmDialog({
-          title: 'Block-Vorlage löschen?',
-          message: '„' + def.label + '" wird endgültig aus den eigenen Block-Vorlagen entfernt.',
-          confirmLabel: 'Löschen',
+          title: t('modals.deleteBlockTemplateTitle'),
+          message: t('modals.deleteBlockTemplateMessage', { name: tProp(def, 'label') }),
+          confirmLabel: t('common.delete'),
           danger: true
         })) return;
         const idx = (state.userBlockTemplates || []).findIndex(t => t.id === def.tpl.id);
@@ -253,16 +264,16 @@ export function openBlockTypeModal(onPick){
       return;
     }
     nav.classList.add('search-active');
-    const allRows = all.concat(byCat['Eigene Vorlagen'] || []);
+    const allRows = all.concat(byCat[t('modals.userTemplatesHead')] || []);
     const matches = allRows.filter(def => {
-      const hay = (def.label + ' ' + (def.description || '') + ' ' + (def.category || '')).toLowerCase();
+      const hay = (tProp(def, 'label') + ' ' + tProp(def, 'description') + ' ' + tProp(def, 'category')).toLowerCase();
       return hay.includes(q);
     });
     list.innerHTML = '';
     if(matches.length === 0){
       const empty = el('div', {
         className: 'block-picker-empty',
-        text: 'Kein Block-Typ entspricht „' + search.value + '".'
+        text: t('modals.noBlockMatch', { query: search.value })
       });
       list.appendChild(empty);
       return;

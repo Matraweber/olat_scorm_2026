@@ -4,6 +4,8 @@
 
 import { el } from './util.js';
 import { MATH_CATS, FORMULA_FN_BTNS } from './math-toolbar-data.js';
+import { t, readForEdit, writeFromEdit, getSourceHint, getDefaultLocale } from './i18n.js';
+import { getEditorLocale } from './state.js';
 
 export function renderMathTextarea(spec, getObj, setObj, wrap){
   const obj = getObj() || {};
@@ -15,12 +17,14 @@ export function renderMathTextarea(spec, getObj, setObj, wrap){
   toolbar.appendChild(pills);
   toolbar.appendChild(symGrid);
 
+  const editorLoc = getEditorLocale();
+  const sourceLoc = getDefaultLocale();
   const ta = el('textarea', {attrs:{rows: spec.rows || 3, placeholder: spec.placeholder || ''}});
-  ta.value = obj[spec.key] != null ? String(obj[spec.key]) : '';
+  ta.value = readForEdit(obj[spec.key], editorLoc, sourceLoc);
 
   const mathPreview = el('div', {className:'math-preview'});
   const mathHint = el('div', {className:'math-hint',
-    text:'Tipp: Formeln zwischen $ und $ schreiben, z. B. $\\frac{a}{b}$ · Variablen als {name}'});
+    text: t('form.math.mathHint')});
 
   function insertMathSnippet(snippet, cursorPos){
     const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value;
@@ -49,7 +53,7 @@ export function renderMathTextarea(spec, getObj, setObj, wrap){
   renderMathCat(0);
 
   const delimRow = el('div', {className:'math-delim-row'});
-  const delimBtn = el('button', {className:'math-delim-btn', attrs:{type:'button', title:'Formel-Umgebung einfügen'}, text:'$ … $'});
+  const delimBtn = el('button', {className:'math-delim-btn', attrs:{type:'button', title: t('form.math.delimBtnTitle')}, text:'$ … $'});
   delimBtn.addEventListener('click', () => {
     const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value;
     const sel = v.slice(s, e);
@@ -74,7 +78,8 @@ export function renderMathTextarea(spec, getObj, setObj, wrap){
   }
 
   ta.addEventListener('input', () => {
-    setObj(spec.key, ta.value);
+    const currentRaw = (getObj() || {})[spec.key];
+    setObj(spec.key, writeFromEdit(currentRaw, editorLoc, ta.value, sourceLoc));
     updateMathPreview();
     if(typeof spec.onChange === 'function'){
       spec.onChange(ta.value, getObj() || {}, (k, v) => setObj(k, v));
@@ -87,6 +92,10 @@ export function renderMathTextarea(spec, getObj, setObj, wrap){
   mathWrap.appendChild(ta);
   mathWrap.appendChild(mathPreview);
   mathWrap.appendChild(mathHint);
+  const hint = getSourceHint(obj[spec.key], editorLoc, sourceLoc);
+  if(hint){
+    mathWrap.appendChild(el('div', {className:'field-i18n-hint', text: sourceLoc.toUpperCase() + ': ' + hint}));
+  }
   wrap.appendChild(mathWrap);
   return wrap;
 }
@@ -123,7 +132,7 @@ export function renderFormulaText(spec, getObj, setObj, wrap){
   finp.addEventListener('input', () => setObj(spec.key, finp.value));
 
   const fhint = el('div', {className:'math-hint',
-    text:'Verfügbar: sqrt, sin, cos, tan, log, exp, abs, floor, ceil, round, min, max, pow, atan2 · Konstanten: pi, e · Potenz: ^'});
+    text: t('form.math.formulaHint')});
 
   formulaWrap.appendChild(fbar);
   formulaWrap.appendChild(finp);

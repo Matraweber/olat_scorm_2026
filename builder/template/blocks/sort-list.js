@@ -2,59 +2,69 @@
   'use strict';
   Blocks.register('sort-list', {
     label: 'Sortierliste',
+    labelKey: 'block.sort-list.label',
     description: 'Items per Drag & Drop in die korrekte Reihenfolge bringen.',
+    descKey: 'block.sort-list.description',
     category: 'Frage',
+    categoryKey: 'block.category.question',
     icon: '↕',
     graded: true,
-    defaultConfig(){
+    defaultConfig(locale = 'de'){
       return {
         blockTitle: '', preset: 'custom',
         question: '', items: [], maxPoints: 1
       };
     },
-    previewConfig(){
+    previewConfig(locale = 'de'){
+      const en = locale === 'en';
       return {
         blockTitle: '', preset: 'custom',
-        question: 'Bringen Sie die Planeten in die richtige Reihenfolge (sonnennah zu sonnenfern).',
-        items: [
-          { value: 'Merkur' }, { value: 'Venus' },
-          { value: 'Erde'   }, { value: 'Mars'  }
-        ],
+        question: en
+          ? 'Put the planets in the correct order (closest to the sun to farthest).'
+          : 'Bringen Sie die Planeten in die richtige Reihenfolge (sonnennah zu sonnenfern).',
+        items: en
+          ? [ { value: 'Mercury' }, { value: 'Venus' }, { value: 'Earth' }, { value: 'Mars' } ]
+          : [ { value: 'Merkur' }, { value: 'Venus' }, { value: 'Erde'   }, { value: 'Mars'  } ],
         maxPoints: 4
       };
     },
     builderSchema(){
       const isCustom = c => (c.preset || 'custom') === 'custom';
       return [
-        { key:'blockTitle', label:'Überschrift', type:'text', placeholder:'Sortierliste' },
-        { key:'preset', label:'Vorlage', type:'select', options:[
-          {value:'custom',          label:'Manuell (leer)'},
-          {value:'example-se',      label:'Beispiel: Informatik, Wasserfallmodell'},
-          {value:'example-science', label:'Beispiel: Wissenschaft, Wissenschaftliche Methode'},
-          {value:'example-algo',    label:'Beispiel: Algorithmus, Merge-Sort-Phasen'}
-        ], help:'Items werden in der eingegebenen Reihenfolge als korrekt gewertet. Beim Start zufällig gemischt.' },
-        { type:'action', label:'↺ Zurücksetzen', action:'reset', showIf: isCustom },
+        { key:'blockTitle', label:'Überschrift', labelKey:'block.sort-list.field.blockTitle.label', type:'text', placeholder:'Sortierliste', placeholderKey:'block.sort-list.field.blockTitle.placeholder' },
+        { key:'preset', label:'Vorlage', labelKey:'block.sort-list.field.preset.label', type:'select', options:[
+          {value:'custom',          label:'Manuell (leer)',                              labelKey:'block.sort-list.field.preset.option.custom'},
+          {value:'example-se',      label:'Beispiel: Informatik, Wasserfallmodell',      labelKey:'block.sort-list.field.preset.option.example-se'},
+          {value:'example-science', label:'Beispiel: Wissenschaft, Wissenschaftliche Methode', labelKey:'block.sort-list.field.preset.option.example-science'},
+          {value:'example-algo',    label:'Beispiel: Algorithmus, Merge-Sort-Phasen',    labelKey:'block.sort-list.field.preset.option.example-algo'}
+        ], help:'Items werden in der eingegebenen Reihenfolge als korrekt gewertet. Beim Start zufällig gemischt.', helpKey:'block.sort-list.field.preset.help' },
+        { type:'action', label:'↺ Zurücksetzen', labelKey:'block.sort-list.field.reset.label', action:'reset', showIf: isCustom },
         // Question & items
-        { type:'section', label:'Frage & Items', key:'_sec_q', showIf: isCustom },
-        { key:'question', label:'Aufgabentext', type:'math-textarea', rows:2, showIf: isCustom },
-        { key:'items', label:'Items', type:'list', itemLabel:'Item',
+        { type:'section', label:'Frage & Items', labelKey:'block.sort-list.field.sec_q.label', key:'_sec_q', showIf: isCustom },
+        { key:'question', label:'Aufgabentext', labelKey:'block.sort-list.field.question.label', type:'math-textarea', rows:2, showIf: isCustom },
+        { key:'items', label:'Items', labelKey:'block.sort-list.field.items.label', type:'list', itemLabel:'Item', itemLabelKey:'block.sort-list.field.items.itemLabel',
           showIf: isCustom,
           help:'Items in der richtigen Reihenfolge eingeben. Beim Start werden sie zufällig gemischt.',
+          helpKey:'block.sort-list.field.items.help',
           itemSummary: item => (item.value || '…').slice(0, 70),
-          itemSchema:[ { key:'value', label:'Text', type:'text', fullWidth:true } ] },
+          itemSchema:[ { key:'value', label:'Text', labelKey:'block.sort-list.field.items.value.label', type:'text', fullWidth:true } ] },
         // Scoring
-        { type:'section', label:'Bewertung', key:'_sec_score' },
-        { key:'maxPoints', label:'Punkte', type:'number', step:1, min:1 }
+        { type:'section', label:'Bewertung', labelKey:'block.sort-list.field.sec_score.label', key:'_sec_score' },
+        { key:'maxPoints', label:'Punkte', labelKey:'block.sort-list.field.maxPoints.label', type:'number', step:1, min:1 }
       ];
     },
     mount(host, config, api){
       const u = api.utils;
-      const generated = sortListPreset(config);
+      const generated = sortListPreset(config, u);
       const correct = generated.items.filter(Boolean);
       // Shuffle indices for display
       const order = u.shuffle(correct.map((_, i) => i));
 
-      const ui = u.simpleQuestionCard(host, { title: config.blockTitle || 'Aufgabe', qBoxTitle: 'Sortieren', question: generated.question || config.question || '' });
+      const ui = u.simpleQuestionCard(host, {
+        title: u.l(config.blockTitle) || u.t('block.sort-list.defaultTitle'),
+        qBoxTitle: u.t('block.sort-list.qBoxTitle'),
+        question: generated.question || u.l(config.question) || ''
+      });
       const { content, buttons, fb } = ui;
 
       const list = document.createElement('div');
@@ -93,7 +103,7 @@
       }
       content.appendChild(list);
 
-      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent='Korrektur';
+      const checkBtn = document.createElement('button'); checkBtn.type='button'; checkBtn.className='btn btn-primary'; checkBtn.textContent = u.t('common.check');
       buttons.appendChild(checkBtn);
 
       checkBtn.addEventListener('click', () => {
@@ -112,8 +122,8 @@
         const ratio = correctCount / Math.max(1, correct.length);
         const pts = Math.round(ratio * (config.maxPoints || 1) * 100) / 100;
         api.reportScore(pts);
-        if(correctCount === correct.length) fb.ok('Alle Items korrekt sortiert.');
-        else fb.bad(correctCount + ' von ' + correct.length + ' richtig sortiert.');
+        if(correctCount === correct.length) fb.ok(u.t('block.sort-list.feedback.allCorrect'));
+        else fb.bad(u.t('block.sort-list.feedback.partial', { correct: correctCount, total: correct.length }));
       });
 
       rerender();
@@ -122,8 +132,8 @@
     },
     preview(host, config){
       const u = window.BlockUtils;
-      const wrap = u.tagPreview(host, { icon:'↕', label:'Sortieren (D&D)', fillHeight:true });
-      const generated = sortListPreset(config);
+      const wrap = u.tagPreview(host, { icon:'↕', label: u.t('block.sort-list.previewTag'), fillHeight:true });
+      const generated = sortListPreset(config, u);
       if(generated.question){
         const q = document.createElement('div'); q.textContent = generated.question;
         q.style.cssText = 'color:#003b5c; font-weight:700; margin-bottom:0.4rem; font-size:0.82rem;';
@@ -137,27 +147,54 @@
         wrap.appendChild(li);
       });
       if(generated.items.length > 5){
-        const m = document.createElement('div'); m.textContent = '… +' + (generated.items.length - 5) + ' weitere'; m.style.cssText = 'color:#888; font-size:0.78rem; padding-left:1rem; font-style:italic;';
+        const m = document.createElement('div'); m.textContent = u.t('block.sort-list.preview.more', { count: generated.items.length - 5 }); m.style.cssText = 'color:#888; font-size:0.78rem; padding-left:1rem; font-style:italic;';
         wrap.appendChild(m);
       }
     }
   });
 
-  function sortListPreset(config){
+  function sortListPreset(config, u){
     const preset = config.preset || 'custom';
     const manual = (config.items || []).map(it => typeof it === 'string' ? it : (it && it.value) || '').filter(Boolean);
+    const tr = (key, params) => (u && typeof u.t === 'function') ? u.t(key, params) : key;
     if(preset === 'example-se'){
-      return { question:'Ordnen Sie die Phasen des Wasserfallmodells in der richtigen Reihenfolge.',
-        items:['Anforderungsanalyse','Systemdesign','Implementierung','Testen','Abnahme','Wartung'] };
+      return { question: tr('block.sort-list.preset.example-se.question'),
+        items:[
+          tr('block.sort-list.preset.example-se.item.requirements'),
+          tr('block.sort-list.preset.example-se.item.design'),
+          tr('block.sort-list.preset.example-se.item.implementation'),
+          tr('block.sort-list.preset.example-se.item.testing'),
+          tr('block.sort-list.preset.example-se.item.acceptance'),
+          tr('block.sort-list.preset.example-se.item.maintenance')
+        ] };
     }
     if(preset === 'example-science'){
-      return { question:'Ordnen Sie die Schritte der wissenschaftlichen Methode.',
-        items:['Beobachtung formulieren','Fragestellung entwickeln','Hypothese aufstellen','Experiment planen und durchführen','Daten auswerten','Schlussfolgerung ziehen'] };
+      return { question: tr('block.sort-list.preset.example-science.question'),
+        items:[
+          tr('block.sort-list.preset.example-science.item.observe'),
+          tr('block.sort-list.preset.example-science.item.question'),
+          tr('block.sort-list.preset.example-science.item.hypothesis'),
+          tr('block.sort-list.preset.example-science.item.experiment'),
+          tr('block.sort-list.preset.example-science.item.analyze'),
+          tr('block.sort-list.preset.example-science.item.conclude')
+        ] };
     }
     if(preset === 'example-algo'){
-      return { question:'Ordnen Sie die Phasen des Merge-Sort-Algorithmus.',
-        items:['Liste in zwei Hälften teilen','Jede Hälfte rekursiv sortieren','Beide sortierten Hälften zusammenführen (merge)','Sortierte Gesamtliste zurückgeben'] };
+      return { question: tr('block.sort-list.preset.example-algo.question'),
+        items:[
+          tr('block.sort-list.preset.example-algo.item.split'),
+          tr('block.sort-list.preset.example-algo.item.sortHalves'),
+          tr('block.sort-list.preset.example-algo.item.merge'),
+          tr('block.sort-list.preset.example-algo.item.return')
+        ] };
     }
-    return { question: config.question || '', items: manual };
+    const q = u && typeof u.l === 'function' ? u.l(config.question) : config.question;
+    const localizedManual = (config.items || [])
+      .map(it => {
+        const raw = typeof it === 'string' ? it : (it && it.value) || '';
+        return u && typeof u.l === 'function' ? u.l(raw) : raw;
+      })
+      .filter(Boolean);
+    return { question: q || '', items: localizedManual.length ? localizedManual : manual };
   }
 })();

@@ -1,7 +1,8 @@
 // task-pane.js: Canvas task editor orchestrator. Builds the shared ctx and
 // wires up head/toolbar/zoom/tab-bar; canvas/config/bulk live in sibling modules.
 import { el, uid, cssEscape, confirmDialog, toast } from './util.js';
-import { state, pushHistory, renderActivePane } from './state.js';
+import { t, readForEdit, writeFromEdit, getDefaultLocale } from './i18n.js';
+import { state, pushHistory, renderActivePane, getEditorLocale } from './state.js';
 import { CANVAS_WIDTH, ensurePos, ensureAllPos, fitHeightForCard } from './canvas.js';
 import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn, bumpBlockUsage } from './tasks.js';
 import { renderTaskList } from './panes.js';
@@ -28,27 +29,35 @@ export function renderTaskPane(host, idx){
 
   let zoom = (typeof task._uiZoom === 'number' && task._uiZoom > 0) ? task._uiZoom : 1.0;
 
-  // Header: task number + editable title + toolbar
+  // Header: task number + editable title + toolbar. Reading and writing the
+  // title go through readForEdit/writeFromEdit so the value stays wrapped
+  // once the author has entered more than one locale (otherwise plain-string
+  // assignment would silently drop the other-locale text).
   const head = el('div', {className:'task-edit-head'});
-  head.appendChild(el('span', {className:'task-num', text: 'Aufgabe ' + (idx+1)}));
-  const titleInput = el('input', {className:'task-title-input', attrs:{type:'text', placeholder:'Titel der Aufgabe (in der Navigation sichtbar)'}});
-  titleInput.value = task.title || '';
-  titleInput.addEventListener('input', () => { task.title = titleInput.value; renderTaskList(); });
+  head.appendChild(el('span', {className:'task-num', text: t('taskPane.taskLabel', { n: idx+1 })}));
+  const titleInput = el('input', {className:'task-title-input', attrs:{type:'text', placeholder: t('taskPane.titlePlaceholder')}});
+  const titleEditorLoc = getEditorLocale();
+  const titleSourceLoc = getDefaultLocale();
+  titleInput.value = readForEdit(task.title, titleEditorLoc, titleSourceLoc);
+  titleInput.addEventListener('input', () => {
+    task.title = writeFromEdit(task.title, titleEditorLoc, titleInput.value, titleSourceLoc);
+    renderTaskList();
+  });
   head.appendChild(titleInput);
 
   const toolbar = el('div', {className:'canvas-toolbar'});
-  const addBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text:'+ Block'});
-  addBtn.title = 'Block hinzufügen';
+  const addBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text: t('taskPane.addBlock')});
+  addBtn.title = t('taskPane.addBlockTitle');
   addBtn.addEventListener('click', () => openBlockTypeModal(addBlockOfType));
-  const saveTplBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text:'★ Vorlage'});
-  saveTplBtn.title = 'Aufgabe als Vorlage speichern';
+  const saveTplBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}, text: t('taskPane.saveTemplate')});
+  saveTplBtn.title = t('taskPane.saveTemplateTitle');
   saveTplBtn.addEventListener('click', () => openSaveTemplateModal(task));
 
   // Tabs toggle
   const tabsBtn = el('button', {className:'btn btn-secondary', attrs:{type:'button'}});
   function refreshTabsBtn(){
-    tabsBtn.textContent = hasTabs(task) ? 'Tabs deaktivieren' : '+ Tabs aktivieren';
-    tabsBtn.title = hasTabs(task) ? 'Tabs entfernen (nur Tab 1 wird behalten)' : '2 Tabs aktivieren: Visualisierung + Aufgabe';
+    tabsBtn.textContent = hasTabs(task) ? t('taskPane.tabsDisable') : t('taskPane.tabsEnable');
+    tabsBtn.title = hasTabs(task) ? t('taskPane.tabsDisableTitle') : t('taskPane.tabsEnableTitle');
   }
   refreshTabsBtn();
   tabsBtn.addEventListener('click', async () => {
@@ -56,9 +65,11 @@ export function renderTaskPane(host, idx){
       const tab2Count = (task.tabs[1] && task.tabs[1].blocks ? task.tabs[1].blocks.length : 0);
       if(tab2Count > 0){
         const ok = await confirmDialog({
-          title: 'Tabs deaktivieren?',
-          message: 'Tab 2 enthält ' + tab2Count + ' Block' + (tab2Count === 1 ? '' : 'e') + '. Beim Deaktivieren gehen diese verloren.',
-          confirmLabel: 'Deaktivieren',
+          title: t('taskPane.tabsDisableConfirmTitle'),
+          message: tab2Count === 1
+            ? t('taskPane.tabsDisableConfirmMessageSingular', { n: tab2Count })
+            : t('taskPane.tabsDisableConfirmMessagePlural', { n: tab2Count }),
+          confirmLabel: t('taskPane.tabsDisableConfirmLabel'),
           danger: true
         });
         if(!ok) return;
@@ -75,10 +86,10 @@ export function renderTaskPane(host, idx){
   toolbar.appendChild(addBtn); toolbar.appendChild(saveTplBtn); toolbar.appendChild(tabsBtn);
 
   const zoomBar = el('div', {className:'canvas-zoom-bar'});
-  const zoomOut = el('button', {className:'icon-btn', attrs:{type:'button', title:'Verkleinern (Strg + Mausrad)'}, text:'−'});
+  const zoomOut = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.zoomOutTitle')}, text:'−'});
   const zoomVal = el('span', {className:'zoom-value', text: Math.round(zoom*100) + '%'});
-  const zoomIn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Vergrößern (Strg + Mausrad)'}, text:'+'});
-  const zoomReset = el('button', {className:'icon-btn', attrs:{type:'button', title:'Zoom 100%'}, text:'⤢'});
+  const zoomIn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.zoomInTitle')}, text:'+'});
+  const zoomReset = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.zoomResetTitle')}, text:'⤢'});
   zoomBar.appendChild(zoomOut); zoomBar.appendChild(zoomVal); zoomBar.appendChild(zoomIn); zoomBar.appendChild(zoomReset);
   toolbar.appendChild(zoomBar);
   head.appendChild(toolbar);
@@ -89,9 +100,9 @@ export function renderTaskPane(host, idx){
     const tabBar = el('div', {className:'builder-tab-bar'});
     task.tabs.forEach((tab, ti) => {
       const isActive = ti === (task._uiActiveTab || 0);
-      const btn = el('button', { className: 'builder-tab-btn' + (isActive ? ' active' : ''), attrs:{type:'button', title:'Tab wechseln'} });
+      const btn = el('button', { className: 'builder-tab-btn' + (isActive ? ' active' : ''), attrs:{type:'button', title: t('taskPane.tabSwitchTitle')} });
       const titleSpan = el('input', {className:'builder-tab-title', attrs:{type:'text'}});
-      titleSpan.value = tab.title || ('Tab ' + (ti+1));
+      titleSpan.value = tab.title || t('taskPane.tabFallbackTitle', { n: ti+1 });
       titleSpan.addEventListener('click', e => e.stopPropagation());
       titleSpan.addEventListener('input', () => { tab.title = titleSpan.value; });
       btn.appendChild(titleSpan);
@@ -237,7 +248,10 @@ export function renderTaskPane(host, idx){
     } else {
       const blockType = blockTypeOrTemplate;
       const def = window.Blocks.get(blockType);
-      block = { id: uid('b_'), type: blockType, config: def && def.defaultConfig ? def.defaultConfig() : {} };
+      // Pass the author's current editor locale so example content (question,
+      // choices, prompt, etc.) is minted in the language they are writing.
+      const seedLocale = getEditorLocale();
+      block = { id: uid('b_'), type: blockType, config: def && def.defaultConfig ? def.defaultConfig(seedLocale) : {} };
     }
     ensurePos(block, task.blocks);
     task.blocks.push(block);
@@ -300,8 +314,8 @@ export function renderTaskPane(host, idx){
     const rejected = files.length - images.length;
     if(rejected > 0){
       toast(rejected === 1
-        ? 'Datei ignoriert: nur Bilddateien können auf die Canvas gezogen werden.'
-        : rejected + ' Dateien ignoriert: nur Bilddateien können auf die Canvas gezogen werden.', 'error');
+        ? t('taskPane.dropRejectedSingular')
+        : t('taskPane.dropRejectedPlural', { n: rejected }), 'error');
     }
     if(images.length === 0) return;
     // Canvas-logical pixels: divide by zoom (canvas uses transform: scale).
@@ -312,7 +326,7 @@ export function renderTaskPane(host, idx){
     const newIds = [];
     images.forEach((file, i) => {
       const v = validateUpload(file, 'image');
-      if(!v.ok){ toast('„' + file.name + '": ' + v.error, 'error'); return; }
+      if(!v.ok){ toast(t('taskPane.fileValidationError', { name: file.name, error: v.error }), 'error'); return; }
       const def = window.Blocks.get('image');
       const cfg = def && def.defaultConfig ? def.defaultConfig() : {};
       const id = uid('b_');
@@ -333,7 +347,7 @@ export function renderTaskPane(host, idx){
           if(body) renderBlockPreview(body, block);
         }
       };
-      r.onerror = () => toast('„' + file.name + '" konnte nicht gelesen werden.', 'error');
+      r.onerror = () => toast(t('taskPane.fileReadError', { name: file.name }), 'error');
       r.readAsDataURL(file);
     });
     if(newIds.length === 0) return;
@@ -342,8 +356,8 @@ export function renderTaskPane(host, idx){
     persistSelection();
     ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
     toast(images.length === 1
-      ? 'Bild als Block hinzugefügt.'
-      : images.length + ' Bilder als Blöcke hinzugefügt.');
+      ? t('taskPane.imageAddedSingular')
+      : t('taskPane.imageAddedPlural', { n: images.length }));
   });
 
   // In-canvas editors (e.g. Komposition drag-to-move) dispatch this on mutation.

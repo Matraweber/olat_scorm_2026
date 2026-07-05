@@ -4,6 +4,7 @@
 
 import { el } from './util.js';
 import { validateUpload, makeUploadStatus } from './form.js';
+import { t } from './i18n.js';
 
 // image field: file upload or URL.
 export function renderImageField(spec, getObj, setObj, wrap){
@@ -11,7 +12,7 @@ export function renderImageField(spec, getObj, setObj, wrap){
   const inner = el('div');
   const fileRow = el('div', {className:'field-row'});
   const fileInp = el('input', {attrs:{type:'file', accept:'image/*'}});
-  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Bild entfernen'});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:t('form.media.image.clear')});
   const status = makeUploadStatus();
   fileInp.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
@@ -24,10 +25,10 @@ export function renderImageField(spec, getObj, setObj, wrap){
     const r = new FileReader();
     r.onload = () => {
       setObj(spec.key, r.result);
-      status.showSuccess('Bild eingebettet (' + v.sizeHuman + ')');
+      status.showSuccess(t('form.media.image.embedded', { size: v.sizeHuman }));
       rerenderImagePreview();
     };
-    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.onerror = () => status.showError(t('form.media.readError'));
     r.readAsDataURL(f);
   });
   clearBtn.addEventListener('click', () => {
@@ -38,7 +39,7 @@ export function renderImageField(spec, getObj, setObj, wrap){
   fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
   inner.appendChild(fileRow);
   inner.appendChild(status.el);
-  const urlInp = el('input', {attrs:{type:'text', placeholder:'oder URL/Pfad eingeben'}});
+  const urlInp = el('input', {attrs:{type:'text', placeholder:t('form.media.urlPlaceholder')}});
   urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
   urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderImagePreview(); });
   inner.appendChild(urlInp);
@@ -62,7 +63,7 @@ export function renderAudioField(spec, getObj, setObj, wrap){
   const inner = el('div');
   const fileRow = el('div', {className:'field-row'});
   const fileInp = el('input', {attrs:{type:'file', accept:'audio/*'}});
-  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Audio entfernen'});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:t('form.media.audio.clear')});
   const status = makeUploadStatus();
   fileInp.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
@@ -71,17 +72,17 @@ export function renderAudioField(spec, getObj, setObj, wrap){
     const r = new FileReader();
     r.onload = () => {
       setObj(spec.key, r.result);
-      status.showSuccess('Audio eingebettet (' + v.sizeHuman + ')');
+      status.showSuccess(t('form.media.audio.embedded', { size: v.sizeHuman }));
       rerenderAudioPreview();
     };
-    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.onerror = () => status.showError(t('form.media.readError'));
     r.readAsDataURL(f);
   });
   clearBtn.addEventListener('click', () => { setObj(spec.key, ''); status.clear(); rerenderAudioPreview(); });
   fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
   inner.appendChild(fileRow);
   inner.appendChild(status.el);
-  const urlInp = el('input', {attrs:{type:'text', placeholder:'oder URL/Pfad eingeben (z. B. https://example.org/clip.mp3)'}});
+  const urlInp = el('input', {attrs:{type:'text', placeholder:t('form.media.audio.urlPlaceholder')}});
   urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
   urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderAudioPreview(); });
   inner.appendChild(urlInp);
@@ -109,7 +110,7 @@ export function renderVideoField(spec, getObj, setObj, wrap){
   const inner = el('div');
   const fileRow = el('div', {className:'field-row'});
   const fileInp = el('input', {attrs:{type:'file', accept:'video/*'}});
-  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Video entfernen'});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:t('form.media.video.clear')});
   const status = makeUploadStatus();
   fileInp.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
@@ -118,17 +119,17 @@ export function renderVideoField(spec, getObj, setObj, wrap){
     const r = new FileReader();
     r.onload = () => {
       setObj(spec.key, r.result);
-      status.showSuccess('Video eingebettet (' + v.sizeHuman + ')');
+      status.showSuccess(t('form.media.video.embedded', { size: v.sizeHuman }));
       rerenderVideoPreview();
     };
-    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.onerror = () => status.showError(t('form.media.readError'));
     r.readAsDataURL(f);
   });
   clearBtn.addEventListener('click', () => { setObj(spec.key, ''); status.clear(); rerenderVideoPreview(); });
   fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
   inner.appendChild(fileRow);
   inner.appendChild(status.el);
-  const urlInp = el('input', {attrs:{type:'text', placeholder:'YouTube-/Vimeo-Link oder direkte Video-URL (z. B. https://youtu.be/abc12345678)'}});
+  const urlInp = el('input', {attrs:{type:'text', placeholder:t('form.media.video.urlPlaceholder')}});
   urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
   urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderVideoPreview(); });
   inner.appendChild(urlInp);
@@ -154,7 +155,7 @@ export function renderVideoField(spec, getObj, setObj, wrap){
       wrap.appendChild(iframe);
       previewWrap.appendChild(wrap);
       const hint = document.createElement('div');
-      hint.textContent = (info.kind === 'youtube' ? 'YouTube' : 'Vimeo') + '-Embed erkannt';
+      hint.textContent = t('form.media.video.embedDetected', { provider: info.kind === 'youtube' ? 'YouTube' : 'Vimeo' });
       hint.style.cssText = 'font-size:0.78rem; color:#2c7a3f; margin-top:0.3rem;';
       previewWrap.appendChild(hint);
       return;
@@ -177,7 +178,7 @@ export function renderFileField(spec, getObj, setObj, wrap){
   const inner = el('div');
   const fileRow = el('div', {className:'field-row'});
   const fileInp = el('input', {attrs:{type:'file'}});
-  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:'Datei entfernen'});
+  const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:t('form.media.file.clear')});
   const status = makeUploadStatus();
   fileInp.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
@@ -189,17 +190,17 @@ export function renderFileField(spec, getObj, setObj, wrap){
       // Auto-fill sibling `filename` if empty.
       const cur = getObj() || {};
       if('filename' in cur && !cur.filename) setObj('filename', f.name);
-      status.showSuccess('Datei eingebettet (' + v.sizeHuman + ')');
+      status.showSuccess(t('form.media.file.embedded', { size: v.sizeHuman }));
       rerenderFilePreview();
     };
-    r.onerror = () => status.showError('Datei konnte nicht gelesen werden.');
+    r.onerror = () => status.showError(t('form.media.readError'));
     r.readAsDataURL(f);
   });
   clearBtn.addEventListener('click', () => { setObj(spec.key, ''); status.clear(); rerenderFilePreview(); });
   fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
   inner.appendChild(fileRow);
   inner.appendChild(status.el);
-  const urlInp = el('input', {attrs:{type:'text', placeholder:'oder URL/Pfad eingeben'}});
+  const urlInp = el('input', {attrs:{type:'text', placeholder:t('form.media.urlPlaceholder')}});
   urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';
   urlInp.addEventListener('input', () => { setObj(spec.key, urlInp.value); rerenderFilePreview(); });
   inner.appendChild(urlInp);
@@ -216,9 +217,9 @@ export function renderFileField(spec, getObj, setObj, wrap){
                     bytes < 1024*1024 ? (bytes/1024).toFixed(1) + ' KB' :
                     bytes < 1024*1024*1024 ? (bytes/1024/1024).toFixed(1) + ' MB' :
                     (bytes/1024/1024/1024).toFixed(2) + ' GB';
-      previewWrap.textContent = '✓ Datei eingebettet (' + human + ')';
+      previewWrap.textContent = t('form.media.file.previewEmbedded', { size: human });
     } else {
-      previewWrap.textContent = '✓ URL: ' + v;
+      previewWrap.textContent = t('form.media.file.previewUrl', { url: v });
     }
   }
   inner.appendChild(previewWrap);

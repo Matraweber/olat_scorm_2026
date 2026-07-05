@@ -4,6 +4,7 @@
 //   * unit-from-to   from/to unit selectors with category switcher
 
 import { el } from './util.js';
+import { t } from './i18n.js';
 
 export function renderZoneEditor(spec, getObj, setObj, wrap){
   const ze = el('div', {className:'zone-editor'});
@@ -57,11 +58,11 @@ export function renderZoneEditor(spec, getObj, setObj, wrap){
     stage.innerHTML = '';
     list.innerHTML  = '';
     if(!src){
-      status.textContent = 'Lade zuerst ein Bild hoch (Feld oben), um Zonen zu markieren.';
+      status.textContent = t('form.specialized.zoneEditor.uploadFirst');
       stage.style.display = 'none';
       return;
     }
-    status.textContent = 'Klicke und ziehe auf dem Bild, um eine Zone zu markieren. Klicke eine Zone an, um sie zu löschen.';
+    status.textContent = t('form.specialized.zoneEditor.instructions');
     stage.style.display = 'inline-block';
     const img = el('img', {attrs:{src, alt:''}});
     stage.appendChild(img);
@@ -74,7 +75,7 @@ export function renderZoneEditor(spec, getObj, setObj, wrap){
       const r = el('div', {className:'zone-editor-rect'});
       r.style.left = (z.x*100)+'%'; r.style.top = (z.y*100)+'%';
       r.style.width = (z.w*100)+'%'; r.style.height = (z.h*100)+'%';
-      r.title = 'Zone ' + (idx+1) + ': klicken zum Löschen';
+      r.title = t('form.specialized.zoneEditor.rectTitle', {n: idx+1});
       r.addEventListener('mousedown', e => e.stopPropagation());
       r.addEventListener('click', e => {
         e.stopPropagation();
@@ -83,7 +84,7 @@ export function renderZoneEditor(spec, getObj, setObj, wrap){
       overlay.appendChild(r);
 
       const row = el('div', {className:'zone-editor-list-item'});
-      row.appendChild(el('span', {text:'Zone ' + (idx+1) + ': ' + Math.round(z.w*100) + '×' + Math.round(z.h*100) + '% @ ('+ Math.round(z.x*100) +'%, '+ Math.round(z.y*100) +'%)'}));
+      row.appendChild(el('span', {text: t('form.specialized.zoneEditor.listItem', {n: idx+1, w: Math.round(z.w*100), h: Math.round(z.h*100), x: Math.round(z.x*100), y: Math.round(z.y*100)})}));
       const del = el('button', {className:'icon-btn danger', attrs:{type:'button'}, text:'×'});
       del.addEventListener('click', () => {
         const arr = getZones(); arr.splice(idx, 1); setZones(arr); render();
@@ -92,7 +93,7 @@ export function renderZoneEditor(spec, getObj, setObj, wrap){
       list.appendChild(row);
     });
     if(zones.length === 0){
-      list.appendChild(el('div', {className:'field-help', text:'Noch keine Zonen markiert.'}));
+      list.appendChild(el('div', {className:'field-help', text: t('form.specialized.zoneEditor.emptyZones')}));
     }
   }
 
@@ -175,21 +176,21 @@ export function renderUnitPairField(spec, getObj, setObj){
   }
 
   const outer = el('div', {className:'field field-full'});
-  outer.appendChild(el('label', {text: spec.label || 'Umrechnungsaufgabe'}));
+  outer.appendChild(el('label', {text: spec.label || t('form.specialized.unitPair.defaultLabel')}));
   if(spec.help) outer.appendChild(el('div', {className:'field-help', text: spec.help}));
 
   const row = el('div');
   row.style.cssText = 'display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.3rem;';
 
-  const fromValInp = el('input', {attrs:{type:'number', step:'any', placeholder:'Eingabe'}});
+  const fromValInp = el('input', {attrs:{type:'number', step:'any', placeholder: t('form.specialized.unitPair.inputPlaceholder')}});
   fromValInp.style.cssText = 'width:110px; flex:0 0 110px;';
   fromValInp.value = obj[fk] != null ? String(obj[fk]) : '';
 
   const fromUnitSel = buildSelect(obj[fuk]);
-  const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Eingabe und Ausgabe vertauschen'}, text:'⇄'});
+  const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('form.specialized.unitPair.swapTitle')}, text:'⇄'});
   swapBtn.style.cssText = 'font-weight:700; color:var(--primary); font-size:1rem; flex:none; min-width:32px;';
 
-  const toValInp = el('input', {attrs:{type:'number', step:'any', placeholder:'Ausgabe'}});
+  const toValInp = el('input', {attrs:{type:'number', step:'any', placeholder: t('form.specialized.unitPair.outputPlaceholder')}});
   toValInp.style.cssText = 'width:110px; flex:0 0 110px;';
   toValInp.value = obj[tk] != null ? String(obj[tk]) : '';
 
@@ -197,7 +198,7 @@ export function renderUnitPairField(spec, getObj, setObj){
 
   const errSpan = el('span');
   errSpan.style.cssText = 'font-size:0.75rem; color:var(--danger); display:none; width:100%;';
-  errSpan.textContent = 'Einheiten nicht kompatibel.';
+  errSpan.textContent = t('form.specialized.unitPair.incompatible');
 
   row.appendChild(fromValInp); row.appendChild(fromUnitSel);
   row.appendChild(swapBtn);
@@ -205,7 +206,7 @@ export function renderUnitPairField(spec, getObj, setObj){
   row.appendChild(errSpan);
   outer.appendChild(row);
   outer.appendChild(el('div', {className:'field-help',
-    text:'Rechts tippt man in Ausgabe, links wird rückwärts berechnet, und umgekehrt.'}));
+    text: t('form.specialized.unitPair.help')}));
 
   function syncFromLeft(){
     const fv = parseFloat(fromValInp.value);
@@ -288,7 +289,7 @@ export function renderUnitFromToField(spec, getObj, setObj){
       // Category-wildcard entry: picks a random unit from this category every round.
       const wildcard = document.createElement('option');
       wildcard.value = '*:' + catName;
-      wildcard.textContent = 'Zufällig  (' + catName + ')';
+      wildcard.textContent = t('form.specialized.unitFromTo.randomOption', {cat: catName});
       og.appendChild(wildcard);
       items.forEach(({id, label}) => {
         const op = document.createElement('option');
@@ -311,14 +312,14 @@ export function renderUnitFromToField(spec, getObj, setObj){
   }
 
   const wrap = el('div', {className:'field field-full'});
-  wrap.appendChild(el('label', {text: spec.label || 'Richtung'}));
+  wrap.appendChild(el('label', {text: spec.label || t('form.specialized.unitFromTo.defaultLabel')}));
   if(spec.help) wrap.appendChild(el('div', {className:'field-help', text: spec.help}));
 
   const row = el('div');
   row.style.cssText = 'display:flex; align-items:center; gap:0.4rem; margin-top:0.2rem;';
 
   const fromSel = buildSelect();
-  const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title:'Von ↔ Nach vertauschen'}, text:'⇄'});
+  const swapBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('form.specialized.unitFromTo.swapTitle')}, text:'⇄'});
   swapBtn.style.cssText = 'font-weight:700; color:var(--primary); font-size:1rem; flex:none; min-width:32px;';
   const toSel = buildSelect();
 

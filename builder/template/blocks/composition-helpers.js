@@ -6,10 +6,15 @@
 
   const NS = 'http://www.w3.org/2000/svg';
   const DASH = { solid: '', dashed: '10 5', dotted: '2 4' };
-  const SHAPE_LABELS = {
-    line:'Linie', arrow:'Pfeil', circle:'Kreis', ellipse:'Ellipse', polygon:'Polygon',
-    rect:'Rechteck', label:'Beschriftung', coords:'Koordinatensystem', image:'Bild'
-  };
+  // Human-readable shape name. Resolved via i18n at call time so language
+  // switches take effect without a page reload.
+  function shapeLabel(type){
+    const u = window.BlockUtils;
+    if(u && typeof u.t === 'function'){
+      return u.t('block.composition.shape.' + type);
+    }
+    return type;
+  }
   // Inline SVG icons for toolbar shape buttons.
   const SHAPE_ICONS = {
     line:    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="16" x2="17" y2="4"/></svg>',
@@ -57,7 +62,11 @@
                color:'#003b5c', fill:'#a1d884', strokeWidth: 3, dash:'solid' };
     },
     rect:    () => ({ type:'rect',    x: 80, y: 80, w:220, h:120,       color:'#003b5c', fill:'#eef5f8', strokeWidth: 3, dash:'solid' }),
-    label:   () => ({ type:'label',   x: 80, y:120, text:'Beschriftung',color:'#003b5c', fontSize:24, fontWeight:'700' }),
+    label:   () => {
+      const u = window.BlockUtils;
+      const text = (u && typeof u.t === 'function') ? u.t('block.composition.shape.label') : 'Beschriftung';
+      return { type:'label', x: 80, y:120, text, color:'#003b5c', fontSize:24, fontWeight:'700' };
+    },
     coords:  () => ({ type:'coords',  x: 60, y: 60, w:320, h:220,
                       xMin:-5, xMax:5, yMin:-3, yMax:3, step:1,
                       showGrid:true, showLabels:true, color:'#003b5c' }),
@@ -371,78 +380,84 @@
   // Human-readable shape label for the picker dropdown (and any future UI
   // that needs to name a shape).
   function shapeDisplayName(shape, idx){
-    if(!shape || !shape.type) return 'Form ' + (idx + 1);
-    const polyByCount = { 3:'Dreieck', 4:'Viereck', 5:'Fünfeck', 6:'Sechseck', 7:'Siebeneck', 8:'Achteck' };
+    const u = window.BlockUtils;
+    const t = (u && typeof u.t === 'function') ? u.t : (k => k);
+    if(!shape || !shape.type) return t('block.composition.display.fallback', { n: idx + 1 });
     switch(shape.type){
-      case 'line':    return 'Linie';
-      case 'arrow':   return 'Pfeil';
-      case 'circle':  return 'Kreis  (r=' + (shape.r ?? '?') + ')';
-      case 'ellipse': return 'Ellipse';
+      case 'line':    return t('block.composition.shape.line');
+      case 'arrow':   return t('block.composition.shape.arrow');
+      case 'circle':  return t('block.composition.shape.circle') + '  (r=' + (shape.r ?? '?') + ')';
+      case 'ellipse': return t('block.composition.shape.ellipse');
       case 'polygon': {
         const n = Array.isArray(shape.points) ? shape.points.length : (shape.sides || 0);
-        return polyByCount[n] || (n + '-Eck');
+        const byCount = t('block.composition.polygonByCount.' + n);
+        if(byCount !== 'block.composition.polygonByCount.' + n) return byCount;
+        return t('block.composition.polygonByCount.generic', { n: n });
       }
-      case 'rect':    return 'Rechteck';
-      case 'label':   return 'Beschriftung „' + String(shape.text || '').slice(0, 20) + '"';
-      case 'coords':  return 'Koordinatensystem';
-      case 'image':   return shape.src ? 'Bild' : 'Bild  (leer)';
+      case 'rect':    return t('block.composition.shape.rect');
+      case 'label':   return t('block.composition.display.label', { text: String(shape.text || '').slice(0, 20) });
+      case 'coords':  return t('block.composition.shape.coords');
+      case 'image':   return shape.src ? t('block.composition.shape.image') : t('block.composition.display.imageEmpty');
       default:        return shape.type;
     }
   }
 
   // Polygon picker presets. Points are designed for 600×360; the add
-  // handler translates them to the current canvas center.
-  const POLYGON_PRESETS = [
+  // handler translates them to the current canvas center. Labels/hints
+  // are pulled from i18n on read so language switches take effect.
+  const POLYGON_PRESETS_RAW = [
     {
       id: 'right',
-      label: 'Rechtwinklig',
-      hint: '90° unten links',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="3,17 17,17 3,4"/></svg>',
       points: [[150, 280], [450, 280], [150, 100]]
     },
     {
       id: 'isosceles',
-      label: 'Gleichschenklig',
-      hint: 'Spitze oben',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="10,3 17,16 3,16"/></svg>',
       points: [[300, 100], [180, 280], [420, 280]]
     },
     {
       id: 'equilateral',
-      label: 'Gleichseitig',
-      hint: 'alle Seiten gleich',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="10,3.5 16.5,15 3.5,15"/></svg>',
       regular: 3, r: 90
     },
     {
       id: 'scalene',
-      label: 'Unregelmäßig',
-      hint: 'beliebig anpassbar',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="4,15 17,12 11,4"/></svg>',
       points: [[160, 270], [450, 240], [320, 110]]
     },
     {
       id: 'square',
-      label: 'Quadrat',
-      hint: '4 gleiche Seiten',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12"/></svg>',
       points: [[200, 100], [400, 100], [400, 300], [200, 300]]
     },
     {
       id: 'pentagon',
-      label: 'Fünfeck',
-      hint: 'regelmäßig',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="10,3 17,8 14,16 6,16 3,8"/></svg>',
       regular: 5, r: 90
     },
     {
       id: 'hexagon',
-      label: 'Sechseck',
-      hint: 'regelmäßig',
       icon: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="6,3.5 14,3.5 18,10 14,16.5 6,16.5 2,10"/></svg>',
       regular: 6, r: 90
     }
   ];
+  // Proxy-like accessor: reading POLYGON_PRESETS returns fresh objects with
+  // translated label/hint each time (Object.defineProperty on the array's
+  // length isn't needed since consumers iterate via forEach / map).
+  const POLYGON_PRESETS = POLYGON_PRESETS_RAW.map(preset => Object.defineProperties(
+    Object.assign({}, preset),
+    {
+      label: { enumerable: true, get(){
+        const u = window.BlockUtils;
+        return (u && typeof u.t === 'function') ? u.t('block.composition.polygonPreset.' + preset.id + '.label') : preset.id;
+      }},
+      hint: { enumerable: true, get(){
+        const u = window.BlockUtils;
+        return (u && typeof u.t === 'function') ? u.t('block.composition.polygonPreset.' + preset.id + '.hint') : '';
+      }}
+    }
+  ));
   function makePolygonFromPreset(preset, cx, cy){
     const sx = cx - 300; // template coords are for cx=300, cy=190
     const sy = cy - 190;
@@ -461,11 +476,13 @@
   }
 
   // Built-in templates: shapes + variables + gradingMode + formula.
-  const COMPOSITION_TEMPLATES = [
+  // label/description resolved via i18n on read (see accessor wrapper below).
+  // Shape text is authored content: the label formulas ("1. Schritt: ...")
+  // stay in German because they carry math that a bilingual author edits
+  // freely after inserting the template.
+  const COMPOSITION_TEMPLATES_RAW = [
     {
       id: 'tpl-rect-area',
-      label: 'Rechteck-Fläche',
-      description: 'A = a · b',
       canvasWidth: 600, canvasHeight: 360,
       gradingMode: 'fillblanks',
       variables: [
@@ -481,8 +498,6 @@
     },
     {
       id: 'tpl-triangle-area',
-      label: 'Dreieck-Fläche',
-      description: 'A = (a · h) / 2',
       canvasWidth: 600, canvasHeight: 360,
       gradingMode: 'fillblanks',
       variables: [
@@ -500,8 +515,6 @@
     },
     {
       id: 'tpl-pythagoras',
-      label: 'Pythagoras',
-      description: 'c = √(a² + b²)',
       canvasWidth: 600, canvasHeight: 360,
       gradingMode: 'fillblanks',
       variables: [
@@ -519,8 +532,6 @@
     },
     {
       id: 'tpl-circle-area',
-      label: 'Kreis-Fläche',
-      description: 'A = π · r²',
       canvasWidth: 600, canvasHeight: 360,
       gradingMode: 'fillblanks',
       variables: [
@@ -535,8 +546,6 @@
     },
     {
       id: 'tpl-multi-step-pyth',
-      label: 'Mehrstufig: Pythagoras  (Lösung als Variable)',
-      description: '{1} und {2}, dabei nutzt {2} die Antwort {1*}',
       canvasWidth: 640, canvasHeight: 380,
       gradingMode: 'fillblanks',
       variables: [
@@ -568,6 +577,21 @@
       ]
     }
   ];
+  // Read-time i18n: label/description look up the current locale so a
+  // language switch updates the picker without rebuilding the array.
+  const COMPOSITION_TEMPLATES = COMPOSITION_TEMPLATES_RAW.map(tpl => Object.defineProperties(
+    Object.assign({}, tpl),
+    {
+      label: { enumerable: true, get(){
+        const u = window.BlockUtils;
+        return (u && typeof u.t === 'function') ? u.t('block.composition.template.' + tpl.id + '.label') : tpl.id;
+      }},
+      description: { enumerable: true, get(){
+        const u = window.BlockUtils;
+        return (u && typeof u.t === 'function') ? u.t('block.composition.template.' + tpl.id + '.description') : '';
+      }}
+    }
+  ));
 
   // Pick an image via hidden <input type=file>, return its data URL.
   // Resolves with null on cancel.
@@ -601,12 +625,14 @@
   }
 
   function shapeSummary(item){
-    if(!item || !item.type) return 'leer';
-    const name = SHAPE_LABELS[item.type] || item.type;
+    const u = window.BlockUtils;
+    const t = (u && typeof u.t === 'function') ? u.t : (k => k);
+    if(!item || !item.type) return t('block.composition.summary.empty');
+    const name = shapeLabel(item.type);
     if(item.type === 'label')  return name + ': "' + String(item.text || '').slice(0, 30) + '"';
     if(item.type === 'circle') return name + '  (r=' + (item.r ?? '?') + ')';
     if(item.type === 'ellipse') return name + '  (' + (item.rx ?? '?') + '×' + (item.ry ?? '?') + ')';
-    if(item.type === 'polygon') return name + '  (' + (item.sides ?? 3) + ' Ecken)';
+    if(item.type === 'polygon') return name + '  (' + (item.sides ?? 3) + ' ' + t('block.composition.summary.cornersSuffix') + ')';
     if(item.type === 'rect' || item.type === 'image' || item.type === 'coords')
       return name + '  (' + (item.w ?? '?') + '×' + (item.h ?? '?') + ')';
     return name;
@@ -770,10 +796,12 @@
 
   // Placeholder for an image shape with no src yet.
   function placeholderImage(){
+    const u = window.BlockUtils;
+    const label = (u && typeof u.t === 'function') ? u.t('block.composition.canvas.imagePlaceholder') : 'Bild auswählen…';
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">' +
       '<rect width="240" height="160" fill="#f5f8fa" stroke="#d8e0e6" stroke-dasharray="6 4"/>' +
-      '<text x="120" y="86" text-anchor="middle" font-family="Verdana,sans-serif" font-size="13" fill="#5d6872">Bild auswählen…</text>' +
+      '<text x="120" y="86" text-anchor="middle" font-family="Verdana,sans-serif" font-size="13" fill="#5d6872">' + label + '</text>' +
       '</svg>'
     );
   }
@@ -895,7 +923,7 @@
   // makeElementSnap, buildArrowhead, renderCoords, placeholderImage are used
   // only inside this file via closure and stay private.
   window.CompositionHelpers = {
-    NS, SHAPE_LABELS, SHAPE_ICONS, ACTION_ICONS,
+    NS, shapeLabel, SHAPE_ICONS, ACTION_ICONS,
     NONE_FILL, NONE_STROKE,
     POLYGON_PRESETS, COMPOSITION_TEMPLATES,
     isNoneColor, newShape,
