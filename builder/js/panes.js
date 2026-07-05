@@ -1,7 +1,7 @@
 // panes.js: Sidebar task list + course/theme settings panes.
 // renderActivePaneImpl dispatches to course/theme/task panes; task editor in task-pane.js.
 import { el, toast, confirmDialog } from './util.js';
-import { state, pushHistory, scheduleAutosave, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder, getEditorLocale, setEditorLocale } from './state.js';
+import { state, pushHistory, scheduleAutosave, render, renderActivePane, defaultTheme, savePersistentTheme, clearPersistentTheme, applyThemeToBuilder, getEditorLocale, setEditorLocale, DEFAULT_COURSE_TITLE } from './state.js';
 import { renderField } from './form.js';
 import { renderTaskPane } from './task-pane.js';
 import { renderWelcomePane } from './welcome-pane.js';
@@ -213,6 +213,14 @@ function renderCoursePane(host){
   const c = state.course;
   const get = () => c;
   const set = (k, v) => {
+    // Deleting the whole course title falls back to the default title, so a
+    // course never ends up without one. Only triggers when the value has
+    // collapsed to a fully empty string (writeFromEdit collapses wrappers
+    // whose every language slot is empty); clearing just one language of a
+    // bilingual title keeps the other language untouched.
+    if(k === 'courseTitle' && v === ''){
+      v = DEFAULT_COURSE_TITLE;
+    }
     c[k] = v;
     if(k === 'courseTitle'){
       renderTaskList();

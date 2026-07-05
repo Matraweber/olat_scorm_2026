@@ -3,9 +3,43 @@
 import { toast } from './util.js';
 import { t } from './i18n.js';
 
+// The default title is a fixed German literal on purpose. defaultCourse()
+// runs once at module load, before main.js has registered the i18n bundles,
+// so a t() call here would freeze the raw key ('state.defaultCourseTitle')
+// into the state. German is the source content language of this builder;
+// authors rename the course anyway.
+export const DEFAULT_COURSE_TITLE = 'Neue SCORM-Lerneinheit';
 export function defaultCourse(){
-  return { courseTitle: t('state.defaultCourseTitle'), courseSubtitle: '', passThreshold: 0.5,
+  return { courseTitle: DEFAULT_COURSE_TITLE, courseSubtitle: '', passThreshold: 0.5,
     regenLockAfterCheck: false, regenNoRegenerate: false, tasks: [] };
+}
+
+// Repair titles written by a buggy earlier build that stored the raw i18n
+// key (bundles were not registered yet when defaultCourse() ran). Applied to
+// every course loaded from autosave, JSON, or ZIP. Handles both shapes:
+// the plain string and multilingual wrappers whose slots carry the key
+// (created when an author added a translation on top of the broken title).
+// Wrappers that end up with only empty slots collapse back to ''.
+const BROKEN_TITLE_KEY = 'state.defaultCourseTitle';
+function repairTitleValue(v){
+  // A plain broken key means the file was saved with the untouched default
+  // title, so restore that default. Inside a wrapper the author had already
+  // gone multilingual; clear the slot and let the other locale show through.
+  if(v === BROKEN_TITLE_KEY) return DEFAULT_COURSE_TITLE;
+  if(v != null && typeof v === 'object' && v.__i18n === true){
+    let hasText = false;
+    for(const k of Object.keys(v)){
+      if(k === '__i18n') continue;
+      if(v[k] === BROKEN_TITLE_KEY) v[k] = '';
+      if(v[k] != null && v[k] !== '') hasText = true;
+    }
+    if(!hasText) return '';
+  }
+  return v;
+}
+export function repairCourse(c){
+  if(c) c.courseTitle = repairTitleValue(c.courseTitle);
+  return c;
 }
 export function defaultTheme(){
   return {
@@ -111,7 +145,7 @@ export function isAutosaveAvailable(){
   try {
     const raw = localStorage.getItem(AUTOSAVE_KEY);
     if(!raw) return false;
-    const c = JSON.parse(raw);
+    const c = repairCourse(JSON.parse(raw));
     return courseHasContent(c);
   } catch{ return false; }
 }
@@ -119,7 +153,7 @@ export function isAutosaveAvailable(){
 export function loadAutosave(){
   try {
     const raw = localStorage.getItem(AUTOSAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? repairCourse(JSON.parse(raw)) : null;
   } catch{ return null; }
 }
 

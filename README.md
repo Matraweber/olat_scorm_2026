@@ -11,6 +11,7 @@ Entwickelt am Umwelt-Campus Birkenfeld, Hochschule Trier.
 - [Schnellstart](#schnellstart)
 - [Projektstruktur](#projektstruktur)
 - [Builder-Workflow](#builder-workflow)
+- [Mehrsprachigkeit (Deutsch / Englisch)](#mehrsprachigkeit-deutsch--englisch)
 - [Block-Kategorien](#block-kategorien)
 - [Persistenz: Autosave, JSON, SCORM-ZIP](#persistenz-autosave-json-scorm-zip)
 - [Tastaturkürzel](#tastaturkürzel)
@@ -124,6 +125,43 @@ Vom leeren Builder bis zum SCORM-Paket:
 - **Shift + Klick** für Mehrfachauswahl
 - **Strg/Cmd + Mausrad** zum Zoomen
 - **Bild per Drag & Drop** auf die Canvas erzeugt automatisch einen Image-Block am Drop-Punkt
+
+---
+
+## Mehrsprachigkeit (Deutsch / Englisch)
+
+Der Builder und die exportierten Lerneinheiten unterstützen mehrere Sprachen. Dabei gibt es zwei getrennte Ebenen:
+
+### Oberflächensprache (Builder-UI)
+
+Der Knopf oben rechts im Header (z. B. `DE`) öffnet die Sprachauswahl für die Builder-Oberfläche: Buttons, Menüs, Dialoge, Feldbeschriftungen. Die Wahl wird lokal gespeichert und gilt beim nächsten Start wieder. Die Oberflächensprache hat keinen Einfluss auf die Kursinhalte.
+
+### Inhaltssprache (Kursinhalte)
+
+Kursinhalte (Kurstitel, Aufgabentitel, Fragen, Antworten, Texte) können pro Feld in mehreren Sprachen hinterlegt werden:
+
+1. Feld normal auf Deutsch ausfüllen.
+2. Oben im Konfigurationspanel (oder bei den Kopfdaten) den Umschalter **Inhaltssprache: DE | EN** auf `EN` stellen.
+3. Dasselbe Feld erneut ausfüllen, diesmal auf Englisch. Als Hilfe wird der deutsche Text unter dem Feld angezeigt.
+4. Zurückschalten auf `DE` zeigt wieder den deutschen Text. Nichts geht verloren.
+
+Felder ohne englische Übersetzung fallen automatisch auf den deutschen Text zurück.
+
+### Was Studierende sehen
+
+- Enthält die Lerneinheit nur eine Sprache, verhält sich alles wie bisher. Kein Umschalter, keine Änderung.
+- Enthält sie zwei Sprachen, erscheint im SCORM-Player oben rechts ein **DE / EN**-Umschalter. Ein Klick wechselt Oberfläche und Inhalte gleichzeitig. Der Kurs startet in der Sprache, die beim Export im Builder aktiv war.
+- Der Export packt nur die tatsächlich benutzten Sprachen ins ZIP. Ein rein deutscher Kurs bleibt so klein wie vorher.
+
+### Neue Sprache hinzufügen (für Entwickler)
+
+1. `builder/i18n/<code>.js` anlegen (UI-Texte des Builders, Aufbau wie `en.js`).
+2. `builder/template/i18n/<code>.js` anlegen (UI-Texte des SCORM-Players und der Blöcke).
+3. In `builder/js/main.js` das Bundle importieren und per `i18n.register('<code>', bundle, meta)` registrieren.
+4. In `builder/index.html` das Runtime-Bundle als `<script>` einbinden (neben `template/i18n/de.js`).
+5. In `builder/js/io.js` den Code zu `RUNTIME_LOCALES` hinzufügen.
+
+Danach erscheint die Sprache automatisch im Header-Umschalter, im Inhaltssprache-Toggle und im Player-Umschalter.
 
 ---
 

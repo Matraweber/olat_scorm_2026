@@ -163,7 +163,16 @@ export function writeFromEdit(value, editorLocale, newValue, sourceLocale){
     if(typeof value === 'string') wrapper[source] = value;
   }
   wrapper[editorLocale] = clean;
-  return wrapper;
+  // Collapse a wrapper whose every slot is empty back to a plain empty
+  // string. A field the author cleared in all languages then behaves
+  // exactly like a field that was never filled (same fallbacks, no ghost
+  // locale entries in the export's locale detection).
+  let hasText = false;
+  for(const k of Object.keys(wrapper)){
+    if(k === '__i18n') continue;
+    if(wrapper[k] != null && wrapper[k] !== ''){ hasText = true; break; }
+  }
+  return hasText ? wrapper : '';
 }
 
 // Return the source-locale text of a field, useful as a placeholder hint

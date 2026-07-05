@@ -219,7 +219,42 @@ function renderWelcomePane(host){
   });
   tips.appendChild(tipsGrid);
 
-  // 05 Keyboard shortcuts
+  // 05 Languages (UI language vs. per-field content language)
+  const langs = chapter(t('welcome.languages.title'));
+  langs.appendChild(el('p', {className:'welcome-lead', text: t('welcome.languages.lead')}));
+  const langGrid = el('div', {className:'welcome-tips-grid'});
+  [
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12 L21 12 M12 3 C15 7 15 17 12 21 C9 17 9 7 12 3"/></svg>',
+      title: t('welcome.languages.uiLang.title'),
+      body: t('welcome.languages.uiLang.body')
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5 L11 5 M7.5 5 L7.5 12 M5 12 L10 12 M13 19 L20 19 M16.5 19 L16.5 12 M14 12 L19 12 M4 19 L9 14 M15 10 L20 5"/></svg>',
+      title: t('welcome.languages.contentLang.title'),
+      body: t('welcome.languages.contentLang.body')
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21 L16 21 M12 18 L12 21 M7 9 L11 9 M7 12 L14 12"/></svg>',
+      title: t('welcome.languages.student.title'),
+      body: t('welcome.languages.student.body')
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L12 15 M8 11 L12 15 L16 11 M4 19 L20 19"/></svg>',
+      title: t('welcome.languages.export.title'),
+      body: t('welcome.languages.export.body')
+    }
+  ].forEach(tip => {
+    const card = el('div', {className:'welcome-tip-card'});
+    card.innerHTML =
+      '<div class="welcome-tip-icon">' + tip.icon + '</div>' +
+      '<div class="welcome-tip-title">' + tip.title + '</div>' +
+      '<div class="welcome-tip-body">' + tip.body + '</div>';
+    langGrid.appendChild(card);
+  });
+  langs.appendChild(langGrid);
+
+  // 06 Keyboard shortcuts
   const shortcuts = chapter(t('welcome.shortcuts.title'));
   shortcuts.appendChild(el('p', {className:'welcome-lead', text: t('welcome.shortcuts.lead')}));
   const kbdTable = el('table', {className:'welcome-kbd-table'});

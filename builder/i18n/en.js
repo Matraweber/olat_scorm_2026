@@ -194,7 +194,6 @@ const en = {
   },
 
   state: {
-    defaultCourseTitle: 'New SCORM learning unit',
     toast: {
       undoFailed: 'Undo failed: {msg}',
       nothingToUndo: 'Nothing to undo.',
@@ -390,6 +389,26 @@ const en = {
       tipTemplates: {
         title: 'Save templates',
         body: 'Save a finished task as a template ("Template" in the task header). It is then available the next time you open the builder.'
+      }
+    },
+    languages: {
+      title: 'Multilingual learning units',
+      lead: 'The builder separates two levels: the language of the interface and the language of the course content.',
+      uiLang: {
+        title: 'Interface language',
+        body: 'The button in the top-right corner of the header (e.g. EN) switches the builder interface language. Course content is not affected.'
+      },
+      contentLang: {
+        title: 'Content language per field',
+        body: 'The config panel has a "Content language: DE | EN" switch. Set it to EN, fill in the same field in English, done. The German text stays visible below the field as a reference and is never lost.'
+      },
+      student: {
+        title: 'What students see',
+        body: 'When two languages are filled in, the SCORM player automatically shows a DE/EN switch. With a single language everything behaves as before, without a switch.'
+      },
+      export: {
+        title: 'Export',
+        body: 'The ZIP contains only the languages actually in use. The course starts in the language that was active in the builder at export time. Fields without a translation fall back to the source language.'
       }
     },
     shortcuts: {

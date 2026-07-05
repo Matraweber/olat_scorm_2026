@@ -195,7 +195,6 @@ const de = {
   },
 
   state: {
-    defaultCourseTitle: 'Neue SCORM-Lerneinheit',
     toast: {
       undoFailed: 'Rückgängig fehlgeschlagen: {msg}',
       nothingToUndo: 'Nichts zum Rückgängigmachen.',
@@ -391,6 +390,26 @@ const de = {
       tipTemplates: {
         title: 'Vorlagen speichern',
         body: 'Eine fertige Aufgabe als Vorlage speichern („Vorlage" im Aufgaben-Header). Sie steht beim nächsten Mal sofort zur Verfügung.'
+      }
+    },
+    languages: {
+      title: 'Mehrsprachige Lerneinheiten',
+      lead: 'Der Builder unterscheidet zwei Ebenen: die Sprache der Oberfläche und die Sprache der Kursinhalte.',
+      uiLang: {
+        title: 'Oberflächensprache',
+        body: 'Der Knopf oben rechts im Header (z. B. DE) wechselt die Sprache der Builder-Oberfläche. Kursinhalte bleiben unberührt.'
+      },
+      contentLang: {
+        title: 'Inhaltssprache pro Feld',
+        body: 'Im Konfigurationspanel steht der Umschalter „Inhaltssprache: DE | EN". Auf EN stellen, dasselbe Feld auf Englisch ausfüllen, fertig. Der deutsche Text wird als Hilfe darunter angezeigt und bleibt erhalten.'
+      },
+      student: {
+        title: 'Was Studierende sehen',
+        body: 'Bei zwei befüllten Sprachen erscheint im SCORM-Player automatisch ein DE/EN-Umschalter. Bei nur einer Sprache verhält sich alles wie bisher, ohne Umschalter.'
+      },
+      export: {
+        title: 'Export',
+        body: 'Das ZIP enthält nur die tatsächlich benutzten Sprachen. Der Kurs startet in der Sprache, die beim Export im Builder aktiv war. Felder ohne Übersetzung fallen auf die Erstsprache zurück.'
       }
     },
     shortcuts: {

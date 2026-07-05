@@ -2,7 +2,7 @@
 import {
   escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
 } from './util.js';
-import { state, render, defaultTheme, scheduleAutosave, markCourseSavedToFile } from './state.js';
+import { state, render, defaultTheme, scheduleAutosave, markCourseSavedToFile, repairCourse } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
 import { t, getLocale, getDefaultLocale, collectContentLocales, l } from './i18n.js';
@@ -524,14 +524,14 @@ export async function loadZipFile(file, sourceHandle){
       );
       toast(t('io.toast.embeddingMedia'));
       const tasks = await reembedMediaInTasks(rawTasks, zip);
-      state.course = {
+      state.course = repairCourse({
         courseTitle: cfg.courseTitle || '',
         courseSubtitle: cfg.courseSubtitle || '',
         passThreshold: cfg.passThreshold != null ? cfg.passThreshold : 0.5,
         regenLockAfterCheck: !!cfg.regenLockAfterCheck,
         regenNoRegenerate: !!cfg.regenNoRegenerate,
         tasks
-      };
+      });
     }
     if(themeFile){
       const themeTxt = await themeFile.async('string');
@@ -568,7 +568,7 @@ export async function loadJsonFile(file){
   try {
     const text = await file.text();
     const parsed = JSON.parse(text);
-    if(parsed.course){ state.course = parsed.course; state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
+    if(parsed.course){ state.course = repairCourse(parsed.course); state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
     if(parsed.theme) state.theme = Object.assign(defaultTheme(), parsed.theme);
     state.selected = {kind:'course'};
     // JSON load isn't tied to a ZIP file; clear any prior ZIP handle.
@@ -657,7 +657,7 @@ export function syncJsonEditor(){
 export function applyJsonEditor(){
   try {
     const parsed = JSON.parse(document.getElementById('jsonEditor').value);
-    if(parsed.course){ state.course = parsed.course; state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
+    if(parsed.course){ state.course = repairCourse(parsed.course); state.course.tasks = (state.course.tasks || []).map(migrateTaskIfNeeded); }
     if(parsed.theme) state.theme = parsed.theme;
     const s = document.getElementById('jsonStatus'); s.textContent = t('io.jsonEditor.applied'); s.className = 'json-status ok';
     scheduleAutosave();
