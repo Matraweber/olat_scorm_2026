@@ -27,7 +27,7 @@ Entwickelt am Umwelt-Campus Birkenfeld, Hochschule Trier.
 
 Der Builder ist eine statische Webseite, er braucht nur einen lokalen HTTP-Server (kein Node.js, kein npm-Build).
 
-**Video-Tutorial:** [tutorial/scorm-builder-tutorial.webm](tutorial/scorm-builder-tutorial.webm) zeigt in gut einer Minute den kompletten Weg vom leeren Kurs bis zum fertigen SCORM-Paket (Kopfdaten, Aufgabe anlegen, Blöcke hinzufügen, Vorschau, Export). Die Datei lässt sich direkt im Browser öffnen.
+**Video-Tutorial:** [tutorial/scorm-builder-tutorial-de.webm](tutorial/scorm-builder-tutorial-de.webm) (englische Fassung: [scorm-builder-tutorial-en.webm](tutorial/scorm-builder-tutorial-en.webm)) zeigt in rund anderthalb Minuten den kompletten Weg vom leeren Kurs bis zum fertigen SCORM-Paket (Kopfdaten, Aufgabe anlegen, Blöcke hinzufügen, Vorschau, Export). Die Dateien lassen sich direkt im Browser öffnen. Auf der Willkommen-Seite des Builders ist das Video passend zur gewählten Sprache eingebettet.
 
 ### macOS / Linux
 

@@ -3,7 +3,7 @@
 import { el, escapeHtml, tProp } from './util.js';
 import { state, renderActivePane } from './state.js';
 import { renderTaskList } from './panes.js';
-import { t } from './i18n.js';
+import { t, getLocale } from './i18n.js';
 
 
 function renderWelcomePane(host){
@@ -121,25 +121,30 @@ function renderWelcomePane(host){
   });
   quick.appendChild(steps);
 
-  // 02 Video tutorial: the five steps as a one-minute screen recording.
-  // The file lives at the project root (tutorial/); the builder page is
+  // 02 Video tutorial: the five steps as a screen recording, one file per
+  // language. Picked by the active chrome locale; render() re-runs this pane
+  // on locale switch, so the source follows the language automatically.
+  // The files live at the project root (tutorial/); the builder page is
   // served from /builder/, hence the relative parent path.
   const video = chapter(t('welcome.video.title'));
   video.appendChild(el('p', {className:'welcome-lead', text: t('welcome.video.lead')}));
   const videoWrap = el('div', {className:'welcome-video-wrap'});
+  const videoLang = getLocale() === 'en' ? 'en' : 'de';
+  const videoFile = 'tutorial/scorm-builder-tutorial-' + videoLang + '.webm';
   const videoEl = el('video', {
     className: 'welcome-video',
     attrs: {
       controls: '',
       preload: 'metadata',
-      src: '../tutorial/scorm-builder-tutorial.webm'
+      src: '../' + videoFile
     }
   });
   // Hide the whole section body gracefully when the file is missing
-  // (e.g. a checkout without the tutorial folder).
+  // (e.g. a checkout without the tutorial folder). The message names the
+  // exact file so a stale cache or wrong path is easy to spot.
   videoEl.addEventListener('error', () => {
     videoWrap.innerHTML = '';
-    videoWrap.appendChild(el('p', {className:'welcome-video-missing', text: t('welcome.video.missing')}));
+    videoWrap.appendChild(el('p', {className:'welcome-video-missing', text: t('welcome.video.missing', {file: videoFile})}));
   });
   videoWrap.appendChild(videoEl);
   video.appendChild(videoWrap);

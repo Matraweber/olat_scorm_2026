@@ -286,7 +286,7 @@ const en = {
     video: {
       title: 'Video: the steps in one minute',
       lead: 'The short tutorial walks through the whole flow from an empty course to the SCORM export.',
-      missing: 'The tutorial video was not found (tutorial/scorm-builder-tutorial.webm).'
+      missing: 'The tutorial video was not found ({file}).'
     },
     quickstart: {
       title: 'From zero to SCORM package in 5 steps',
