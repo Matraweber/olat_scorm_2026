@@ -109,13 +109,30 @@
           btn.addEventListener('click', ev => { ev.stopPropagation(); insertAtCaret(b.ins, b.caret); });
           helpRow.appendChild(btn);
         });
+        // Trigonometry: inserts e.g. "sin()" with the caret inside the parens.
+        // Degrees vs. radians is set once per block (angle-unit select below).
+        const trigSel = document.createElement('select');
+        trigSel.className = 'comp-formula-btn';
+        trigSel.title = _t('block.composition.popover.grading.trigSelectTitle');
+        trigSel.innerHTML = '<option value="">' + _t('block.composition.popover.grading.trigSelectPlaceholder') + '</option>' +
+          ['sin','cos','tan','arcsin','arccos','arctan'].map(f => '<option value="' + f + '">' + f + '( )</option>').join('');
+        trigSel.addEventListener('change', () => {
+          const f = trigSel.value;
+          trigSel.value = '';
+          if(f) insertAtCaret(f + '()', f.length + 1);
+        });
+        helpRow.appendChild(trigSel);
         const defVars = (block.config.variables || []).filter(v => v && v.name);
-        if(defVars.length){
+        // Plus course-wide variables the block doesn't shadow.
+        const localNames = new Set(defVars.map(v => v.name));
+        const globVars = (window.BlockUtils.globalVarNames ? window.BlockUtils.globalVarNames() : []).filter(n => !localNames.has(n));
+        if(defVars.length || globVars.length){
           const sel2 = document.createElement('select');
           sel2.className = 'comp-formula-btn';
           sel2.title = _t('block.composition.popover.grading.varsSelectTitle');
           sel2.innerHTML = '<option value="">' + _t('block.composition.popover.grading.varsSelectPlaceholder') + '</option>' +
-            defVars.map(v => '<option value="' + v.name + '">' + v.name + '</option>').join('');
+            defVars.map(v => '<option value="' + v.name + '">' + v.name + '</option>').join('') +
+            globVars.map(n => '<option value="' + n + '">' + n + ' (' + _t('block.composition.popover.grading.globalSuffix') + ')</option>').join('');
           sel2.addEventListener('change', () => {
             const v = sel2.value;
             sel2.value = '';
@@ -200,6 +217,25 @@
           );
           body.appendChild(fmlWrap);
         }
+
+        // Angle unit for sin/cos/tan (and inverses) in every formula of this
+        // block. Unset = degrees (geometry tasks); see prepareFormula().
+        const unitWrap = document.createElement('div');
+        unitWrap.className = 'comp-bew-field';
+        const unitLbl = document.createElement('label');
+        unitLbl.textContent = _t('block.composition.popover.grading.angleUnitLabel');
+        unitWrap.appendChild(unitLbl);
+        const unitSel = document.createElement('select');
+        unitSel.title = _t('block.composition.popover.grading.angleUnitTitle');
+        [['deg', 'angleUnitDeg'], ['rad', 'angleUnitRad']].forEach(([v, k]) => {
+          const o = document.createElement('option');
+          o.value = v; o.textContent = _t('block.composition.popover.grading.' + k);
+          unitSel.appendChild(o);
+        });
+        unitSel.value = block.config.angleUnit === 'rad' ? 'rad' : 'deg';
+        unitSel.addEventListener('change', () => { block.config.angleUnit = unitSel.value; commitQuiet(); });
+        unitWrap.appendChild(unitSel);
+        body.appendChild(unitWrap);
       }
       renderBewBody();
 

@@ -10,13 +10,14 @@
   if(!H) throw new Error("composition-runtime.js: window.CompositionHelpers not loaded.");
   const {
     NS, buildSvg, renderShape,
-    parseSlotTokens, slotNumbersInLabel, expandSlotRefs, formatSlotValue
+    parseSlotTokens, slotNumbersInLabel, prepareFormula, formatSlotValue,
+    labelHasHtml, labelHasMath, labelPlainText, labelMetrics, labelHtmlFragment, yesNoPlaceholder
   } = H;
 
   // Runtime mount helpers (SCORM player)
 
   // Roll variable values (shared across all modes).
-  function compGenVars(variables){
+  function compGenVars(variables, cfg){
     const vars = {};
     (variables || []).forEach(v => {
       if(!v || !v.name) return;
@@ -24,25 +25,41 @@
       const a = isNaN(lo) ? 1 : lo;
       const b = isNaN(hi) ? 10 : hi;
       let val = a + Math.random() * (b - a);
-      if(v.integer !== false) val = Math.round(val);
-      else val = Math.round(val * 100) / 100;
+      // Variables are whole numbers unless integer is explicitly false.
+      val = window.BlockUtils.roundVarValue(val, v.integer !== false, v, cfg);
       vars[v.name] = val;
     });
     return vars;
   }
+  // Plain numeric substitution ({a} -> 3.14159, braces dropped). Only for
+  // values that get parsed back as numbers (static correctText solutions);
+  // text shown to students goes through compFillDisplay.
   function compFillTemplate(str, vars){
     return String(str || '').replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
       if(name in vars){
         const v = vars[name];
-        return Number.isInteger(v) ? String(v) : String(Math.round(v * 1000) / 1000);
+        return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
       }
       return m;
     });
   }
-  function compApplyVarsToShapes(shapes, vars){
+  // Display substitution, same rules as the numeric input block (keeps {} in
+  // $…$ so LaTeX arguments like frac{a}{b} stay intact, fractions like 3/7,
+  // negatives wrapped after operators).
+  function compFillDisplay(str, vars, cfg){
+    const U = window.BlockUtils;
+    return U.fillMathTemplate(String(str || ''), vars || {}, U.varFormats(cfg && cfg.variables, cfg));
+  }
+  // Task text with the current variable values ({a} -> 3). Localized first,
+  // so a bilingual prompt keeps working; numbered slots {1} stay untouched.
+  function compApplyVarsToPrompt(prompt, vars, cfg){
+    if(!prompt) return prompt;
+    return compFillDisplay(window.BlockUtils.l(prompt), vars, cfg);
+  }
+  function compApplyVarsToShapes(shapes, vars, cfg){
     return (shapes || []).map(sh => {
       if(sh.type !== 'label') return sh;
-      return Object.assign({}, sh, { text: compFillTemplate(sh.text, vars) });
+      return Object.assign({}, sh, { text: compFillDisplay(sh.text, vars, cfg) });
     });
   }
 
@@ -84,9 +101,37 @@
   }
 
   // Mode dispatcher; graded modes share the standard question card.
+  // ---- Ja/Nein answer fields (fill-in-the-blanks mode) ----------------------
+  function compYesNoPoints(sh){
+    const p = Number(sh && sh.points);
+    return (sh && sh.points !== '' && sh.points != null && Number.isFinite(p)) ? Math.max(0, p) : 1;
+  }
+  // 'yes' / 'no' / null for whatever the student typed (Ja/Nein, j/n, yes/no).
+  function compParseYesNo(s){
+    const v = String(s || '').trim().toLowerCase();
+    if(['ja', 'j', 'yes', 'y'].includes(v)) return 'yes';
+    if(['nein', 'n', 'no'].includes(v)) return 'no';
+    return null;
+  }
+  // Does the block have numeric/text slots ({}, {N}, legacy blank labels)?
+  function compHasSlotBlanks(config){
+    return (config.shapes || []).some(sh => sh && sh.type === 'label' &&
+      (sh.blank || slotNumbersInLabel(sh.text || '').length > 0 || String(sh.text || '').indexOf('{}') >= 0));
+  }
+  // Max points of the block. Fill-in-the-blanks with Ja/Nein fields:
+  // slot points ("Punkte", if slots exist) + the sum of the Ja/Nein points.
+  function compMaxPoints(config){
+    const base = Math.max(1, Number(config.maxPoints) || 1);
+    if((config.gradingMode || 'none') !== 'fillblanks') return base;
+    const yn = (config.shapes || []).filter(sh => sh && sh.type === 'yesno');
+    if(!yn.length) return base;
+    const total = (compHasSlotBlanks(config) ? base : 0) + yn.reduce((s, sh) => s + compYesNoPoints(sh), 0);
+    return total > 0 ? total : base;
+  }
+
   function mountGraded(host, config, api, mode){
     const ui = makeRuntimeCard(host, config);
-    const maxPoints = Math.max(1, Number(config.maxPoints) || 1);
+    const maxPoints = compMaxPoints(config);
     api.initScore(maxPoints);
     if(mode === 'acknowledge') return runAcknowledge(ui, config, api, maxPoints);
     if(mode === 'click')       return runClick(ui, config, api, maxPoints);
@@ -121,17 +166,19 @@
     const svg = appendSvg(ui.content, config, 'comp-click-' + (api?.blockId || ''));
     const shapes = config.shapes || [];
     const correctCount = shapes.filter(s => s.isCorrect).length;
-    const penalize     = !!config.penalizeWrong;
+    // Each correct shape earns a share; each wrong click can deduct
+    // (penalizeWrong + penaltyPoints, '' = one share), never below 0.
+    const U = window.BlockUtils;
+    const perCorrect = correctCount ? maxPoints / correctCount : 0;
+    const penalty = U.penaltyPerWrong(config, perCorrect);
     let foundCorrect = 0;
     let wrongClicks  = 0;
     let locked = false;
+    const clickScore = () => correctCount === 0 ? 0
+      : U.scoreWithPenalty(foundCorrect * perCorrect, wrongClicks, penalty, maxPoints);
 
     function recomputeScore(){
-      if(correctCount === 0){ api.reportScore(0); return; }
-      const ratio = penalize
-        ? Math.max(0, (foundCorrect - wrongClicks) / correctCount)
-        : (foundCorrect / correctCount);
-      api.reportScore(Math.round(ratio * maxPoints * 100) / 100);
+      api.reportScore(clickScore());
     }
     function markShape(node, kind){
       node.classList.add('comp-graded-' + kind);
@@ -168,9 +215,7 @@
         }
         node.style.cursor = 'default';
       });
-      const pts = correctCount === 0 ? 0
-                : penalize ? Math.max(0, Math.round((foundCorrect - wrongClicks) / correctCount * maxPoints * 100) / 100)
-                           : Math.round((foundCorrect / correctCount) * maxPoints * 100) / 100;
+      const pts = clickScore();
       api.reportScore(pts);
       const msg = wrongClicks
         ? t('block.composition.runtime.click.summaryWithWrong', { found: foundCorrect, total: correctCount, wrong: wrongClicks, pts, max: maxPoints })
@@ -188,17 +233,20 @@
   // can build multi-step problems where step 2 references step 1's solution.
   function runFillBlanks(ui, config, api, maxPoints){
     const u = window.BlockUtils;
+    // Points shared by the numeric/text slots ("Punkte" field); Ja/Nein
+    // fields add their own on top (see compMaxPoints).
+    const numericMax = compHasSlotBlanks(config) ? Math.max(1, Number(config.maxPoints) || 1) : 0;
     const variables = Array.isArray(config.variables) ? config.variables : [];
     let currentVars = {};
     const renderedSvgHost = document.createElement('div');
     ui.content.appendChild(renderedSvgHost);
 
-    const genVars       = () => compGenVars(variables);
+    const genVars       = () => u.withGlobalVars(compGenVars(variables, config), variables);
     const fillTemplate  = compFillTemplate;
     function evalFormula(expr, vars){
       if(!expr) return null;
       try {
-        const r = u.safeMathExpr(expandSlotRefs(expr), vars);
+        const r = u.safeMathExpr(prepareFormula(expr, config.angleUnit), vars);
         if(typeof r === 'number' && Number.isFinite(r)) return r;
       } catch{}
       return null;
@@ -251,6 +299,8 @@
           const asNum = u.parseNum(filled);
           if(asNum != null) value = asNum;
         }
+        // Snap whole results so 2.9999999 shows and grades as 3.
+        if(config.integerAnswers && u.isWholeNumber(value)) value = Math.round(value);
         const asString = value == null ? '' : formatSlotValue(value);
         results[n] = { value, asString, tolerance, formula };
         if(n > 0 && value != null) slotVars['s' + n] = value;
@@ -260,10 +310,15 @@
 
     function render(){
       renderedSvgHost.innerHTML = '';
+      // Task text shows the same variable values as the labels.
+      if(ui.qText && config.prompt && String(u.l(config.prompt) || '').trim()){
+        ui.qText.textContent = compApplyVarsToPrompt(config.prompt, currentVars, config);
+        u.renderMath(ui.qText);
+      }
       // Substitute named variables {name} (numbered {N} placeholders are kept).
       const shapes = (config.shapes || []).map(sh => {
         if(sh.type !== 'label') return sh;
-        return Object.assign({}, sh, { text: fillTemplate(sh.text, currentVars) });
+        return Object.assign({}, sh, { text: compFillDisplay(sh.text, currentVars, config) });
       });
       const renderConfig = Object.assign({}, config, { shapes });
       const svg = appendSvg(renderedSvgHost, renderConfig, 'comp-blanks-' + (api?.blockId || ''));
@@ -279,7 +334,7 @@
         const tokens = parseSlotTokens(text);
         const hasInline = tokens.some(t => t.kind === 'slot' || t.kind === 'mirror');
         if(!sh.blank && !hasInline) return;
-        const textNode = svg.querySelector('text[data-shape-idx="' + idx + '"]');
+        const textNode = svg.querySelector('[data-shape-idx="' + idx + '"]');
         if(!textNode) return;
         const fs = sh.fontSize || 18;
         const fontWeight = sh.fontWeight || 400;
@@ -299,56 +354,86 @@
         if(hasInline){
           // Mixed text + slots + mirrors. Build a flow layout with a foreignObject.
           const charW = fs * 0.55;
-          // Width estimate: text segments + per-slot input + per-mirror span.
-          let estW = 12;
+          // Labels with formatting (<b>, <sup>, <br>, …) are built from the
+          // sanitized HTML with slot markers; plain labels keep the flex row.
+          const isHtml = labelHasHtml(text) || labelHasMath(text); // math: KaTeX needs the HTML path
+          const lineCount = isHtml ? labelMetrics(sh).lines : 1;
+          // Width estimate: widest line of text segments + slots + mirrors.
+          let estW = 12, lineW = 12;
           tokens.forEach(t => {
-            if(t.kind === 'text') estW += t.text.length * charW;
-            else if(t.kind === 'slot'){
+            if(t.kind === 'text'){
+              const parts = isHtml ? String(t.text).split(/<br\s*\/?>/i) : [t.text];
+              parts.forEach((p, pi) => {
+                if(pi > 0){ estW = Math.max(estW, lineW); lineW = 12; }
+                lineW += (isHtml ? labelPlainText(p) : p).length * charW;
+              });
+            } else if(t.kind === 'slot'){
               const n = t.n == null ? 0 : t.n;
               const expectedStr = (slotInfo.results[n] && slotInfo.results[n].asString) || '';
-              estW += Math.max(60, expectedStr.length * fs * 0.55 + 20);
+              lineW += Math.max(60, expectedStr.length * fs * 0.55 + 20);
             } else if(t.kind === 'mirror'){
-              estW += Math.max(40, 4 * charW + 8);
+              lineW += Math.max(40, 4 * charW + 8);
             }
           });
+          estW = Math.max(estW, lineW);
+          const rowH = fs + 12;
 
           const fo = document.createElementNS(NS, 'foreignObject');
           fo.setAttribute('x', sh.x - 2);
           fo.setAttribute('y', sh.y - fs);
           fo.setAttribute('width', estW);
-          fo.setAttribute('height', fs + 16);
+          fo.setAttribute('height', rowH * lineCount + 4);
           fo.setAttribute('data-shape-idx', String(idx));
 
           const wrap = document.createElement('div');
-          wrap.style.cssText = 'display:flex; align-items:center; gap:3px; height:' + (fs + 12) + 'px; ' +
+          wrap.style.cssText = (isHtml
+              ? 'display:block; line-height:' + rowH + 'px; '
+              : 'display:flex; align-items:center; gap:3px; height:' + rowH + 'px; ') +
             'font:' + fontWeight + ' ' + fs + 'px Verdana,Arial,sans-serif; color:' + color + '; white-space:nowrap;';
 
-          tokens.forEach(t => {
-            if(t.kind === 'text'){
-              if(t.text){
-                const s = document.createElement('span');
-                s.textContent = t.text;
-                wrap.appendChild(s);
-              }
-            } else if(t.kind === 'slot'){
+          // Input for a slot / live mirror of a slot's answer.
+          function slotNode(t){
+            if(t.kind === 'slot'){
               const n = t.n == null ? 0 : t.n;
               const exp = slotInfo.results[n] || { value:null, asString:'', tolerance:0.01, formula:null };
               const expectedStr = exp.asString || '';
               const inputW = Math.max(60, expectedStr.length * fs * 0.55 + 20);
               const inp = makeInput(inputW);
-              wrap.appendChild(inp);
+              if(isHtml) inp.style.verticalAlign = 'middle';
               blanks.push({ slotN: n, idx, input: inp, expected: exp });
-            } else if(t.kind === 'mirror'){
-              const n = t.n;
-              const span = document.createElement('span');
-              span.className = 'comp-mirror';
-              span.style.cssText = 'display:inline-block; min-width:1.5em; padding:0 0.25rem; ' +
-                'border-bottom:1px dashed #84bf66; color:#0f567d; font-style:italic;';
-              span.textContent = '?';
-              wrap.appendChild(span);
-              (mirrorsBySlot[n] = mirrorsBySlot[n] || []).push(span);
+              return inp;
             }
-          });
+            const n = t.n;
+            const span = document.createElement('span');
+            span.className = 'comp-mirror';
+            span.style.cssText = 'display:inline-block; min-width:1.5em; padding:0 0.25rem; ' +
+              'border-bottom:1px dashed #84bf66; color:#0f567d; font-style:italic;' +
+              (isHtml ? ' line-height:normal; vertical-align:middle;' : '');
+            span.textContent = '?';
+            (mirrorsBySlot[n] = mirrorsBySlot[n] || []).push(span);
+            return span;
+          }
+
+          if(isHtml){
+            const html = tokens.map((t, ti) => t.kind === 'text' ? t.text : '<span data-cslot="' + ti + '"></span>').join('');
+            wrap.appendChild(labelHtmlFragment(html));
+            wrap.querySelectorAll('[data-cslot]').forEach(m => {
+              const t = tokens[Number(m.getAttribute('data-cslot'))];
+              m.replaceWith(slotNode(t));
+            });
+          } else {
+            tokens.forEach(t => {
+              if(t.kind === 'text'){
+                if(t.text){
+                  const s = document.createElement('span');
+                  s.textContent = t.text;
+                  wrap.appendChild(s);
+                }
+              } else {
+                wrap.appendChild(slotNode(t));
+              }
+            });
+          }
           fo.appendChild(wrap);
           textNode.replaceWith(fo);
         } else if(sh.blank){
@@ -370,6 +455,28 @@
         }
       });
 
+      // Ja/Nein fields: swap the placeholder box for a real input of the same size.
+      (config.shapes || []).forEach((sh, idx) => {
+        if(!sh || sh.type !== 'yesno') return;
+        const node = svg.querySelector('[data-shape-idx="' + idx + '"]');
+        if(!node) return;
+        const w = Math.max(40, sh.w ?? 140), h = Math.max(20, sh.h ?? 40);
+        const fo = document.createElementNS(NS, 'foreignObject');
+        fo.setAttribute('x', sh.x ?? 0); fo.setAttribute('y', sh.y ?? 0);
+        fo.setAttribute('width', w); fo.setAttribute('height', h);
+        fo.setAttribute('data-shape-idx', String(idx));
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'comp-blank-input';
+        inp.placeholder = yesNoPlaceholder();
+        inp.style.cssText = 'width:100%; height:100%; box-sizing:border-box; ' +
+          'font:400 ' + Math.max(10, Math.min(20, h * 0.45)) + 'px Verdana,Arial,sans-serif; ' +
+          'padding:0 0.5rem; border:1px solid var(--line, #d8e0e6); border-radius:6px; background:#fff; color:#003b5c;';
+        fo.appendChild(inp);
+        node.replaceWith(fo);
+        blanks.push({ kind: 'yesno', idx, input: inp, correct: sh.correct === 'no' ? 'no' : 'yes', points: compYesNoPoints(sh) });
+      });
+
       // Mirror spans show the student's actual entered value (live update).
       function updateMirrorsForSlot(slotN){
         const spans = mirrorsBySlot[slotN];
@@ -388,8 +495,24 @@
       return blanks;
     }
 
+    // "Nur ganzzahlige Lösungen": redraw until every slot computed by a
+    // formula is a whole number (falls back to the last draw).
+    function drawVars(){
+      let vars = genVars();
+      if(!config.integerAnswers) return vars;
+      const prev = currentVars;
+      for(let i = 0; i < 2000; i++){
+        currentVars = vars;
+        const { results } = computeSlotExpected();
+        if(Object.keys(results).every(n => !results[n].formula || u.isWholeNumber(results[n].value))) break;
+        vars = genVars();
+      }
+      currentVars = prev;
+      return vars;
+    }
+
     function regenerate(){
-      currentVars = genVars();
+      currentVars = drawVars();
       const blanks = render();
       checkBtn.disabled = false;
       checked = false;
@@ -400,7 +523,7 @@
 
     let currentBlanks = [];
     let checked = false;
-    currentVars = genVars();
+    currentVars = drawVars();
     currentBlanks = render();
 
     const checkBtn = document.createElement('button');
@@ -415,8 +538,11 @@
       // for follow-through grading: a later slot whose formula references
       // {N*} is re-evaluated against the student's slot N, not the correct
       // one, so a propagated mistake still earns half points.
+      // Numeric / text slots share the block points; Ja/Nein fields carry their own.
+      const numBlanks = currentBlanks.filter(b => b.kind !== 'yesno');
+      const ynBlanks  = currentBlanks.filter(b => b.kind === 'yesno');
       const studentSlotValues = {};
-      currentBlanks.forEach(b => {
+      numBlanks.forEach(b => {
         if(b.slotN > 0){
           const g = u.parseNum(b.input.value);
           if(g != null) studentSlotValues['s' + b.slotN] = g;
@@ -425,7 +551,7 @@
       let scoreSum = 0;
       let strictCount = 0;
       let partialCount = 0;
-      currentBlanks.forEach(b => {
+      numBlanks.forEach(b => {
         const given = String(b.input.value || '').trim();
         const tol = b.expected.tolerance != null ? b.expected.tolerance : 0.01;
         let mark = 'wrong';
@@ -456,9 +582,28 @@
         if(mark === 'correct'){ scoreSum += 1; strictCount++; }
         else if(mark === 'partial'){ scoreSum += 0.5; partialCount++; }
       });
-      const pts = Math.round((scoreSum / currentBlanks.length) * maxPoints * 100) / 100;
+      // Ja/Nein fields: each one is worth its own points (default 1).
+      // Wrong Ja/Nein answers may deduct (penalizeWrong / penaltyPoints, '' =
+      // that field's own points). Empty fields cost nothing.
+      let ynPts = 0, ynCorrect = 0, ynPenalty = 0;
+      ynBlanks.forEach(b => {
+        const given = compParseYesNo(b.input.value);
+        const ok = given === b.correct;
+        if(!ok && given != null) ynPenalty += window.BlockUtils.penaltyPerWrong(config, b.points);
+        b.input.disabled = true;
+        b.input.classList.add(ok ? 'comp-blank-ok' : 'comp-blank-bad');
+        if(!ok){
+          b.input.title = u.t('block.composition.runtime.fillblanks.solutionTitle', {
+            solution: u.t(b.correct === 'no' ? 'block.composition.yesno.no' : 'block.composition.yesno.yes')
+          });
+        }
+        if(ok){ ynPts += b.points; ynCorrect++; }
+      });
+      // Slots share the block's "Punkte" (only counted when slots exist).
+      const numPts = numBlanks.length ? (scoreSum / numBlanks.length) * numericMax : 0;
+      const pts = window.BlockUtils.scoreWithPenalty(numPts + ynPts, 1, ynPenalty, maxPoints);
       api.reportScore(pts);
-      const fullCount = strictCount;
+      const fullCount = strictCount + ynCorrect;
       const msgKey = partialCount > 0
         ? 'block.composition.runtime.fillblanks.summaryWithPartial'
         : 'block.composition.runtime.fillblanks.summary';
@@ -467,7 +612,7 @@
         partial: partialCount, pts, max: maxPoints
       });
       if(fullCount === currentBlanks.length) ui.fb.ok(msg);
-      else if(scoreSum > 0)                  ui.fb.neutral(msg);
+      else if(pts > 0 || scoreSum > 0)       ui.fb.neutral(msg);
       else                                   ui.fb.bad(msg);
     });
     ui.buttons.appendChild(checkBtn);
@@ -480,7 +625,21 @@
       ui.buttons.appendChild(newBtn);
       window.BlockUtils.regenPolicy(newBtn, config, api);
     }
-    return {};
+    return {
+      getVars: () => currentVars,
+      showSolution(){
+        const yes = u.getLocale && u.getLocale() === 'en' ? 'Yes' : 'Ja';
+        const no  = u.getLocale && u.getLocale() === 'en' ? 'No' : 'Nein';
+        currentBlanks.forEach(b => {
+          if(b.kind === 'yesno') b.input.value = b.correct === 'yes' ? yes : no;
+          else if(b.expected) b.input.value = b.expected.asString || '';
+          b.input.dispatchEvent(new Event('input'));
+        });
+        checked = true;
+        checkBtn.disabled = true;
+        ui.fb.ok(u.t('utils.resume.solved'));
+      }
+    };
   }
 
   // Mode: hotspot. Draggable markers must land in their target zones.
@@ -619,8 +778,51 @@
   }
 
 
+  // Course-wide variables: with "Nur ganzzahlige Lösungen", can some draw
+  // of the block's own variables still make every formula slot a whole
+  // number with this set of global values? Slots are evaluated in number
+  // order so later formulas can use earlier results (s1, s2, …), like
+  // computeSlotExpected in runFillBlanks.
+  function compAcceptsGlobals(config, globals){
+    if(!config || config.gradingMode !== 'fillblanks' || !config.integerAnswers) return true;
+    const U = window.BlockUtils;
+    const shapes = config.shapes || [];
+    const nums = new Set();
+    shapes.forEach(sh => {
+      if(sh.type === 'label' && sh.text){
+        slotNumbersInLabel(sh.text).forEach(n => nums.add(n));
+        if(sh.text.indexOf('{}') >= 0) nums.add(0);
+      }
+    });
+    const formulas = [];
+    Array.from(nums).sort((a, b) => a - b).forEach(n => {
+      for(const sh of shapes){
+        if(sh.type !== 'label') continue;
+        if(n > 0 && sh.formulas && sh.formulas[n] && sh.formulas[n].formula){ formulas.push({ n, f: sh.formulas[n].formula }); return; }
+        const has = n > 0 ? slotNumbersInLabel(sh.text || '').indexOf(n) >= 0 : (sh.text || '').indexOf('{}') >= 0;
+        if(has && sh.formula && String(sh.formula).trim()){ formulas.push({ n, f: sh.formula }); return; }
+      }
+    });
+    if(!formulas.length) return true;
+    const variables = Array.isArray(config.variables) ? config.variables : [];
+    const tries = variables.some(v => v && v.name) ? 2000 : 1;
+    for(let i = 0; i < tries; i++){
+      const vars = U.withGlobalVars(compGenVars(variables, config), variables, globals);
+      const slotVars = {};
+      const ok = formulas.every(({ n, f }) => {
+        let v = null;
+        try { v = U.safeMathExpr(prepareFormula(f, config.angleUnit), Object.assign({}, vars, slotVars)); } catch{}
+        if(!U.isWholeNumber(v)) return false;
+        if(n > 0) slotVars['s' + n] = v;
+        return true;
+      });
+      if(ok) return true;
+    }
+    return false;
+  }
+
   window.CompositionRuntime = {
-    compGenVars, compApplyVarsToShapes,
+    compGenVars, compApplyVarsToShapes, compApplyVarsToPrompt, compMaxPoints, compAcceptsGlobals,
     mountStatic, mountGraded
   };
 })();

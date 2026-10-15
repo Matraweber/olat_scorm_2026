@@ -100,6 +100,8 @@
           });
           list.appendChild(item);
         });
+        // The list is rebuilt as plain text on every move: typeset $…$ again.
+        u.renderMath(list);
       }
       content.appendChild(list);
 

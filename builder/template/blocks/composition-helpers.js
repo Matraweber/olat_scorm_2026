@@ -25,7 +25,9 @@
     rect:    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="12" height="10" rx="1"/></svg>',
     label:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><text x="3" y="15" font-size="14" font-family="Verdana, sans-serif" font-weight="700">T</text></svg>',
     coords:  '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 L4 3 M2 5 L4 3 L6 5"/><path d="M4 17 L18 17 M16 15 L18 17 L16 19"/></svg>',
-    image:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1"/><circle cx="8" cy="9" r="1.3" fill="currentColor" stroke="none"/><path d="M3 14 L8 10 L13 14 L17 11"/></svg>'
+    image:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1"/><circle cx="8" cy="9" r="1.3" fill="currentColor" stroke="none"/><path d="M3 14 L8 10 L13 14 L17 11"/></svg>',
+    // Yes/no answer field: input box with a check mark.
+    yesno:   '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="16" height="10" rx="2"/><path d="M6 10 L8.5 12.5 L13.5 7.5"/></svg>'
   };
 
   // Action-button icons (z-order, duplicate, delete) in the right toolbar
@@ -65,12 +67,14 @@
     label:   () => {
       const u = window.BlockUtils;
       const text = (u && typeof u.t === 'function') ? u.t('block.composition.shape.label') : 'Beschriftung';
-      return { type:'label', x: 80, y:120, text, color:'#003b5c', fontSize:24, fontWeight:'700' };
+      return { type:'label', x: 80, y:120, text, color:'#003b5c', fontSize:24, fontWeight:'400' };
     },
     coords:  () => ({ type:'coords',  x: 60, y: 60, w:320, h:220,
                       xMin:-5, xMax:5, yMin:-3, yMax:3, step:1,
                       showGrid:true, showLabels:true, color:'#003b5c' }),
-    image:   () => ({ type:'image',   x: 80, y: 80, w:240, h:160, src:'' })
+    image:   () => ({ type:'image',   x: 80, y: 80, w:240, h:160, src:'' }),
+    // Ja/Nein answer field (fill-in-the-blanks mode): correct = 'yes' | 'no'.
+    yesno:   () => ({ type:'yesno',   x: 80, y: 80, w:140, h: 40, correct:'yes', points: 1, color:'#c6d1d8' })
   };
   function newShape(type){
     const factory = SHAPE_DEFAULTS[type];
@@ -102,6 +106,197 @@
     return out;
   }
 
+  // ---- Label rich text ----------------------------------------------------
+  // Labels accept a small HTML subset: <b>/<strong>, <i>/<em>, <u>, <s>,
+  // <sub>, <sup>, <br> and color via <span style="color:…">. Labels stay real
+  // SVG <text> (rendered as <tspan>s), so dragging, hit-testing, snapping and
+  // {var}/{N} placeholders keep working. Unknown tags are unwrapped to their
+  // text; nothing from the markup except these formats reaches the DOM.
+  // Plain labels (no recognised tag/entity) render exactly as before, so a
+  // math label like "x<y" is not misread as HTML.
+  const LABEL_HTML_RE = /<\/?(b|strong|i|em|u|s|sub|sup|br|span)\b[^>]*>|&(?:[a-z]+|#\d+);/i;
+  function labelHasHtml(text){ return LABEL_HTML_RE.test(String(text || '')); }
+  // -> array of lines, each an array of runs {text, bold, italic, underline,
+  //    strike, shift:'sub'|'sup', color}.
+  function parseLabelLines(text){
+    const str = String(text || '');
+    if(!labelHasHtml(str)) return [[{ text: str }]];
+    const tpl = document.createElement('template');
+    tpl.innerHTML = str; // inert: template content never runs scripts
+    const lines = [[]];
+    (function walk(node, fmt){
+      node.childNodes.forEach(ch => {
+        if(ch.nodeType === 3){
+          if(ch.nodeValue) lines[lines.length - 1].push(Object.assign({ text: ch.nodeValue }, fmt));
+          return;
+        }
+        if(ch.nodeType !== 1) return;
+        const tag = ch.tagName.toLowerCase();
+        if(tag === 'br'){ lines.push([]); return; }
+        const f = Object.assign({}, fmt);
+        if(tag === 'b' || tag === 'strong') f.bold = true;
+        else if(tag === 'i' || tag === 'em') f.italic = true;
+        else if(tag === 'u') f.underline = true;
+        else if(tag === 's' || tag === 'strike' || tag === 'del') f.strike = true;
+        else if(tag === 'sub') f.shift = 'sub';
+        else if(tag === 'sup') f.shift = 'sup';
+        if(ch.style && ch.style.color) f.color = ch.style.color;
+        walk(ch, f);
+      });
+    })(tpl.content, {});
+    return lines;
+  }
+  // KaTeX in labels: $…$, $$…$$, \(…\) or \[…\]. SVG <text> cannot hold
+  // KaTeX output, so such labels render as an HTML box in a <foreignObject>
+  // (see renderMathLabel); everything else stays SVG text.
+  const LABEL_MATH_RE = /\$[^$]+\$|\\\(|\\\[/;
+  function labelHasMath(text){ return LABEL_MATH_RE.test(String(text || '')); }
+  // The math box's top edge sits this many font sizes above the baseline
+  // anchor (x, y), so it lines up with where SVG text would be.
+  const MATH_LABEL_TOP = 1.15;
+  function mathLabelY(shape){
+    return (shape.y ?? 30) - (Number(shape.fontSize) || 18) * MATH_LABEL_TOP;
+  }
+  // Ja/Nein answer field as drawn on the canvas (builder + non-graded views).
+  function yesNoPlaceholder(){
+    const u = window.BlockUtils;
+    return (u && typeof u.t === 'function') ? u.t('block.composition.yesno.placeholder') : 'Ja/Nein';
+  }
+  function renderYesNoBox(shape){
+    const x = shape.x ?? 0, y = shape.y ?? 0;
+    const w = Math.max(40, shape.w ?? 140), h = Math.max(20, shape.h ?? 40);
+    const g = document.createElementNS(NS, 'g');
+    const box = document.createElementNS(NS, 'rect');
+    box.setAttribute('x', x); box.setAttribute('y', y);
+    box.setAttribute('width', w); box.setAttribute('height', h);
+    box.setAttribute('rx', Math.min(8, h / 4));
+    box.setAttribute('fill', '#ffffff');
+    box.setAttribute('stroke', shape.color || '#c6d1d8');
+    box.setAttribute('stroke-width', 1.5);
+    g.appendChild(box);
+    const tx = document.createElementNS(NS, 'text');
+    const fs = Math.max(10, Math.min(20, h * 0.45));
+    tx.setAttribute('x', x + 10); tx.setAttribute('y', y + h / 2 + fs * 0.35);
+    tx.setAttribute('font-size', fs);
+    tx.setAttribute('font-family', 'Verdana, Arial, sans-serif');
+    tx.setAttribute('fill', '#8a959e');
+    tx.textContent = yesNoPlaceholder();
+    g.appendChild(tx);
+    return g;
+  }
+  function renderMathLabel(shape, color, text){
+    const m = labelMetrics(shape);
+    const fs = m.fs;
+    const fo = document.createElementNS(NS, 'foreignObject');
+    fo.setAttribute('x', shape.x ?? 10);
+    fo.setAttribute('y', mathLabelY(shape));
+    // Generous box (rendered math is often wider/taller than the estimate);
+    // only the inline-block content takes pointer events, not the empty area.
+    fo.setAttribute('width', Math.max(80, m.w * 1.6 + 40));
+    fo.setAttribute('height', m.h + fs * 1.2);
+    fo.style.overflow = 'visible';
+    fo.style.pointerEvents = 'none';
+    const div = document.createElement('div');
+    div.className = 'comp-math-label';
+    div.style.cssText = 'display:inline-block; white-space:nowrap; pointer-events:auto; ' +
+      'font:' + (shape.fontWeight || '400') + ' ' + fs + 'px Verdana, Arial, sans-serif; ' +
+      'line-height:1.25; color:' + color + ';';
+    div.appendChild(labelHtmlFragment(text != null ? text : shape.text));
+    fo.appendChild(div);
+    const u = window.BlockUtils;
+    if(u && u.renderMath){
+      // Typeset now if KaTeX is ready; otherwise once the node is in the DOM.
+      if(typeof window.renderMathInElement === 'function') u.renderMath(div);
+      else setTimeout(() => u.renderMath(div), 0);
+    }
+    return fo;
+  }
+  function labelPlainText(text){
+    return parseLabelLines(text).map(l => l.map(r => r.text).join('')).join(' ');
+  }
+  // Estimated box (SVG has no cheap text measuring before render):
+  // w = widest line, h = first-line font size + extra lines.
+  function labelMetrics(shape){
+    const fs = Number(shape && shape.fontSize) || 18;
+    const charW = fs * 0.55;
+    const lines = parseLabelLines(shape && shape.text);
+    let w = 0;
+    // In $…$ math, LaTeX commands/braces are much wider in source than
+    // rendered: count \frac etc. as one character and drop {}^_$.
+    const visible = s => labelHasMath(s)
+      ? s.replace(/\\[A-Za-z]+/g, 'x').replace(/[{}^_$]|\\[()[\]]/g, '')
+      : s;
+    lines.forEach(runs => {
+      let lw = 0;
+      runs.forEach(r => { lw += visible(r.text).length * charW * (r.shift ? 0.7 : 1); });
+      if(lw > w) w = lw;
+    });
+    const lineH = fs * 1.25;
+    return { fs, w, h: fs + (lines.length - 1) * lineH, lineH, lines: lines.length };
+  }
+  // Fill an SVG <text> element with the label's (possibly formatted) text.
+  function fillLabelText(el, shape, text){
+    const str = text != null ? String(text) : String((shape && shape.text) || '');
+    while(el.firstChild) el.removeChild(el.firstChild);
+    if(!labelHasHtml(str)){ el.textContent = str; return; }
+    const fs = Number(shape && shape.fontSize) || 18;
+    const lineH = fs * 1.25;
+    const x = (shape && shape.x != null) ? shape.x : 10;
+    let shift = 0;
+    parseLabelLines(str).forEach((runs, li) => {
+      // Empty lines still need a node to advance the baseline.
+      if(runs.length === 0) runs = [{ text: ' ' }];
+      runs.forEach((r, ri) => {
+        const ts = document.createElementNS(NS, 'tspan');
+        // Sub/sup via dy (baseline-shift is unreliable across browsers).
+        const target = r.shift === 'sup' ? -fs * 0.35 : r.shift === 'sub' ? fs * 0.2 : 0;
+        let dy = target - shift;
+        if(ri === 0 && li > 0){ ts.setAttribute('x', x); dy += lineH; }
+        if(dy) ts.setAttribute('dy', Math.round(dy * 100) / 100);
+        shift = target;
+        if(r.shift) ts.setAttribute('font-size', Math.round(fs * 0.7 * 100) / 100);
+        if(r.bold) ts.setAttribute('font-weight', '700');
+        if(r.italic) ts.setAttribute('font-style', 'italic');
+        const deco = [r.underline && 'underline', r.strike && 'line-through'].filter(Boolean).join(' ');
+        if(deco) ts.setAttribute('text-decoration', deco);
+        if(r.color) ts.setAttribute('fill', r.color);
+        ts.textContent = r.text;
+        el.appendChild(ts);
+      });
+    });
+  }
+  // Same subset as safe HTML for the fill-in-the-blanks foreignObject.
+  // Elements with data-cslot (slot/mirror placeholders) are kept as empty
+  // markers for the caller to replace with inputs.
+  function labelHtmlFragment(html){
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html || '');
+    const frag = document.createDocumentFragment();
+    const MAP = { b:'b', strong:'b', i:'i', em:'i', u:'u', s:'s', strike:'s', del:'s', sub:'sub', sup:'sup', span:'span' };
+    (function walk(src, dst){
+      src.childNodes.forEach(ch => {
+        if(ch.nodeType === 3){ dst.appendChild(document.createTextNode(ch.nodeValue)); return; }
+        if(ch.nodeType !== 1) return;
+        const tag = ch.tagName.toLowerCase();
+        if(tag === 'br'){ dst.appendChild(document.createElement('br')); return; }
+        if(ch.hasAttribute('data-cslot')){
+          const m = document.createElement('span');
+          m.setAttribute('data-cslot', ch.getAttribute('data-cslot'));
+          dst.appendChild(m);
+          return;
+        }
+        let out = dst;
+        if(MAP[tag]){
+          out = document.createElement(MAP[tag]);
+          if(ch.style && ch.style.color) out.style.color = ch.style.color;
+          dst.appendChild(out);
+        }
+        walk(ch, out);
+      });
+    })(tpl.content, frag);
+    return frag;
+  }
+
   // Collect all slot numbers used by a label's text (input slots only;
   // mirrors are ignored).
   function slotNumbersInLabel(text){
@@ -120,6 +315,14 @@
   // to safeMathExpr.
   function expandSlotRefs(formula){
     return String(formula || '').replace(/\{(\d+)\*\}/g, 's$1');
+  }
+
+  // Formula ready for safeMathExpr: slot refs expanded and, unless the block
+  // works in radians (config.angleUnit === 'rad'), sin/cos/tan/asin/acos/atan
+  // switched to their degree variants (sind, …) so sin(30) = 0.5 and
+  // asin(0.5) = 30. Explicit sind()/sin() spellings are left alone.
+  function prepareFormula(formula, angleUnit){
+    return window.BlockUtils.applyAngleUnit(expandSlotRefs(formula), angleUnit);
   }
 
   // Format a number for display in a {N*} mirror span.
@@ -342,7 +545,7 @@
         if(shape.cx != null && shape.cy != null) out.push({ x: shape.cx, y: shape.cy });
         return out;
       }
-      case 'rect': case 'image': case 'coords': {
+      case 'rect': case 'image': case 'coords': case 'yesno': {
         const x = shape.x || 0, y = shape.y || 0;
         const w = shape.w || 0, h = shape.h || 0;
         return [
@@ -360,16 +563,18 @@
       case 'label': {
         // Labels render baseline-left, so (x, y) is the baseline anchor.
         // The visual box reaches from (x, y - fontSize) to (x + textWidth, y).
-        const fs = Number(shape.fontSize) || 18;
-        const charW = fs * 0.55;
-        const textW = Math.max(charW, String(shape.text || ' ').length * charW);
+        // Multi-line labels (<br>) extend below the first baseline.
+        const m = labelMetrics(shape);
+        const fs = m.fs;
+        const textW = Math.max(fs * 0.55, m.w);
         const x = shape.x || 0, y = shape.y || 0;
+        const bottom = y + (m.h - fs);
         return [
           { x: x, y: y },                       // baseline-left (the anchor)
           { x: x + textW, y: y },               // baseline-right
           { x: x, y: y - fs },                  // top-left
           { x: x + textW, y: y - fs },          // top-right
-          { x: x + textW / 2, y: y - fs / 2 }   // visual center
+          { x: x + textW / 2, y: (y - fs + bottom) / 2 } // visual center
         ];
       }
       default:
@@ -395,9 +600,10 @@
         return t('block.composition.polygonByCount.generic', { n: n });
       }
       case 'rect':    return t('block.composition.shape.rect');
-      case 'label':   return t('block.composition.display.label', { text: String(shape.text || '').slice(0, 20) });
+      case 'label':   return t('block.composition.display.label', { text: labelPlainText(shape.text).slice(0, 20) });
       case 'coords':  return t('block.composition.shape.coords');
       case 'image':   return shape.src ? t('block.composition.shape.image') : t('block.composition.display.imageEmpty');
+      case 'yesno':   return t('block.composition.display.yesno', { answer: t(shape.correct === 'no' ? 'block.composition.yesno.no' : 'block.composition.yesno.yes'), pts: shape.points ?? 1 });
       default:        return shape.type;
     }
   }
@@ -595,31 +801,36 @@
 
   // Pick an image via hidden <input type=file>, return its data URL.
   // Resolves with null on cancel.
+  // Cancel is detected via the input's `cancel` event. Do not infer it from
+  // the window regaining focus: on Windows focus returns before `change`
+  // delivers the file, which used to resolve null and drop the picked image.
   function pickImageDataUrl(){
     return new Promise(resolve => {
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = 'image/*';
       inp.style.position = 'absolute'; inp.style.left = '-9999px';
       document.body.appendChild(inp);
-      let resolved = false;
-      const cleanup = () => {
-        if(resolved) return;
-        resolved = true;
+      let done = false;
+      const finish = (value) => {
+        if(done) return;
+        done = true;
         if(inp.parentNode) inp.parentNode.removeChild(inp);
+        resolve(value);
       };
       inp.addEventListener('change', () => {
         const file = inp.files && inp.files[0];
-        if(!file){ cleanup(); resolve(null); return; }
+        if(!file){ finish(null); return; }
         const reader = new FileReader();
-        reader.onload = () => { cleanup(); resolve(reader.result); };
-        reader.onerror = () => { cleanup(); resolve(null); };
+        // In the builder, shrink big photos first (js/image-shrink.js).
+        reader.onload = () => {
+          const shrink = window.ScormBuilderShrinkImage;
+          if(typeof shrink === 'function') shrink(reader.result).then(finish, () => finish(reader.result));
+          else finish(reader.result);
+        };
+        reader.onerror = () => finish(null);
         reader.readAsDataURL(file);
       });
-      // Cancel-via-OS-dialog: no `change` fires but the window regains focus.
-      window.addEventListener('focus', function onFocus(){
-        window.removeEventListener('focus', onFocus);
-        setTimeout(() => { if(!inp.files || !inp.files[0]){ cleanup(); resolve(null); } }, 250);
-      });
+      inp.addEventListener('cancel', () => finish(null));
       inp.click();
     });
   }
@@ -629,11 +840,11 @@
     const t = (u && typeof u.t === 'function') ? u.t : (k => k);
     if(!item || !item.type) return t('block.composition.summary.empty');
     const name = shapeLabel(item.type);
-    if(item.type === 'label')  return name + ': "' + String(item.text || '').slice(0, 30) + '"';
+    if(item.type === 'label')  return name + ': "' + labelPlainText(item.text).slice(0, 30) + '"';
     if(item.type === 'circle') return name + '  (r=' + (item.r ?? '?') + ')';
     if(item.type === 'ellipse') return name + '  (' + (item.rx ?? '?') + '×' + (item.ry ?? '?') + ')';
     if(item.type === 'polygon') return name + '  (' + (item.sides ?? 3) + ' ' + t('block.composition.summary.cornersSuffix') + ')';
-    if(item.type === 'rect' || item.type === 'image' || item.type === 'coords')
+    if(item.type === 'rect' || item.type === 'image' || item.type === 'coords' || item.type === 'yesno')
       return name + '  (' + (item.w ?? '?') + '×' + (item.h ?? '?') + ')';
     return name;
   }
@@ -852,6 +1063,8 @@
       el.setAttribute('stroke', color); el.setAttribute('stroke-width', sw);
       el.setAttribute('fill', shape.fill || 'none');
       if(dashAttr) el.setAttribute('stroke-dasharray', dashAttr);
+    } else if(shape.type === 'label' && labelHasMath(shape.text)){
+      el = renderMathLabel(shape, color);
     } else if(shape.type === 'label'){
       el = document.createElementNS(NS, 'text');
       el.setAttribute('x', shape.x ?? 10); el.setAttribute('y', shape.y ?? 30);
@@ -859,9 +1072,13 @@
       el.setAttribute('font-size', shape.fontSize || 18);
       el.setAttribute('font-weight', shape.fontWeight || '400');
       el.setAttribute('font-family', 'Verdana, Arial, sans-serif');
-      el.textContent = shape.text || '';
+      fillLabelText(el, shape);
     } else if(shape.type === 'coords'){
       el = renderCoords(shape);
+    } else if(shape.type === 'yesno'){
+      // Looks like the runtime input: rounded box + grey "Ja/Nein" placeholder.
+      // In fill-in-the-blanks mode the runtime swaps it for a real input.
+      el = renderYesNoBox(shape);
     } else if(shape.type === 'image'){
       el = document.createElementNS(NS, 'image');
       el.setAttribute('x', shape.x ?? 0); el.setAttribute('y', shape.y ?? 0);
@@ -927,7 +1144,8 @@
     NONE_FILL, NONE_STROKE,
     POLYGON_PRESETS, COMPOSITION_TEMPLATES,
     isNoneColor, newShape,
-    parseSlotTokens, slotNumbersInLabel, expandSlotRefs, formatSlotValue,
+    parseSlotTokens, slotNumbersInLabel, expandSlotRefs, prepareFormula, formatSlotValue,
+    labelHasHtml, labelHasMath, mathLabelY, renderMathLabel, yesNoPlaceholder, labelPlainText, labelMetrics, fillLabelText, labelHtmlFragment,
     makeCompositionSnap, buildSnapIndicator, shapeSnapCandidates,
     shapeDisplayName, makePolygonFromPreset,
     pickImageDataUrl, shapeSummary,

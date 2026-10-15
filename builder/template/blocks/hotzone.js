@@ -62,7 +62,11 @@
           help:'Rechteck auf dem Bild ziehen → Zone hinzufügen. Zone anklicken → löschen.', helpKey:'block.hotzone.field.zones.help' },
         { type:'section', label:'Einstellungen & Bewertung', labelKey:'block.hotzone.field._sec_opts.label', key:'_sec_opts' },
         { key:'showZonesAfterCheck', label:'Nicht gefundene Zonen nach Korrektur anzeigen', labelKey:'block.hotzone.field.showZonesAfterCheck.label', type:'boolean' },
-        { key:'maxPoints', label:'Punkte', labelKey:'block.hotzone.field.maxPoints.label', type:'number', step:1, min:1 }
+        { key:'maxPoints', label:'Punkte', labelKey:'block.hotzone.field.maxPoints.label', type:'number', step:1, min:1 },
+        // Wrong = a click outside every zone.
+        ...window.BlockUtils.penaltySchemaFields({
+          help:'Jeder Klick außerhalb aller Zonen zieht Punkte ab; die Gesamtpunktzahl fällt nie unter 0.',
+          helpKey:'block.hotzone.field.penalizeWrong.help' })
       ];
     },
     mount(host, config, api){
@@ -177,8 +181,12 @@
         });
         stage.dataset.locked = '1';
         stage.style.cursor = 'default';
-        const ratio = correct / zones.length;
-        const pts = Math.round(ratio * (config.maxPoints || 1) * 100) / 100;
+        // Each found zone earns a share; each click outside all zones can
+        // deduct (penalizeWrong / penaltyPoints), never below 0.
+        const maxPts = config.maxPoints || 1;
+        const perZone = maxPts / zones.length;
+        const BU = window.BlockUtils;
+        const pts = BU.scoreWithPenalty(correct * perZone, misclicks, BU.penaltyPerWrong(config, perZone), maxPts);
         api.reportScore(pts);
         if(correct === zones.length && misclicks === 0){
           fb.ok(t('block.hotzone.allFound', { total: zones.length }));

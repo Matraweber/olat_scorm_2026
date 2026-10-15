@@ -335,7 +335,12 @@
   // composition.js via BLOCK_FILES in canvas.js.
   const R = window.CompositionRuntime;
   if(!R) throw new Error('composition.js: window.CompositionRuntime not loaded. Ensure composition-runtime.js is loaded first.');
-  const { compGenVars, compApplyVarsToShapes, mountStatic, mountGraded } = R;
+  const { compGenVars, compApplyVarsToShapes, compApplyVarsToPrompt, compMaxPoints, compAcceptsGlobals, mountStatic, mountGraded } = R;
+  // Modes where a deduction for wrong answers applies (builder field showIf).
+  function compHasPenaltyTargets(c){
+    if(c.gradingMode === 'click') return true;
+    return c.gradingMode === 'fillblanks' && (c.shapes || []).some(sh => sh && sh.type === 'yesno');
+  }
   // Block registration
   Blocks.register('composition', {
     label: 'Komposition',
@@ -348,6 +353,10 @@
     // graded:true means the block can award points; behavior depends on
     // config.gradingMode below.
     graded: true,
+    // Ja/Nein fields carry their own points, so the max is not just maxPoints.
+    maxPointsFor(cfg){ return compMaxPoints(cfg || {}); },
+    // Global variables + "Nur ganzzahlige Lösungen" (see compAcceptsGlobals).
+    acceptsGlobals(cfg, globals){ return compAcceptsGlobals(cfg || {}, globals); },
 
     newShape, // for the right-pane "+ Form" toolbox
 
@@ -402,17 +411,26 @@
           helpKey: 'block.composition.field.gradingMode.help'
         },
         { key:'prompt',    label:'Aufgabentext (optional)', labelKey:'block.composition.field.prompt.label', type:'textarea', rows:2, showIf: isGraded,
-          help:'Wird oberhalb der Komposition angezeigt.', helpKey:'block.composition.field.prompt.help' },
-        { key:'maxPoints', label:'Maximalpunkte', labelKey:'block.composition.field.maxPoints.label', type:'number', min:1, max:100, step:1, showIf: isGraded },
+          help:'Wird oberhalb der Komposition angezeigt. Variablen als {name} werden durch die aktuellen Werte ersetzt.', helpKey:'block.composition.field.prompt.help' },
+        { key:'maxPoints', label:'Maximalpunkte', labelKey:'block.composition.field.maxPoints.label', type:'number', min:1, max:100, step:1, showIf: isGraded,
+          help:'Gilt für die Antwortfelder {1}, {2} … (zusammen). Ja/Nein-Felder bringen ihre eigenen Punkte zusätzlich.', helpKey:'block.composition.field.maxPoints.help' },
         ...window.BlockUtils.regenSchemaFields(c => c.gradingMode === 'fillblanks'),
+        window.BlockUtils.integerAnswersSchemaField({ showIf: c => c.gradingMode === 'fillblanks', helpKey: 'block.composition.field.integerAnswers.help' }),
         { key:'tolerance', label:'Toleranz', labelKey:'block.composition.field.tolerance.label', type:'number', step:'any', min:0,
           showIf: c => c.gradingMode === 'fillblanks',
           help:'Zulässige Abweichung der Antwort vom berechneten Wert. 0.01 bedeutet ±0,01. Wird auf alle Lösungsfelder angewendet, die keine eigene Toleranz haben.',
           helpKey:'block.composition.field.tolerance.help' },
-        { key:'penalizeWrong', label:'Falsche Klicks abziehen', labelKey:'block.composition.field.penalizeWrong.label', type:'boolean',
-          showIf: c => c.gradingMode === 'click',
-          help:'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.',
+        // Deduction: click mode (wrong clicks) and Ja/Nein fields in fill-in-
+        // the-blanks mode (wrongly answered fields).
+        { key:'penalizeWrong', label:'Punkte für falsche Antworten abziehen', labelKey:'block.composition.field.penalizeWrong.label', type:'boolean',
+          showIf: compHasPenaltyTargets,
+          help:'Klick-Modus: jeder Klick auf eine nicht als korrekt markierte Form. Lückentext: jedes falsch beantwortete Ja/Nein-Feld. Die Gesamtpunktzahl fällt nie unter 0.',
           helpKey:'block.composition.field.penalizeWrong.help' },
+        { key:'penaltyPoints', label:'Abzug pro falscher Antwort (Punkte)', labelKey:'utils.penalty.pointsLabel', type:'number', step:0.25, min:0,
+          placeholder:'leer = so viel wie eine richtige Antwort bringt', placeholderKey:'utils.penalty.pointsPlaceholder',
+          showIf: c => compHasPenaltyTargets(c) && !!c.penalizeWrong,
+          help:'Leer lassen: Klick-Modus = Wert einer richtigen Form, Ja/Nein = die Punkte des jeweiligen Feldes.',
+          helpKey:'block.composition.field.penaltyPoints.help' },
         { type:'section', label:'Zufallsvariablen', labelKey:'block.composition.field._sec_vars.label', key:'_sec_vars' },
         { key:'variables', label:'Variablen', labelKey:'block.composition.field.variables.label', type:'list', itemLabel:'Variable', itemLabelKey:'block.composition.field.variables.itemLabel',
           help:'In jedem Label kann {name} als Platzhalter genutzt werden. Bei jedem "Neu generieren"-Klick (erscheint sobald mindestens eine Variable definiert ist) werden alle Variablen im angegebenen Bereich neu gezogen. Im Lückentext-Modus können Lücken zusätzlich eine Formel referenzieren, die mit den aktuellen Werten ausgewertet wird.',
@@ -420,10 +438,13 @@
           itemSummary: item => (item.name || '?') + ' = [' + (item.min ?? '?') + '..' + (item.max ?? '?') + ']',
           itemSchema: [
             { key:'name',    label:'Name', labelKey:'block.composition.field.variables.item.name.label', type:'text', placeholder:'z. B. a', placeholderKey:'block.composition.field.variables.item.name.placeholder' },
-            { key:'min',     label:'Min',  labelKey:'block.composition.field.variables.item.min.label',  type:'number', step:1 },
-            { key:'max',     label:'Max',  labelKey:'block.composition.field.variables.item.max.label',  type:'number', step:1 },
-            { key:'integer', label:'Ganzzahlig', labelKey:'block.composition.field.variables.item.integer.label', type:'boolean', default:true }
+            { key:'min',     label:'Min',  labelKey:'block.composition.field.variables.item.min.label',  type:'number', step:'any' },
+            { key:'max',     label:'Max',  labelKey:'block.composition.field.variables.item.max.label',  type:'number', step:'any' },
+            { key:'integer', label:'Ganzzahlig', labelKey:'block.composition.field.variables.item.integer.label', type:'boolean', default:true },
+            ...window.BlockUtils.varItemFormatFields(item => item.integer !== false)
           ]},
+        // Task-wide defaults for decimal variables (each variable can override).
+        ...window.BlockUtils.varFormatSchemaFields(),
         // Advanced manual editing; day-to-day work happens on the canvas.
         { type:'section', label:'Formen (erweitert)', labelKey:'block.composition.field._sec_shapes.label', key:'_sec_shapes' },
         { key:'shapes', label:'Formen', labelKey:'block.composition.field.shapes.label', type:'list', itemLabel:'Form', itemLabelKey:'block.composition.field.shapes.itemLabel',
@@ -440,13 +461,17 @@
               {value:'rect',    label:'Rechteck',           labelKey:'block.composition.shape.rect'},
               {value:'label',   label:'Beschriftung',       labelKey:'block.composition.shape.label'},
               {value:'coords',  label:'Koordinatensystem',  labelKey:'block.composition.shape.coords'},
-              {value:'image',   label:'Bild',               labelKey:'block.composition.shape.image'}
+              {value:'image',   label:'Bild',               labelKey:'block.composition.shape.image'},
+              {value:'yesno',   label:'Ja/Nein-Feld',       labelKey:'block.composition.shape.yesno'}
             ]},
             { key:'text', label:'Text', labelKey:'block.composition.field.shapes.item.text.label', type:'text', fullWidth:true, showIf: s => s.type === 'label' },
             { key:'sides', label:'Ecken', labelKey:'block.composition.field.shapes.item.sides.label', type:'number', min:3, max:20, step:1, showIf: s => s.type === 'polygon' },
             { key:'color', label:'Linienfarbe', labelKey:'block.composition.field.shapes.item.color.label', type:'color' },
             { key:'fill',  label:'Füllfarbe',   labelKey:'block.composition.field.shapes.item.fill.label',  type:'color', showIf: s => s.type === 'circle' || s.type === 'ellipse' || s.type === 'polygon' || s.type === 'rect' },
             // Grading flags (relevant per mode)
+            { key:'correct', label:'Richtige Antwort', labelKey:'block.composition.field.shapes.item.yesnoCorrect.label', type:'select', showIf: s => s.type === 'yesno',
+              options:[ {value:'yes', label:'Ja', labelKey:'block.composition.yesno.yes'}, {value:'no', label:'Nein', labelKey:'block.composition.yesno.no'} ] },
+            { key:'points', label:'Punkte', labelKey:'block.composition.field.shapes.item.yesnoPoints.label', type:'number', min:0, step:0.5, default:1, showIf: s => s.type === 'yesno' },
             { key:'isCorrect',   label:'Richtige Antwort (Klick-Modus)', labelKey:'block.composition.field.shapes.item.isCorrect.label', type:'boolean' },
             { key:'blank',       label:'Als Lücke (Label-Modus)', labelKey:'block.composition.field.shapes.item.blank.label', type:'boolean', showIf: s => s.type === 'label' },
             { key:'correctText', label:'Lösung (Lücke)', labelKey:'block.composition.field.shapes.item.correctText.label', type:'text', showIf: s => s.type === 'label' && s.blank },
@@ -471,14 +496,17 @@
         return mountGraded(host, config, api, mode);
       }
       // Variables exist + non-fillblanks mode → wrap with regenerate.
-      let currentVars = compGenVars(variables);
+      let currentVars = compGenVars(variables, config);
       function doMount(){
         host.innerHTML = '';
         const substituted = Object.assign({}, config, {
-          shapes: compApplyVarsToShapes(config.shapes, currentVars)
+          shapes: compApplyVarsToShapes(config.shapes, currentVars, config),
+          prompt: compApplyVarsToPrompt(config.prompt, currentVars, config)
         });
         if(mode === 'none') mountStatic(host, substituted, api);
         else mountGraded(host, substituted, api, mode);
+        // Re-typeset after a regenerate (the initial mount is covered by the runtime).
+        api.utils.renderMath(host);
         // Append "Neu generieren" to ui.buttons; static mode has no row, so create one.
         let buttonsRow = host.querySelector('.scorm-buttons, .qcard-buttons');
         if(!buttonsRow){
@@ -492,7 +520,7 @@
         regenBtn.className = 'btn btn-secondary';
         regenBtn.textContent = api.utils.t('common.regenerate');
         regenBtn.addEventListener('click', () => {
-          currentVars = compGenVars(variables);
+          currentVars = compGenVars(variables, config);
           doMount();
         });
         buttonsRow.appendChild(regenBtn);

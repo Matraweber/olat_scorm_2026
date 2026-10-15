@@ -66,6 +66,10 @@
         { type:'section', label:'Einstellungen & Bewertung', labelKey:'block.truth-table.field.sectionSettings.label', key:'_sec_score' },
         { key:'randomize', label:'Ausdruck zufällig wählen', labelKey:'block.truth-table.field.randomize.label', type:'boolean' },
         { key:'maxPoints', label:'Punkte', labelKey:'block.truth-table.field.maxPoints.label', type:'number', step:1, min:1 },
+        // Wrong = row answered with the wrong value; rows left at "?" cost 0.
+        ...window.BlockUtils.penaltySchemaFields({
+          help:'Jede falsch ausgefüllte Zeile zieht Punkte ab; die Gesamtpunktzahl fällt nie unter 0. Mit „?“ offen gelassene Zeilen zählen 0.',
+          helpKey:'block.truth-table.field.penalizeWrong.help' }),
         ...window.BlockUtils.regenSchemaFields()
       ];
     },
@@ -154,19 +158,19 @@
       }
       function grade(){
         const totalRows = current.rows.length;
-        let correctRows = 0, any = false;
+        let correctRows = 0, wrongRows = 0, any = false;
         current.rows.forEach((vars, i) => {
           const expected = evalBool(current.expr, vars);
           const v = current.inputs[i].value;
-          if(v === '?' || expected == null) return;
+          if(v === '?' || expected == null) return;   // left open: 0 points, no deduction
           any = true;
           const got = v === '1';
-          if(got === expected) correctRows++;
+          if(got === expected) correctRows++; else wrongRows++;
         });
         if(!any){ fb.bad(u.t('block.truth-table.fillAllRows')); return; }
         const maxPoints = config.maxPoints || 1;
-        const ratio = totalRows > 0 ? correctRows / totalRows : 0;
-        const pts = Math.round(ratio * maxPoints * 100) / 100;
+        const perRow = totalRows > 0 ? maxPoints / totalRows : 0;
+        const pts = u.scoreWithPenalty(correctRows * perRow, wrongRows, u.penaltyPerWrong(config, perRow), maxPoints);
         api.reportScore(pts);
         if(correctRows === totalRows) fb.ok(u.t('feedback.correctScored', { pts, max: maxPoints }));
         else if(correctRows > 0) fb.neutral(u.t('block.truth-table.partialRows', { correct: correctRows, total: totalRows, pts, max: maxPoints }));

@@ -416,8 +416,11 @@
             { key:'valueMax', label:'bis', labelKey:'block.unit-convert.field.valueMax.label',
               type:'number', step:'any', default: 100 },
             { key:'integer',  label:'Nur Ganzzahlen', labelKey:'block.unit-convert.field.integer.label',
-              type:'boolean' }
+              type:'boolean' },
+            // Decimals only: fractions read oddly with units ("3/4 km").
+            ...window.BlockUtils.varItemFormatFields(item => !!item.integer, { noDisplay: true })
           ]},
+        ...window.BlockUtils.varFormatSchemaFields({ noDisplay: true }),
         { key:'randomize',  label:'Variante zufällig wählen',
           labelKey:'block.unit-convert.field.randomize.label', type:'boolean' },
         { key:'randomSwap', label:'Richtung zufällig vertauschen',
@@ -507,11 +510,11 @@
         const min = Number(v.valueMin), max = Number(v.valueMax);
         let value = min + Math.random() * (max - min);
         if(v.integer) value = Math.round(value);
-        else value = Math.round(value * 100) / 100;
+        else value = window.BlockUtils.roundVarValue(value, false, v, ac);
         if(ac.randomSwap && Math.random() < 0.5){
           const inv = convertUnits(value, from, to);
           if(inv != null && isFinite(inv)){
-            value = v.integer ? Math.round(inv) : Math.round(inv * 100) / 100;
+            value = window.BlockUtils.roundVarValue(inv, !!v.integer, v, ac);
             const tmp = from; from = to; to = tmp;
           }
         }
@@ -537,6 +540,8 @@
         inp.value = '';
         qText.textContent = fillTemplate(u.l(ac.questionTemplate), current.value, current.from, current.to,
           u.t('block.unit-convert.questionTemplateFallback'));
+        // New question text after "Neu generieren": typeset $…$ again.
+        u.renderMath(qText);
         unitLbl.textContent = current.to;
         if(showMsg) fb.neutral(u.t('block.unit-convert.newTaskGenerated'));
       }

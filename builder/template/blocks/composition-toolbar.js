@@ -17,7 +17,7 @@
     NONE_FILL, NONE_STROKE,
     isNoneColor, newShape,
     pickImageDataUrl,
-    slotNumbersInLabel,
+    slotNumbersInLabel, fillLabelText, labelMetrics, labelHasMath, renderShape,
     regularPolygonPoints, polygonGetPoints, polygonCentroid
   } = H;
   // Short helper: prefer window.BlockUtils.t but return the key on fallback.
@@ -82,7 +82,7 @@
       // Smart-placement helpers: bounding box per shape type.
       function shapeBounds(s){
         if(!s) return null;
-        if(s.type === 'rect' || s.type === 'image' || s.type === 'coords'){
+        if(s.type === 'rect' || s.type === 'image' || s.type === 'coords' || s.type === 'yesno'){
           return { x:s.x, y:s.y, w:s.w, h:s.h };
         }
         if(s.type === 'circle'){
@@ -104,8 +104,9 @@
           return { x: mnx, y: mny, w: Math.abs(s.x2 - s.x1), h: Math.abs(s.y2 - s.y1) };
         }
         if(s.type === 'label'){
-          // Approximate label bounding box (text width unknown).
-          return { x:s.x, y:s.y - (s.fontSize || 18), w: 80, h: (s.fontSize || 18) + 4 };
+          // Estimated label box (text width is not measured).
+          const m = labelMetrics(s);
+          return { x:s.x, y:s.y - m.fs, w: Math.max(80, m.w), h: m.h + 4 };
         }
         return null;
       }
@@ -113,7 +114,7 @@
       // Add-shape buttons
       const addGroup = document.createElement('div');
       addGroup.className = 'comp-tool-group';
-      ['line','arrow','circle','ellipse','polygon','rect','label','coords','image'].forEach(type => {
+      ['line','arrow','circle','ellipse','polygon','rect','label','coords','image','yesno'].forEach(type => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'comp-tool-btn';
@@ -165,8 +166,11 @@
           } else if(type === 'polygon'){
             shape.points = regularPolygonPoints(cx, cy, 70, shape.sides || 3);
             shape.cx = cx; shape.cy = cy;
-          } else if(type === 'coords'){
-            shape.x = cx - (shape.w || 320) / 2; shape.y = cy - (shape.h || 220) / 2;
+          } else if(type === 'coords' || type === 'yesno'){
+            shape.x = Math.round(cx - (shape.w || 320) / 2 + (type === 'yesno' ? stagger % 160 : 0));
+            shape.y = Math.round(cy - (shape.h || 220) / 2 + (type === 'yesno' ? stagger % 120 : 0));
+            // A Ja/Nein field only does something in fill-in-the-blanks mode.
+            if(type === 'yesno' && (block.config.gradingMode || 'none') !== 'fillblanks') block.config.gradingMode = 'fillblanks';
           }
           block.config.shapes.push(shape);
           setSingleSelection(block.config.shapes.length - 1);
@@ -178,7 +182,8 @@
       });
       bar.appendChild(addGroup);
     
-      // Clickable mode chip. Only three modes; click/hotspot belong in other blocks.
+      // Clickable mode chip with the three common modes. The click and hotspot
+      // modes are chosen in the config pane ("Bewertungsart").
       const modeBadge = document.createElement('div');
       modeBadge.className = 'comp-tool-group comp-mode-badge';
       const _gradingMode = block.config.gradingMode || 'none';
@@ -437,6 +442,41 @@
         styleGroup.appendChild(dashSel);
       }
     
+      // Ja/Nein field: which answer is correct + how many points it is worth.
+      if(sel && sel.type === 'yesno'){
+        const ansLbl = document.createElement('span');
+        ansLbl.className = 'comp-tool-lbl';
+        ansLbl.textContent = _t('block.composition.toolbar.yesno.correctLabel');
+        styleGroup.appendChild(ansLbl);
+        const ansSel = document.createElement('select');
+        ansSel.className = 'comp-tool-select';
+        ansSel.title = _t('block.composition.toolbar.yesno.correctTitle');
+        [['yes', 'block.composition.yesno.yes'], ['no', 'block.composition.yesno.no']].forEach(([v, k]) => {
+          const o = document.createElement('option');
+          o.value = v; o.textContent = _t(k);
+          ansSel.appendChild(o);
+        });
+        ansSel.value = sel.correct === 'no' ? 'no' : 'yes';
+        ansSel.addEventListener('change', () => { sel.correct = ansSel.value; commit(); });
+        styleGroup.appendChild(ansSel);
+
+        const ptsLbl = document.createElement('span');
+        ptsLbl.className = 'comp-tool-lbl';
+        ptsLbl.textContent = _t('block.composition.toolbar.yesno.pointsLabel');
+        styleGroup.appendChild(ptsLbl);
+        const ptsInp = document.createElement('input');
+        ptsInp.type = 'number'; ptsInp.min = '0'; ptsInp.step = '0.5';
+        ptsInp.className = 'comp-tool-num';
+        ptsInp.title = _t('block.composition.toolbar.yesno.pointsTitle');
+        ptsInp.value = sel.points != null ? String(sel.points) : '1';
+        ptsInp.addEventListener('change', () => {
+          const v = Number(ptsInp.value);
+          sel.points = Number.isFinite(v) && v >= 0 ? v : 1;
+          commit();
+        });
+        styleGroup.appendChild(ptsInp);
+      }
+
       // Label: text + (optional) Variable picker + font size
       if(sel && sel.type === 'label'){
         const ti = document.createElement('input');
@@ -455,21 +495,30 @@
           sel.text = ti.value;
           const idx = selectedShapeIdx();
           if(idx >= 0){
-            const svgText = host.querySelector('svg.comp-canvas text[data-shape-idx="' + idx + '"]');
+            // SVG <text>, or a <foreignObject> for KaTeX labels.
+            const svgText = host.querySelector('svg.comp-canvas [data-shape-idx="' + idx + '"]');
             if(svgText){
               // Apply rolled-var substitution if the author has rolled values.
               const rolled = block._compRolledVars;
               let display = ti.value;
               if(rolled && Object.keys(rolled).length){
-                display = display.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, n) => {
-                  if(n in rolled){
-                    const v = rolled[n];
-                    return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
-                  }
-                  return m;
-                });
+                // Same display rules as the runtime (utils.fillMathTemplate).
+                display = window.BlockUtils.fillMathTemplate(display, rolled,
+                  window.BlockUtils.varFormats(block.config.variables, block.config));
               }
-              svgText.textContent = display;
+              const isMathNode = svgText.tagName.toLowerCase() === 'foreignobject';
+              if(!isMathNode && !labelHasMath(display)){
+                fillLabelText(svgText, sel, display);
+              } else {
+                // Math involved: swap in a freshly rendered node (text <-> math
+                // box). Drag handlers return with the full re-render on blur.
+                const fresh = renderShape(Object.assign({}, sel, { text: display }), null, idx, 'comp-live');
+                if(fresh){
+                  fresh.setAttribute('data-shape-idx', String(idx));
+                  fresh.style.cursor = svgText.style.cursor;
+                  svgText.replaceWith(fresh);
+                }
+              }
             }
           }
           commitQuiet();
@@ -494,6 +543,41 @@
           ti.setSelectionRange(caret, caret);
           commit();
         }
+        // Formatting buttons: wrap the selected text in a tag (or insert an
+        // empty pair at the caret). Labels render a small HTML subset.
+        function tiWrap(open, close){
+          const start = ti.selectionStart ?? ti.value.length;
+          const end   = ti.selectionEnd   ?? ti.value.length;
+          const next  = ti.value.slice(0, start) + open + ti.value.slice(start, end) + close + ti.value.slice(end);
+          ti.value = next;
+          sel.text = next;
+          ti.focus();
+          ti.setSelectionRange(start + open.length, end + open.length);
+          commit();
+        }
+        const fmtGroup = document.createElement('span');
+        fmtGroup.className = 'comp-fmt-group';
+        [
+          { key:'bold',      html:'<b>B</b>',             open:'<b>',   close:'</b>' },
+          { key:'italic',    html:'<i>I</i>',             open:'<i>',   close:'</i>' },
+          { key:'underline', html:'<u>U</u>',             open:'<u>',   close:'</u>' },
+          { key:'sup',       html:'x<sup>2</sup>',        open:'<sup>', close:'</sup>' },
+          { key:'sub',       html:'x<sub>2</sub>',        open:'<sub>', close:'</sub>' },
+          { key:'lineBreak', html:'↵',                    open:'<br>',  close:'' }
+        ].forEach(f => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'comp-tool-btn comp-fmt-btn';
+          // Wrapped in a span: the button is inline-flex, and flex items
+          // ignore vertical-align, which would flatten <sub>/<sup>.
+          b.innerHTML = '<span>' + f.html + '</span>';
+          b.title = _t('block.composition.toolbar.label.format.' + f.key);
+          // Keep the text field's selection: don't steal focus on mousedown.
+          b.addEventListener('mousedown', e => e.preventDefault());
+          b.addEventListener('click', e => { e.stopPropagation(); tiWrap(f.open, f.close); });
+          fmtGroup.appendChild(b);
+        });
+        styleGroup.appendChild(fmtGroup);
         // "Insert ▾" dropdown with variables + special characters.
         const definedVars = (block.config.variables || []).filter(v => v && v.name);
         const insertBtn = document.createElement('button');
@@ -564,6 +648,22 @@
             });
             pop.appendChild(row);
           }
+          // Course-wide variables (Kopfdaten) not shadowed by a block variable.
+          const localNames = new Set(definedVars.map(v => v.name));
+          const globalNames = (window.BlockUtils.globalVarNames ? window.BlockUtils.globalVarNames() : []).filter(n => !localNames.has(n));
+          if(globalNames.length > 0){
+            const hg = document.createElement('div'); hg.className = 'comp-insert-head'; hg.textContent = _t('block.composition.popover.insert.globalVariablesHead');
+            pop.appendChild(hg);
+            const rowG = document.createElement('div'); rowG.className = 'comp-insert-row';
+            globalNames.forEach(n => {
+              const b = document.createElement('button');
+              b.type = 'button'; b.className = 'comp-insert-cell comp-insert-cell-var';
+              b.textContent = '{' + n + '}';
+              b.addEventListener('click', () => { tiInsertAtCaret('{' + n + '}'); pop.remove(); });
+              rowG.appendChild(b);
+            });
+            pop.appendChild(rowG);
+          }
           const h2 = document.createElement('div'); h2.className = 'comp-insert-head'; h2.textContent = _t('block.composition.popover.insert.symbolsHead');
           pop.appendChild(h2);
           const SYMS = [
@@ -618,6 +718,19 @@
           if(!isNaN(v) && v >= 8){ sel.fontSize = v; commit(); }
         });
         styleGroup.appendChild(fs);
+
+        // Whole label bold or normal (new labels start normal; single words
+        // can still be made bold with the B formatting button).
+        const boldWrap = document.createElement('label');
+        boldWrap.className = 'comp-tool-toggle';
+        boldWrap.title = _t('block.composition.toolbar.label.boldAllTitle');
+        const boldCb = document.createElement('input');
+        boldCb.type = 'checkbox';
+        boldCb.checked = Number(sel.fontWeight || 400) >= 600;
+        boldCb.addEventListener('change', () => { sel.fontWeight = boldCb.checked ? '700' : '400'; commit(); });
+        boldWrap.appendChild(boldCb);
+        boldWrap.appendChild(document.createTextNode(' ' + _t('block.composition.toolbar.label.boldAll')));
+        styleGroup.appendChild(boldWrap);
     
         // Mode auto-switches to fillblanks once {} appears in the text
         // (see insert popover). No separate toggle needed.
@@ -723,7 +836,8 @@
               e.stopPropagation();
               pops.openBewertungPopover(bewBtn, sel);
             });
-            styleGroup.appendChild(bewBtn);
+            // Top row, next to the variables / shapes buttons.
+            modeBadge.appendChild(bewBtn);
           }
         }
         if(gMode === 'hotspot'){

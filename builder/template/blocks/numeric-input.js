@@ -26,7 +26,13 @@
         formula: '',
         tolerance: 0.01,
         unit: '',
+        answerPrefix: '',
+        extraAnswers: [],
         simplifyFractions: true,
+        integerAnswers: false,
+        decimals: 2,
+        valueDisplay: 'auto',
+        allowImpossible: false,
         maxPoints: 1
       };
     },
@@ -42,6 +48,12 @@
       const w = [];
       if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push(t('block.numeric-input.validate.templateMissing', 'Frage-Vorlage fehlt.'));
       if(!cfg.formula || !String(cfg.formula).trim()) w.push(t('block.numeric-input.validate.formulaMissing', 'Lösungsformel fehlt.'));
+      (cfg.extraAnswers || []).forEach((a, i) => {
+        if(!a || !String(a.formula || '').trim()){
+          w.push(t('block.numeric-input.validate.extraFormulaMissing',
+            'Antwortfeld ' + (i + 2) + ': Lösungsformel fehlt (Feld wird ignoriert).', { n: i + 2 }));
+        }
+      });
       // Variable names must be ASCII identifiers. The substitution regex
       // and the math evaluator both reject non-ASCII names, so reject early.
       (cfg.variables || []).forEach((v, i) => {
@@ -59,33 +71,70 @@
         }
       });
       // Monte Carlo check: catches 0 under a fraction bar, sqrt(-x), log(0) before export.
-      if(cfg.formula && (cfg.variables || []).length > 0 && window.BlockUtils){
+      const usesGlobals = !!(window.BlockUtils && window.BlockUtils.globalVarsUsedBy(cfg).length);
+      if(cfg.formula && ((cfg.variables || []).length > 0 || usesGlobals) && window.BlockUtils){
         const SAMPLES = 200;
-        let invalid = 0;
+        let invalid = 0, whole = 0;
         for(let i = 0; i < SAMPLES; i++){
-          const vars = {};
+          const local = {};
           (cfg.variables || []).forEach(v => {
             const min = Number(v.min), max = Number(v.max);
             if(!isFinite(min) || !isFinite(max)) return;
             let val = min + Math.random() * (max - min);
             if(v.integer) val = Math.round(val);
-            else val = Math.round(val * 100) / 100;
-            vars[v.name] = val;
+            else val = window.BlockUtils.roundVarValue(val, false, v, cfg);
+            local[v.name] = val;
           });
-          const r = window.BlockUtils.safeMathExpr(cfg.formula, vars);
+          // Global variables get a fresh sample each round, like at runtime.
+          const vars = window.BlockUtils.withGlobalVars(local, cfg.variables, window.BlockUtils.genGlobalVarValues());
+          const r = window.BlockUtils.safeMathExpr(window.BlockUtils.applyAngleUnit(cfg.formula, cfg.angleUnit), vars);
           if(typeof r !== 'number' || !Number.isFinite(r)) invalid++;
+          else if(Math.abs(r - Math.round(r)) < 1e-9) whole++;
         }
         const ratio = invalid / SAMPLES;
         if(ratio === 1){
           w.push(t('block.numeric-input.validate.formulaAlwaysInvalid',
             'Formel ergibt mit den aktuellen Variablenbereichen IMMER ein ungültiges Ergebnis (z. B. Division durch 0, Wurzel aus Negativem). Formel oder Bereiche anpassen.'));
-        } else if(ratio >= 0.2){
+        } else if(ratio >= 0.2 && !cfg.allowImpossible){
+          // With "X" allowed, invalid results are intended tasks, not errors.
           w.push(t('block.numeric-input.validate.formulaOftenInvalid',
             'Formel scheitert in ' + Math.round(ratio * 100) + '% der Stichproben (z. B. Division durch 0). Variablenbereich enger fassen oder Formel anpassen.',
             { pct: Math.round(ratio * 100) }));
         }
+        if(cfg.integerAnswers && ratio < 1 && whole === 0){
+          w.push(t('block.numeric-input.validate.integerNever',
+            '„Nur ganzzahlige Lösungen“: In keiner Stichprobe war die Lösung ganzzahlig. Variablen auf „Nur Ganzzahlen“ stellen oder Formel/Bereiche anpassen.'));
+        }
       }
       return w;
+    },
+    // Global variables are drawn for the whole course; the runtime asks every
+    // block that uses them whether a drawn set still allows a valid task
+    // (whole-number / solvable results as configured).
+    acceptsGlobals(cfg, globals){
+      const u = window.BlockUtils;
+      const ac = numericPresetConfig(cfg, (u.getLocale && u.getLocale()) || 'de');
+      const formulas = [ac.formula || '0'].concat((ac.extraAnswers || [])
+        .filter(a => a && String(a.formula || '').trim()).map(a => a.formula));
+      const isWhole = v => Math.abs(v - Math.round(v)) < 1e-9;
+      const tries = (ac.variables || []).length ? (ac.integerAnswers ? 2000 : 200) : 1;
+      for(let i = 0; i < tries; i++){
+        const local = {};
+        (ac.variables || []).forEach(v => {
+          const min = Number(v.min), max = Number(v.max);
+          let val = min + Math.random() * (max - min);
+          val = v.integer ? Math.round(val) : u.roundVarValue(val, false, v, ac);
+          local[v.name] = val;
+        });
+        const vars = u.withGlobalVars(local, ac.variables, globals);
+        const ok = formulas.every(f => {
+          const r = u.safeMathExpr(u.applyAngleUnit(f, ac.angleUnit), vars);
+          const valid = typeof r === 'number' && Number.isFinite(r);
+          return valid ? (!ac.integerAnswers || isWhole(r)) : !!ac.allowImpossible;
+        });
+        if(ok) return true;
+      }
+      return false;
     },
     previewConfig(){
       const u = window.BlockUtils || {};
@@ -146,8 +195,11 @@
                 // Upper bound below lower: lower the lower bound alongside.
                 if(val != null && item.min != null && val < item.min) set('min', val);
               }},
-            { key:'integer', label:'Nur Ganzzahlen', labelKey:'block.numeric-input.field.variables.item.integer.label', type:'boolean' }
+            { key:'integer', label:'Nur Ganzzahlen', labelKey:'block.numeric-input.field.variables.item.integer.label', type:'boolean' },
+            ...window.BlockUtils.varItemFormatFields(item => !!item.integer)
           ]},
+        // Task-wide defaults for decimal variables (each variable can override).
+        ...window.BlockUtils.varFormatSchemaFields(isCustom),
         // Solution
         { type:'section', label:'Lösung', labelKey:'block.numeric-input.field.sectionSolution.label', key:'_sec_formula' },
         { key:'formula', label:'Lösungs-Formel', labelKey:'block.numeric-input.field.formula.label', type:'formula-text', placeholder:'sqrt(a^2 + b^2)', placeholderKey:'block.numeric-input.field.formula.placeholder', showIf: isCustom,
@@ -156,8 +208,31 @@
           help:'Abweichung, die noch als korrekt gilt. 0 = exakt.', helpKey:'block.numeric-input.field.tolerance.help' },
         { key:'unit', label:'Antwort-Einheit (optional)', labelKey:'block.numeric-input.field.unit.label', type:'text', placeholder:'z. B. m/s oder kg', placeholderKey:'block.numeric-input.field.unit.placeholder',
           help:'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehört in den Fragetext.', helpKey:'block.numeric-input.field.unit.help' },
+        { key:'answerPrefix', label:'Bezeichnung vor dem Antwortfeld (optional)', labelKey:'block.numeric-input.field.answerPrefix.label', type:'text', placeholder:'z. B. x =', placeholderKey:'block.numeric-input.field.answerPrefix.placeholder',
+          help:'Steht links vor dem Eingabefeld, z. B. ein Variablenname. $…$ für Formeln möglich.', helpKey:'block.numeric-input.field.answerPrefix.help' },
+        // Additional answer fields, each with its own formula. Field 1 is the
+        // main formula/unit/prefix above.
+        { key:'extraAnswers', label:'Weitere Antwortfelder', labelKey:'block.numeric-input.field.extraAnswers.label', type:'list',
+          itemLabel:'Antwortfeld', itemLabelKey:'block.numeric-input.field.extraAnswers.itemLabel', showIf: isCustom,
+          help:'Jedes Feld hat eine eigene Formel (gleiche Zufallsvariablen). Teilpunkte pro richtigem Feld.', helpKey:'block.numeric-input.field.extraAnswers.help',
+          itemSummary: item => {
+            const L = v => (window.BlockUtils && window.BlockUtils.l) ? (window.BlockUtils.l(v) || '') : (v || '');
+            return [L(item.prefix), item.formula ? '= ' + item.formula : '…', L(item.unit)].filter(Boolean).join(' ');
+          },
+          itemSchema:[
+            { key:'prefix',    label:'Bezeichnung davor', labelKey:'block.numeric-input.field.extraAnswers.item.prefix.label', type:'text', placeholder:'z. B. y =', placeholderKey:'block.numeric-input.field.extraAnswers.item.prefix.placeholder' },
+            { key:'formula',   label:'Lösungs-Formel',    labelKey:'block.numeric-input.field.extraAnswers.item.formula.label', type:'formula-text', placeholder:'a - b' },
+            { key:'unit',      label:'Einheit dahinter',  labelKey:'block.numeric-input.field.extraAnswers.item.unit.label', type:'text', placeholder:'z. B. m', placeholderKey:'block.numeric-input.field.extraAnswers.item.unit.placeholder' },
+            // '' (not 0) by default: empty = use the block tolerance above.
+            { key:'tolerance', label:'Toleranz (±), leer = wie oben', labelKey:'block.numeric-input.field.extraAnswers.item.tolerance.label', type:'number', step:'any', default:'' }
+          ]},
+        window.BlockUtils.angleUnitSchemaField(isCustom),
         { key:'simplifyFractions', label:'Term vereinfachen', labelKey:'block.numeric-input.field.simplifyFractions.label', type:'boolean',
           help:'Aktiv: Studierende müssen den gekürzten Bruch eingeben. „10/20" wird als falsch gewertet, „1/2" ist korrekt. Aus: alle äquivalenten Eingaben werden akzeptiert.', helpKey:'block.numeric-input.field.simplifyFractions.help' },
+        { key:'integerAnswers', label:'Nur ganzzahlige Lösungen', labelKey:'block.numeric-input.field.integerAnswers.label', type:'boolean',
+          help:'Es werden nur Aufgaben gestellt, deren Lösungen (alle Antwortfelder) ganze Zahlen sind.', helpKey:'block.numeric-input.field.integerAnswers.help' },
+        { key:'allowImpossible', label:'Unlösbare Aufgaben zulassen (Antwort „X“)', labelKey:'block.numeric-input.field.allowImpossible.label', type:'boolean',
+          help:'Hat eine Formel für die gezogenen Werte kein Ergebnis (z. B. Wurzel aus Negativem, Division durch 0), wird die Aufgabe trotzdem gestellt. Richtig ist dann die Eingabe „X“.', helpKey:'block.numeric-input.field.allowImpossible.help' },
         // Scoring
         { type:'section', label:'Bewertung', labelKey:'block.numeric-input.field.sectionScoring.label', key:'_sec_score' },
         { key:'maxPoints', label:'Punkte', labelKey:'block.numeric-input.field.maxPoints.label', type:'number', step:1, min:1 },
@@ -171,16 +246,72 @@
       const activeConfig = numericPresetConfig(config, locale);
       const unitStr = u.l(activeConfig.unit) || '';
       const titleStr = u.l(activeConfig.blockTitle);
+      const blockTol = Number(activeConfig.tolerance) || 0.01;
+      // Answer fields: #1 is the main formula/unit/prefix, then any
+      // additional fields (ones without a formula are skipped).
+      const answers = [{
+        prefix: u.l(activeConfig.answerPrefix) || '',
+        formula: activeConfig.formula || '0',
+        unit: unitStr,
+        tolerance: blockTol
+      }].concat((activeConfig.extraAnswers || [])
+        .filter(a => a && String(a.formula || '').trim())
+        .map(a => {
+          const tol = Number(a.tolerance);
+          return {
+            prefix: u.l(a.prefix) || '',
+            formula: a.formula,
+            unit: u.l(a.unit) || '',
+            tolerance: (a.tolerance === '' || a.tolerance == null || !Number.isFinite(tol)) ? blockTol : tol
+          };
+        }));
+      // Row layout (prefix · input · unit) as soon as there is more than one
+      // field or a prefix; otherwise the original single-field card.
+      const multi = answers.length > 1 || !!answers[0].prefix;
 
       const ui = u.questionCard(host, {
         h3: titleStr || u.t('common.task'),
         qBoxTitle: u.t('common.question'),
-        inputLabel: unitStr
+        inputLabel: (unitStr && !multi)
           ? u.t('block.numeric-input.answerWithUnit', { unit: unitStr })
           : u.t('common.answer'),
-        inputPlaceholder: u.t('block.numeric-input.answerPlaceholder')
+        inputPlaceholder: u.t(activeConfig.allowImpossible ? 'block.numeric-input.answerPlaceholderX' : 'block.numeric-input.answerPlaceholder')
       });
       const { qText, inp, checkBtn, newBtn, fb } = ui;
+      answers[0].input = inp;
+      if(multi){
+        const grp = inp.parentElement;
+        const rows = document.createElement('div');
+        rows.className = 'ni-answer-rows';
+        answers.forEach((a, i) => {
+          const row = document.createElement('div');
+          row.className = 'ni-answer-row';
+          if(a.prefix){
+            const p = document.createElement('span');
+            p.className = 'ni-prefix';
+            p.textContent = a.prefix;
+            row.appendChild(p);
+          }
+          let field = inp;
+          if(i > 0){
+            field = document.createElement('input');
+            field.type = 'text';
+            field.className = 'text-input';
+            field.placeholder = inp.placeholder;
+            a.input = field;
+          }
+          row.appendChild(field);
+          if(a.unit){
+            const un = document.createElement('span');
+            un.className = 'ni-unit';
+            un.textContent = a.unit;
+            row.appendChild(un);
+          }
+          rows.appendChild(row);
+        });
+        grp.appendChild(rows);
+        u.renderMath(rows);
+      }
 
       function genVars(){
         const vars = {};
@@ -188,127 +319,122 @@
           const min = Number(v.min), max = Number(v.max);
           let val = min + Math.random() * (max - min);
           if(v.integer) val = Math.round(val);
-          else val = Math.round(val * 100) / 100;
+          else val = u.roundVarValue(val, false, v, activeConfig);
           vars[v.name] = val;
         });
-        return vars;
+        return u.withGlobalVars(vars, activeConfig.variables);
       }
-      function fillTemplate(tpl, vars){
-        // Render a numeric value. Clean small-denominator fractions show as
-        // "num/den" with the sign in front; everything else falls back to a
-        // rounded decimal. (The simplifyFractions toggle only changes how
-        // the solution is reported, not the question display.)
-        function formatValue(v, wrapNeg){
-          let s;
-          const frac = u.asFraction(v);
-          // den <= 20 keeps fractions readable (1/2, 3/7) and avoids ugly
-          // artefacts like 43/100 that come from 2-decimal rounding.
-          if(frac && Math.abs(frac.den) > 1 && Math.abs(frac.den) <= 20){
-            const absNum = Math.abs(frac.num);
-            s = (frac.num < 0 ? '-' : '') + absNum + '/' + frac.den;
-          } else if(Number.isInteger(v)){
-            s = String(v);
-          } else {
-            s = String(Math.round(v * 100) / 100);
-          }
-          // After a multiplicative, divisive or power operator a negative
-          // value is wrapped so the sign stays glued to the number:
-          // a · (-3/7) instead of the confusing a · -3/7.
-          if(wrapNeg && v < 0) s = '(' + s + ')';
-          return s;
-        }
-        // True when the placeholder follows a binary operator (so a negative
-        // substitution should appear inside parentheses).
-        function shouldWrap(fullStr, placeholderOffset){
-          let i = placeholderOffset - 1;
-          while(i >= 0 && /\s/.test(fullStr[i])) i--;
-          if(i < 0) return false;
-          const c = fullStr[i];
-          if(/[+\-*/:·×÷^]/.test(c)) return true;
-          // LaTeX multiplicative ops: \cdot \times \div end in t/s/v.
-          if(/[tsv]/.test(c) && /\\(cdot|times|div)$/.test(fullStr.slice(0, i + 1))) return true;
-          return false;
-        }
-        const tplStr = String(tpl || '');
-        return tplStr.replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName, offset) => {
-          if(match.startsWith('$')){
-            // Inside $...$ KaTeX preserves {} as argument grouping. Decide
-            // wrapping based on the character before each placeholder inside
-            // the math expression. innerOffset is relative to `match`, which
-            // begins at `offset` in the full template, so the absolute index
-            // of each {x} is offset + innerOffset.
-            const filled = match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name, innerOffset) => {
-              if(name in vars){
-                const wrap = shouldWrap(tplStr, offset + innerOffset);
-                return '{' + formatValue(vars[name], wrap) + '}';
-              }
-              return m;
-            });
-            // A negative value in a fraction numerator reads better with the
-            // sign in front of the bar: \frac{-3}{7} -> -\frac{3}{7}.
-            return fracMinusOut(filled);
-          }
-          if(plainName && plainName in vars){
-            return formatValue(vars[plainName], shouldWrap(tplStr, offset));
-          }
-          return match;
-        });
-      }
+      // Shared with the composition block (utils.fillMathTemplate): keeps {}
+      // inside $…$, shows clean fractions, wraps negatives after operators.
+      const varFormats = u.varFormats(activeConfig.variables, activeConfig);
+      const fillTemplate = (tpl, vars) => u.fillMathTemplate(tpl, vars, varFormats);
       function sameInstance(a, b){
-        return !!a && !!b && JSON.stringify(a.vars || {}) === JSON.stringify(b.vars || {}) && a.expected === b.expected;
+        return !!a && !!b && JSON.stringify(a.vars || {}) === JSON.stringify(b.vars || {}) &&
+          JSON.stringify(a.expected) === JSON.stringify(b.expected);
       }
       // Valid = finite real number (no NaN/Infinity).
       function isValidExpected(e){
         return typeof e === 'number' && Number.isFinite(e);
       }
+      const integerOnly = !!activeConfig.integerAnswers;
+      const allowImpossible = !!activeConfig.allowImpossible;
+      // Expected value per answer field; null = no valid result (impossible,
+      // e.g. sqrt of a negative or division by 0).
+      function evalAll(vars){
+        return answers.map(a => {
+          const r = u.safeMathExpr(u.applyAngleUnit(a.formula || '0', activeConfig.angleUnit), vars);
+          return isValidExpected(r) ? r : null;
+        });
+      }
+      const isWhole = v => Math.abs(v - Math.round(v)) < 1e-9;
+      // A task is usable if every field has a valid result (whole-numbered
+      // when "Nur ganzzahlige Lösungen" is on), or, with "Unlösbar = X" on,
+      // no result at all; those fields are then answered with X.
+      function acceptable(list){
+        return list.every(e => e == null ? allowImpossible : (!integerOnly || isWhole(e)));
+      }
       function chooseNew(showMsg){
-        const MAX_TRIES = 200;
+        // Whole-number results can be rare, so search harder for them.
+        const MAX_TRIES = integerOnly ? 2000 : 200;
         let vars = null, expected = null;
-        // First find any combination that evaluates to a finite number.
         let attempts = 0;
         while(attempts < MAX_TRIES){
           vars = genVars();
-          expected = u.safeMathExpr(activeConfig.formula || '0', vars);
-          if(isValidExpected(expected)) break;
+          expected = evalAll(vars);
+          if(acceptable(expected)) break;
           attempts++;
         }
-        if(!isValidExpected(expected)){
-          // Formula always fails (e.g. 1/0). Feedback and bail out.
-          fb.bad(u.t('block.numeric-input.feedback.notGeneratable'));
+        if(!acceptable(expected)){
+          // No usable combination (formula always fails, or never whole).
+          fb.bad(u.t(integerOnly ? 'block.numeric-input.feedback.notGeneratableInteger' : 'block.numeric-input.feedback.notGeneratable'));
           return;
         }
+        // Snap whole results so 2.9999999 displays and grades as 3.
+        if(integerOnly) expected = expected.map(e => e == null ? e : Math.round(e));
         // Prefer a different instance than before, but never sacrifice validity.
         let next = { vars, expected };
         for(let i = 0; current && sameInstance(next, current) && i < 30; i++){
           const tryVars = genVars();
-          const tryExp = u.safeMathExpr(activeConfig.formula || '0', tryVars);
-          if(!isValidExpected(tryExp)) continue;
+          let tryExp = evalAll(tryVars);
+          if(!acceptable(tryExp)) continue;
+          if(integerOnly) tryExp = tryExp.map(e => e == null ? e : Math.round(e));
           vars = tryVars; expected = tryExp; next = { vars, expected };
         }
         current = next;
-        inp.value = '';
+        answers.forEach(a => {
+          a.input.value = '';
+          a.input.classList.remove('ni-ok', 'ni-bad');
+        });
         qText.textContent = fillTemplate(u.l(activeConfig.questionTemplate), vars);
         u.renderMath(qText);
         if(showMsg) fb.neutral(u.t('block.numeric-input.feedback.newTask'));
       }
+      const isX = s => allowImpossible && /^\s*x\s*$/i.test(String(s || ''));
       function grade(){
-        if(!current || current.expected == null){ fb.bad(u.t('block.numeric-input.feedback.solutionUnavailable')); return; }
-        const got = u.parseNum(inp.value);
-        if(got == null){ fb.bad(u.t('block.numeric-input.feedback.enterValidNumber')); return; }
+        if(!current || !current.expected){ fb.bad(u.t('block.numeric-input.feedback.solutionUnavailable')); return; }
+        // 'X' = "impossible" answer (only when allowed); otherwise a number.
+        const gots = answers.map(a => isX(a.input.value) ? 'X' : u.parseNum(a.input.value));
+        if(gots.some(g => g == null)){
+          fb.bad(u.t(allowImpossible ? 'block.numeric-input.feedback.enterValidNumberOrX' : 'block.numeric-input.feedback.enterValidNumber'));
+          return;
+        }
         // simplifyFractions: when on, an unsimplified fraction like "10/20"
         // is rejected even though its numeric value matches the expected one.
         if(activeConfig.simplifyFractions !== false){
-          const fracParts = parseFractionInput(inp.value);
-          if(fracParts && !isFractionSimplified(fracParts.num, fracParts.den)){
+          const unsimplified = answers.some(a => {
+            const fracParts = parseFractionInput(a.input.value);
+            return fracParts && !isFractionSimplified(fracParts.num, fracParts.den);
+          });
+          if(unsimplified){
             fb.bad(u.t('block.numeric-input.feedback.needSimplifiedFraction'));
             api.reportScore(0);
             return;
           }
         }
-        if(u.nearlyEqual(got, current.expected, Number(activeConfig.tolerance) || 0.01)){
-          const solutionText = u.formatSolution(current.expected) + (unitStr ? ' ' + unitStr : '');
+        const maxPts = activeConfig.maxPoints || 1;
+        const ok = answers.map((a, i) => {
+          const exp = current.expected[i];
+          if(exp == null) return gots[i] === 'X';
+          return gots[i] !== 'X' && u.nearlyEqual(gots[i], exp, a.tolerance);
+        });
+        if(multi) answers.forEach((a, i) => {
+          a.input.classList.toggle('ni-ok', ok[i]);
+          a.input.classList.toggle('ni-bad', !ok[i]);
+        });
+        const nOk = ok.filter(Boolean).length;
+        if(nOk === answers.length){
+          const solutionText = answers.map((a, i) => {
+            const exp = current.expected[i];
+            if(exp == null) return (multi && a.prefix ? a.prefix + ' ' : '') + u.t('block.numeric-input.impossibleSolution');
+            return (multi && a.prefix ? a.prefix + ' ' : '') + u.formatSolution(exp) + (a.unit ? ' ' + a.unit : '');
+          }).join('; ');
           fb.ok(u.t('block.numeric-input.feedback.correctWithSolution', { solution: solutionText }));
-          api.reportScore(activeConfig.maxPoints || 1);
+          api.reportScore(maxPts);
+        } else if(nOk > 0){
+          // Partial credit: equal share per correct field.
+          const pts = Math.round(maxPts * nOk / answers.length * 100) / 100;
+          fb.neutral(u.t('block.numeric-input.feedback.partial', { n: nOk, total: answers.length, pts, max: maxPts }));
+          api.reportScore(pts);
         } else {
           fb.bad(u.t('common.wrong'));
           api.reportScore(0);
@@ -320,7 +446,18 @@
 
       chooseNew(false);
       api.initScore(activeConfig.maxPoints || 1);
-      return {};
+      return {
+        getVars: () => (current && current.vars) || {},
+        showSolution(){
+          if(!current || !current.expected) return;
+          answers.forEach((a, i) => {
+            const e = current.expected[i];
+            a.input.value = e == null ? 'X' : u.formatSolution(e);
+            if(multi) a.input.classList.add('ni-ok');
+          });
+          fb.ok(u.t('utils.resume.solved'));
+        }
+      };
     },
     preview(host, config){
       const BU = window.BlockUtils;
@@ -330,14 +467,14 @@
       const previewFormula = BU.l(activeConfig.formula) || '';
       const previewTemplate = BU.l(activeConfig.questionTemplate) || '';
       // Deterministic sample so the preview is stable across renders.
-      const sample = { a: 7, b: 3, p: 20, g: 150, x: 4, y: 3 };
+      const sample = Object.assign({ a: 7, b: 3, p: 20, g: 150, x: 4, y: 3 }, BU.globalVarValues());
       const questionText = (previewTemplate || BU.t('block.numeric-input.preview.taskPlaceholder'))
         .replace(/\{(\w+)\}/g, (_, name) => (sample[name] != null ? sample[name] : '?'));
       // Evaluate with the same sample so the solution hint shows a number.
       let solution = null;
       if(previewFormula){
         try {
-          solution = BU.safeMathExpr(previewFormula, sample);
+          solution = BU.safeMathExpr(BU.applyAngleUnit(previewFormula, activeConfig.angleUnit), sample);
           if(typeof solution === 'number') solution = Math.round(solution * 100) / 100;
         } catch{}
       }
@@ -349,19 +486,31 @@
       const q = document.createElement('p');
       q.textContent = questionText;
       card.appendChild(q);
-      const inpRow = document.createElement('div');
-      inpRow.className = 'bp-input-row';
-      const inp = document.createElement('div');
-      inp.className = 'bp-input';
-      inp.textContent = BU.t('block.numeric-input.preview.enterNumber');
-      inpRow.appendChild(inp);
-      if(previewUnit){
-        const u = document.createElement('span');
-        u.className = 'bp-unit';
-        u.textContent = previewUnit;
-        inpRow.appendChild(u);
-      }
-      card.appendChild(inpRow);
+      // One row per answer field: [prefix] input [unit].
+      const rowsSpec = [{ prefix: BU.l(activeConfig.answerPrefix) || '', unit: previewUnit }]
+        .concat((activeConfig.extraAnswers || []).filter(a => a && String(a.formula || '').trim())
+          .map(a => ({ prefix: BU.l(a.prefix) || '', unit: BU.l(a.unit) || '' })));
+      rowsSpec.forEach(rs => {
+        const inpRow = document.createElement('div');
+        inpRow.className = 'bp-input-row';
+        if(rs.prefix){
+          const p = document.createElement('span');
+          p.className = 'bp-unit';
+          p.textContent = rs.prefix;
+          inpRow.appendChild(p);
+        }
+        const inp = document.createElement('div');
+        inp.className = 'bp-input';
+        inp.textContent = BU.t('block.numeric-input.preview.enterNumber');
+        inpRow.appendChild(inp);
+        if(rs.unit){
+          const u = document.createElement('span');
+          u.className = 'bp-unit';
+          u.textContent = rs.unit;
+          inpRow.appendChild(u);
+        }
+        card.appendChild(inpRow);
+      });
       const btn = document.createElement('span');
       btn.textContent = BU.t('common.check');
       btn.className = 'bp-btn';
@@ -460,76 +609,6 @@
     // Collapse multiple whitespace runs into a single space.
     best = best.replace(/\s+/g, ' ');
     return best;
-  }
-
-  // Read the balanced {...} group whose opening brace is at index i.
-  // Returns { content, end } where end is the index of the matching '}'.
-  function readBraceGroup(s, i){
-    let depth = 0;
-    for(let k = i; k < s.length; k++){
-      if(s[k] === '{') depth++;
-      else if(s[k] === '}'){ depth--; if(depth === 0) return { content: s.slice(i + 1, k), end: k }; }
-    }
-    return null;
-  }
-  // Normalize the sign of a fraction so it sits in front of the bar:
-  //   \frac{-3}{7} -> -\frac{3}{7}      (negative numerator)
-  //   \frac{3}{-7} -> -\frac{3}{7}      (negative denominator)
-  //   \frac{-3}{-7} -> \frac{3}{7}      (both negative cancel; never "--")
-  // Only plain negative numbers/fractions are pulled; compound parts like
-  // \frac{a-b}{c} are left untouched (the sign is not just a unary minus).
-  function fracMinusOut(tex){
-    let out = '', i = 0;
-    while(i < tex.length){
-      if(tex.startsWith('\\frac', i)){
-        let j = i + 5;
-        while(j < tex.length && tex[j] === ' ') j++;
-        if(tex[j] === '{'){
-          const num = readBraceGroup(tex, j);
-          if(num){
-            let k = num.end + 1;
-            while(k < tex.length && tex[k] === ' ') k++;
-            if(tex[k] === '{'){
-              const den = readBraceGroup(tex, k);
-              if(den){
-                const NUMRE = /^-?(\d+(\.\d+)?|\d+\/\d+)$/; // signed plain number/fraction
-                const numBare = num.content.replace(/[{}\s]/g, '');
-                const denBare = den.content.replace(/[{}\s]/g, '');
-                const numIsNum = NUMRE.test(numBare);
-                const denIsNum = NUMRE.test(denBare);
-                const numNeg = numIsNum && numBare[0] === '-';
-                const denNeg = denIsNum && denBare[0] === '-';
-                if(numNeg || denNeg){
-                  const newNum = numIsNum ? numBare.replace('-', '') : num.content;
-                  const newDen = denIsNum ? denBare.replace('-', '') : den.content;
-                  // One side negative -> minus in front; both negative cancel
-                  // to a positive fraction (avoids a leading "--").
-                  const sign = (numNeg !== denNeg) ? '-' : '';
-                  const frac = '\\frac{' + newNum + '}{' + newDen + '}';
-                  // Wrap a negative fraction in parens when it sits next to a
-                  // binary operator on EITHER side, so it reads "a + (-3/7)" and
-                  // "(-3/7) + a" instead of the confusing "a + -3/7" / "-3/7 + a"
-                  // (mirrors how a plain negative value is wrapped to "(-3)").
-                  const before = out.replace(/\s+$/, '');
-                  const rest = tex.slice(den.end + 1).replace(/^\s+/, '');
-                  const precededByOp = /[+\-*/:·×÷^]$/.test(before) || /\\(cdot|times|div)$/.test(before);
-                  const followedByOp = /^[+\-*/:·×÷^]/.test(rest) || /^\\(cdot|times|div)\b/.test(rest);
-                  if(sign === '-' && (precededByOp || followedByOp)){
-                    out += '\\left(-' + frac + '\\right)';
-                  } else {
-                    out += sign + frac;
-                  }
-                  i = den.end + 1;
-                  continue;
-                }
-              }
-            }
-          }
-        }
-      }
-      out += tex[i++];
-    }
-    return out;
   }
 
   function numericPresetConfig(config, locale){

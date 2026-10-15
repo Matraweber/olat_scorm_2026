@@ -15,7 +15,7 @@
   if(!H) throw new Error("composition-canvas.js: window.CompositionHelpers not loaded.");
   const {
     NS,
-    makeCompositionSnap, buildSnapIndicator, shapeSnapCandidates,
+    makeCompositionSnap, buildSnapIndicator, shapeSnapCandidates, labelMetrics, mathLabelY,
     polygonGetPoints, polygonPointsAttr, polygonCentroid,
     renderShape, buildSvg
   } = H;
@@ -50,11 +50,11 @@
         return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
       }
       if(shape.type === 'label'){
-        const fs = shape.fontSize || 18;
+        const m = labelMetrics(shape);
         return {
-          x: shape.x - 2, y: shape.y - fs,
-          w: Math.max(40, (shape.text || '').length * fs * 0.55) + 4,
-          h: fs + 4
+          x: shape.x - 2, y: shape.y - m.fs,
+          w: Math.max(40, m.w) + 4,
+          h: m.h + 4
         };
       }
       return { x: shape.x || 0, y: shape.y || 0, w: shape.w || 100, h: shape.h || 60 };
@@ -124,13 +124,9 @@
       const rolled = block._compRolledVars;
       let renderConfig = block.config;
       if(rolled && Object.keys(rolled).length){
-        const sub = txt => String(txt || '').replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, n) => {
-          if(n in rolled){
-            const v = rolled[n];
-            return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
-          }
-          return m;
-        });
+        // Same display rules as the runtime (utils.fillMathTemplate).
+        const sub = txt => window.BlockUtils.fillMathTemplate(String(txt || ''), rolled,
+          window.BlockUtils.varFormats(block.config.variables, block.config));
         renderConfig = Object.assign({}, block.config, {
           shapes: (block.config.shapes || []).map(s =>
             s.type === 'label' ? Object.assign({}, s, { text: sub(s.text) }) : s
@@ -189,46 +185,131 @@
       };
     }
     
-    // Inline edit: foreignObject + input instead of text; Enter/blur saves, ESC cancels.
+    // Inline edit (double-click): multi-line text field with a live preview
+    // below it, in a foreignObject in place of the label. Line breaks are
+    // real lines while editing and stored as <br>. Enter/blur saves,
+    // Shift+Enter adds a line, Esc cancels.
+    const toEditText = t => String(t || '').replace(/<br\s*\/?>/gi, '\n');
+    const fromEditText = v => String(v || '').replace(/\r?\n/g, '<br>');
+    let _measureCtx = null;
+    function measureTextWidth(text, font){
+      if(!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+      _measureCtx.font = font;
+      return _measureCtx.measureText(text).width;
+    }
+    // Label text as the preview shows it: variables with sample values
+    // (block + global), answer fields {1} / {} / {1*} as small boxes.
+    function previewSource(text){
+      const U = window.BlockUtils;
+      const local = {};
+      (block.config.variables || []).forEach(v => {
+        if(!v || !v.name) return;
+        const lo = Number(v.min), hi = Number(v.max);
+        const a = Number.isFinite(lo) ? lo : 1, b = Number.isFinite(hi) ? hi : 10;
+        local[v.name] = U.roundVarValue((a + b) / 2, v.integer !== false, v, block.config);
+      });
+      const vars = U.withGlobalVars ? U.withGlobalVars(local, block.config.variables) : local;
+      // Answer fields first and only outside math ($…$ etc.): after the
+      // variables are filled in, {a} inside a formula would look like {5}.
+      const slots = String(text || '').split(/(\$\$[\s\S]+?\$\$|\$[^$]+\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\])/)
+        .map((part, i) => i % 2 ? part : part.replace(/\{(\d+)(\*)?\}|\{\}/g, (m, n, star) =>
+          '<span data-cslot="' + (n ? n + (star ? '*' : '') : '?') + '"></span>'))
+        .join('');
+      return U.fillMathTemplate(slots, vars, U.varFormats(block.config.variables, block.config));
+    }
     function startInlineLabelEdit(node, idx, svg){
       const shape = block.config.shapes[idx];
       if(!shape || shape.type !== 'label') return;
-      const NS = 'http://www.w3.org/2000/svg';
+      const U = window.BlockUtils;
       const fs = shape.fontSize || 18;
+      const weight = shape.fontWeight || 400;
+      const color = shape.color || '#003b5c';
+      const font = weight + ' ' + (fs - 1) + 'px Verdana, Arial, sans-serif';
+      const lineH = Math.round(fs * 1.3);
+      const canvasW = Math.max(100, Number(block.config && block.config.canvasWidth) || 600);
+      const maxW = Math.max(160, canvasW - (shape.x || 0) - 8);
+
       const fo = document.createElementNS(NS, 'foreignObject');
       fo.setAttribute('x', shape.x - 4);
       fo.setAttribute('y', (shape.y || 0) - fs - 2);
-      fo.setAttribute('height', fs + 12);
-      // Resize the foreign-object so the input grows with the text, capped to
-      // the available SVG width so it never spills out of the canvas.
-      function resizeForeignObject(value){
-        const charW = fs * 0.6;
-        const padding = 6;
-        const ideal = Math.max(120, (String(value || '').length + padding) * charW);
-        const canvasW = Math.max(100, Number(block.config && block.config.canvasWidth) || 600);
-        const maxW = Math.max(120, canvasW - (shape.x || 0) - 8);
-        fo.setAttribute('width', Math.min(ideal, maxW));
-      }
-      resizeForeignObject(shape.text || '');
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.value = shape.text || '';
-      inp.placeholder = window.BlockUtils.t('block.composition.canvas.labelInputPlaceholder');
-      inp.style.cssText = 'width:100%; height:' + (fs + 8) + 'px; box-sizing:border-box; ' +
-        'font:' + (shape.fontWeight || 700) + ' ' + (fs - 1) + 'px Verdana, Arial, sans-serif; ' +
+      fo.setAttribute('width', maxW);
+      fo.style.overflow = 'visible';
+      const wrap = document.createElement('div');
+      wrap.className = 'comp-inline-edit';
+      wrap.style.cssText = 'display:inline-flex; flex-direction:column; gap:4px; max-width:' + maxW + 'px;';
+
+      const ta = document.createElement('textarea');
+      ta.value = toEditText(shape.text);
+      ta.rows = 1;
+      ta.spellcheck = false;
+      ta.placeholder = U.t('block.composition.canvas.labelInputPlaceholder');
+      ta.style.cssText = 'display:block; box-sizing:border-box; resize:none; overflow:hidden; margin:0; ' +
+        'font:' + font + '; line-height:' + lineH + 'px; ' +
         'padding:0.1rem 0.4rem; border:2px solid var(--primary, #003b5c); border-radius:4px; ' +
-        'background:#fff; color:#003b5c; outline:none;';
-      fo.appendChild(inp);
-      // Hide the SVG text node and insert the foreignObject in its place.
+        'background:#fff; color:' + color + '; outline:none; white-space:pre;';
+      wrap.appendChild(ta);
+
+      // Live preview: same rendering as the canvas/runtime (HTML subset + KaTeX).
+      const pv = document.createElement('div');
+      pv.className = 'comp-inline-preview';
+      pv.style.cssText = 'box-sizing:border-box; padding:0.3rem 0.5rem 0.4rem; border:1px dashed #9fb3c0; ' +
+        'border-radius:4px; background:#f7fafc; pointer-events:none;';
+      const pvHead = document.createElement('div');
+      pvHead.textContent = U.t('block.composition.canvas.previewHead');
+      pvHead.style.cssText = 'font:600 10px Verdana, Arial, sans-serif; color:#6b7785; margin-bottom:2px; white-space:nowrap;';
+      const pvBody = document.createElement('div');
+      pvBody.style.cssText = 'font:' + weight + ' ' + fs + 'px Verdana, Arial, sans-serif; line-height:1.25; color:' + color + '; white-space:nowrap;';
+      pv.appendChild(pvHead);
+      pv.appendChild(pvBody);
+      wrap.appendChild(pv);
+      fo.appendChild(wrap);
+
+      function layout(){
+        const lines = ta.value.split('\n');
+        let w = 0;
+        lines.forEach(l => { w = Math.max(w, measureTextWidth(l || ' ', font)); });
+        ta.style.width = Math.min(maxW, Math.max(140, Math.ceil(w) + 28)) + 'px';
+        ta.style.height = (lines.length * lineH + 8) + 'px';
+        fo.setAttribute('height', Math.ceil(wrap.getBoundingClientRect().height / svgScale()) + 8);
+      }
+      // foreignObject sizes are in SVG units; the canvas may be scaled.
+      function svgScale(){
+        const r = svg.getBoundingClientRect();
+        const vb = svg.viewBox && svg.viewBox.baseVal;
+        return (vb && vb.width && r.width) ? r.width / vb.width : 1;
+      }
+      let pvTimer = 0;
+      function updatePreview(){
+        pvTimer = 0;
+        pvBody.innerHTML = '';
+        const src = fromEditText(ta.value);
+        if(!src.trim()){
+          pvBody.textContent = '–';
+        } else {
+          pvBody.appendChild(H.labelHtmlFragment(previewSource(src)));
+          pvBody.querySelectorAll('[data-cslot]').forEach(m => {
+            m.textContent = m.getAttribute('data-cslot').replace('?', '');
+            m.style.cssText = 'display:inline-block; min-width:2.2em; padding:0 0.3em; margin:0 0.1em; border:1.5px solid #9fb3c0; ' +
+              'border-radius:3px; background:#fff; color:#6b7785; font-size:0.75em; text-align:center; vertical-align:middle;';
+          });
+          if(U.renderMath) U.renderMath(pvBody);
+        }
+        layout();
+      }
+      const schedulePreview = () => { if(!pvTimer) pvTimer = setTimeout(updatePreview, 120); };
+
+      // Hide the SVG text node and insert the editor in its place.
       node.style.display = 'none';
       node.parentNode.insertBefore(fo, node);
-      inp.focus();
-      inp.select();
-    
+      updatePreview();
+      ta.focus();
+      ta.select();
+
       let done = false;
       function save(){
         if(done) return; done = true;
-        const v = inp.value;
+        clearTimeout(pvTimer);
+        const v = fromEditText(ta.value);
         if(v !== (shape.text || '')){
           shape.text = v;
           commit();
@@ -240,18 +321,21 @@
       }
       function cancel(){
         if(done) return; done = true;
+        clearTimeout(pvTimer);
         fo.remove();
         node.style.display = '';
       }
-      inp.addEventListener('input', () => resizeForeignObject(inp.value));
-      inp.addEventListener('blur', save);
-      inp.addEventListener('keydown', e => {
-        if(e.key === 'Enter'){ e.preventDefault(); save(); }
+      ta.addEventListener('input', () => { layout(); schedulePreview(); });
+      ta.addEventListener('blur', save);
+      ta.addEventListener('keydown', e => {
+        // Shift+Enter: new line (textarea default); Enter alone saves.
+        if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); save(); }
         else if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+        else if(e.key === 'Enter') setTimeout(() => { layout(); schedulePreview(); }, 0);
         e.stopPropagation(); // don't bubble into composition's keydown
       });
-      inp.addEventListener('mousedown', e => e.stopPropagation());
-      inp.addEventListener('click', e => e.stopPropagation());
+      ta.addEventListener('mousedown', e => e.stopPropagation());
+      ta.addEventListener('click', e => e.stopPropagation());
     }
     
     function attachShapeHandlers(node, idx, svg){
@@ -410,14 +494,19 @@
         node.setAttribute('rx', shape.rx); node.setAttribute('ry', shape.ry);
       } else if(shape.type === 'polygon'){
         node.setAttribute('points', polygonPointsAttr(shape));
+      } else if(shape.type === 'label' && node.tagName.toLowerCase() === 'foreignobject'){
+        // KaTeX label: an HTML box whose y is its top edge, not the baseline.
+        node.setAttribute('x', shape.x); node.setAttribute('y', mathLabelY(shape));
       } else if(shape.type === 'rect' || shape.type === 'label' || shape.type === 'image'){
         node.setAttribute('x', shape.x); node.setAttribute('y', shape.y);
+        // Multi-line labels: continuation lines carry their own x.
+        if(shape.type === 'label') node.querySelectorAll('tspan[x]').forEach(ts => ts.setAttribute('x', shape.x));
         if(shape.type === 'rect' || shape.type === 'image'){
           node.setAttribute('width',  shape.w);
           node.setAttribute('height', shape.h);
         }
-      } else if(shape.type === 'coords'){
-        // Coords is a group; cheapest update is replacing the whole node.
+      } else if(shape.type === 'coords' || shape.type === 'yesno'){
+        // Coords / Ja-Nein fields are groups; cheapest update is replacing the node.
         replaceShapeNode(svg, idx);
       }
     }
@@ -499,13 +588,12 @@
         });
         bx = minX; by = minY; bw = maxX - minX; bh = maxY - minY;
       }
-      else if(shape.type === 'rect' || shape.type === 'image' || shape.type === 'coords'){
+      else if(shape.type === 'rect' || shape.type === 'image' || shape.type === 'coords' || shape.type === 'yesno'){
         bx = shape.x; by = shape.y; bw = shape.w; bh = shape.h;
       }
       else if(shape.type === 'label'){
-        const fs = shape.fontSize || 18;
-        const textW = Math.max(40, (shape.text || '').length * fs * 0.55);
-        bx = shape.x - 2; by = shape.y - fs; bw = textW + 4; bh = fs + 4;
+        const m = labelMetrics(shape);
+        bx = shape.x - 2; by = shape.y - m.fs; bw = Math.max(40, m.w) + 4; bh = m.h + 4;
       } else return;
       const rect = document.createElementNS(NS, 'rect');
       rect.setAttribute('data-overlay-bbox', '1'); // for in-place drag update
@@ -548,7 +636,7 @@
           overlay.appendChild(h);
         });
       }
-      if(shape.type === 'rect' || shape.type === 'image' || shape.type === 'coords'){
+      if(shape.type === 'rect' || shape.type === 'image' || shape.type === 'coords' || shape.type === 'yesno'){
         const h = document.createElementNS(NS, 'circle');
         h.setAttribute('cx', shape.x + shape.w); h.setAttribute('cy', shape.y + shape.h);
         h.setAttribute('r', 6); h.setAttribute('fill', '#fff'); h.setAttribute('stroke', color); h.setAttribute('stroke-width', 2);
@@ -828,7 +916,7 @@
           if(shape.type === 'rect' || shape.type === 'image'){
             node.setAttribute('width',  shape.w);
             node.setAttribute('height', shape.h);
-          } else if(shape.type === 'coords'){
+          } else if(shape.type === 'coords' || shape.type === 'yesno'){
             // Resizing a coordinate system requires regenerating its grid.
             node = replaceShapeNode(svg, idx) || node;
           }

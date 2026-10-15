@@ -1,5 +1,16 @@
 (function(){
   'use strict';
+  // pi/PI/e/E -> Math constants, unless a slider variable has that name
+  // (a slider called e must not silently become Euler's number).
+  function replaceConsts(s, vars){
+    const has = n => Object.prototype.hasOwnProperty.call(vars || {}, n);
+    let body = s;
+    if(!has('pi')) body = body.replace(/\bpi\b/g, '(Math.PI)');
+    if(!has('PI')) body = body.replace(/\bPI\b/g, '(Math.PI)');
+    if(!has('e'))  body = body.replace(/\be\b/g, '(Math.E)');
+    if(!has('E'))  body = body.replace(/\bE\b/g, '(Math.E)');
+    return body;
+  }
   Blocks.register('function-sandbox', {
     label: 'Funktionsplot-Sandbox',
     labelKey: 'block.function-sandbox.label',
@@ -98,7 +109,7 @@
           const ids = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
           const allowed = Object.keys(vars).concat(['x','pi','e','PI','E']).concat(fns);
           for(const id of ids) if(!allowed.includes(id)) return null;
-          let body = s.replace(/\bpi\b/g,'(Math.PI)').replace(/\bPI\b/g,'(Math.PI)').replace(/\be\b/g,'(Math.E)').replace(/\bE\b/g,'(Math.E)');
+          let body = replaceConsts(s, vars);
           fns.forEach(fn => { body = body.replace(new RegExp('\\b'+fn+'\\b','g'),'Math.'+fn); });
           const argNames = Object.keys(vars).concat(['x']);
           const f = new Function(...argNames, '"use strict";return ('+body+');');
@@ -174,7 +185,7 @@
       const allowed = Object.keys(vars).concat(['x','pi','e','PI','E']).concat(fns);
       const ids = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
       const safe = ids.every(id => allowed.includes(id));
-      let body = s.replace(/\bpi\b/g,'(Math.PI)').replace(/\bPI\b/g,'(Math.PI)').replace(/\be\b/g,'(Math.E)').replace(/\bE\b/g,'(Math.E)');
+      let body = replaceConsts(s, vars);
       fns.forEach(fn => { body = body.replace(new RegExp('\\b'+fn+'\\b','g'),'Math.'+fn); });
       const argNames = Object.keys(vars).concat(['x']);
       const N = 200, points = [];

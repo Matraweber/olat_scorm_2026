@@ -3,7 +3,7 @@
   Blocks.register('match-pairs', {
     label: 'Zuordnung (Drag & Drop)',
     labelKey: 'block.match-pairs.label',
-    description: 'Linke Begriffe per Drag-and-Drop mit den richtigen rechten verbinden.',
+    description: 'Begriffe paarweise verbinden oder in Kategorien einsortieren, per Ziehen oder Antippen.',
     descKey: 'block.match-pairs.description',
     category: 'Frage',
     categoryKey: 'block.category.question',
@@ -39,7 +39,9 @@
         if(cats.length < 2) w.push(t('block.match-pairs.validate.minTwoCategories'));
         if(items.length < 2) w.push(t('block.match-pairs.validate.minTwoItems'));
         const ids = new Set(cats.map(c => c.id));
-        if(items.some(i => !ids.has(i.categoryId))) w.push(t('block.match-pairs.validate.itemMissingCategory'));
+        // categoryId may list several ids ("c1, c2"); every one must exist.
+        if(items.some(i => { const l = String(i.categoryId || '').split(',').map(s => s.trim()).filter(Boolean); return !l.length || l.some(id => !ids.has(id)); }))
+          w.push(t('block.match-pairs.validate.itemMissingCategory'));
         return w;
       }
       if(!Array.isArray(cfg.pairs) || cfg.pairs.length < 2) w.push(t('block.match-pairs.validate.minTwoPairs'));
@@ -91,7 +93,7 @@
         { key:'mode', label:'Zuordnungs-Modus', labelKey:'block.match-pairs.field.mode.label',
           type:'select', showIf: isCustom, options:[
           {value:'pairs',      label:'1 zu 1 (jeder Begriff hat genau einen Partner)',      labelKey:'block.match-pairs.field.mode.option.pairs'},
-          {value:'categorize', label:'Kategorisierung (mehrere Begriffe pro Kategorie)',    labelKey:'block.match-pairs.field.mode.option.categorize'}
+          {value:'categorize', label:'Kategorisierung (mehrere Elemente pro Kategorie)',    labelKey:'block.match-pairs.field.mode.option.categorize'}
         ]},
 
         // Question
@@ -132,9 +134,9 @@
             { key:'image', label:'Bild (optional)', labelKey:'block.match-pairs.field.category.image.label',
               type:'image', fullWidth:true }
           ]},
-        { type:'section', label:'Begriffe', labelKey:'block.match-pairs.field.sec_items.label', key:'_sec_items', showIf: isCat },
-        { key:'items', label:'Begriffe', labelKey:'block.match-pairs.field.items.label',
-          type:'list', itemLabel:'Begriff', itemLabelKey:'block.match-pairs.field.items.itemLabel',
+        { type:'section', label:'Elemente', labelKey:'block.match-pairs.field.sec_items.label', key:'_sec_items', showIf: isCat },
+        { key:'items', label:'Elemente', labelKey:'block.match-pairs.field.items.label',
+          type:'list', itemLabel:'Element', itemLabelKey:'block.match-pairs.field.items.itemLabel',
           showIf: isCat,
           itemSummary: item => (item.text || (item.image ? '(Bild)' : '...')) + '  ->  ' + (item.categoryId || '?'),
           itemSchema:[
@@ -142,8 +144,10 @@
               type:'text', placeholder:'z. B. Hund', placeholderKey:'block.match-pairs.field.item.text.placeholder' },
             { key:'image',      label:'Bild (optional)', labelKey:'block.match-pairs.field.item.image.label',
               type:'image', fullWidth:true },
-            { key:'categoryId', label:'Zugehörige Kategorie-ID', labelKey:'block.match-pairs.field.item.categoryId.label',
-              type:'text', placeholder:'c1', placeholderKey:'block.match-pairs.field.item.categoryId.placeholder' }
+            { key:'categoryId', label:'Zugehörige Kategorie-ID(s)', labelKey:'block.match-pairs.field.item.categoryId.label',
+              type:'text', placeholder:'c1', placeholderKey:'block.match-pairs.field.item.categoryId.placeholder',
+              help:'Mehrere IDs mit Komma (z. B. c1, c2): Das Element erscheint dann einmal pro Kategorie. Gleich aussehende Elemente sind beim Zuordnen austauschbar.',
+              helpKey:'block.match-pairs.field.item.categoryId.help' }
           ]},
 
         // Settings
@@ -156,7 +160,7 @@
         { key:'poolSize',  label:'Anzahl Aufgaben pro Durchlauf  (0 = alle)',
           labelKey:'block.match-pairs.field.poolSize.label',
           type:'number', step:1, min:0,
-          help:'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Begriffen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.',
+          help:'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Elementen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.',
           helpKey:'block.match-pairs.field.poolSize.help' },
         // Scoring
         { type:'section', label:'Bewertung', labelKey:'block.match-pairs.field.sec_score.label', key:'_sec_score' },
@@ -304,6 +308,8 @@
         });
 
         renderAssignments();
+        // A regenerated round is new DOM; the runtime only typesets on mount.
+        api.utils.renderMath(gridHost);
       }
 
       function assign(leftId, rightId){
@@ -330,6 +336,8 @@
           const R = rights.find(r => r.id === rid);
           slot.innerHTML = '';
           if(R) slot.appendChild(makeContent(R.text, R.img));
+          // The copied right-hand content is fresh plain text: typeset its $…$.
+          api.utils.renderMath(slot);
           slot.dataset.empty = 'false';
           slot.draggable = true;
           slot.ondragstart = (e) => {
@@ -412,6 +420,7 @@
       }
 
       host.appendChild(card);
+      enableDragAutoScroll(card);
       buildRound();
       api.initScore(activeConfig.maxPoints || 1);
       return {};
@@ -616,6 +625,51 @@
     return pairs ? Object.assign(base, pairs) : config;
   }
   // Mount for categorization mode (n-to-1 drag&drop).
+  // ---- Categorize helpers ----------------------------------------------------
+  // An item's categoryId may list several ids ("c1, c2"): the item then
+  // appears once per category.
+  function catIds(item){
+    return String((item && item.categoryId) || '').split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  // Auto-scroll while dragging near the top/bottom edge: nested scroll boxes
+  // (e.g. the block cell), the page itself and, if allowed (same origin), the
+  // LMS page around the SCO frame. Native drag & drop doesn't do this
+  // reliably, so long element lists couldn't reach every category.
+  function enableDragAutoScroll(root){
+    const EDGE = 70, MAX_STEP = 22;
+    let active = false;
+    const step = dist => dist < EDGE ? Math.ceil((EDGE - Math.max(0, dist)) / EDGE * MAX_STEP) : 0;
+    function scrollBoxes(){
+      const out = [];
+      for(let n = root.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement){
+        const oy = getComputedStyle(n).overflowY;
+        if((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) out.push(n);
+      }
+      return out;
+    }
+    function onDragOver(e){
+      if(!active) return;
+      const y = e.clientY;
+      scrollBoxes().forEach(box => {
+        const r = box.getBoundingClientRect();
+        const up = step(y - r.top), down = step(r.bottom - y);
+        if(up) box.scrollTop -= up; else if(down) box.scrollTop += down;
+      });
+      const up = step(y), down = step(window.innerHeight - y);
+      if(up || down){
+        const d = up ? -up : down;
+        window.scrollBy(0, d);
+        try { if(window.parent && window.parent !== window) window.parent.scrollBy(0, d); } catch(_){ /* cross-origin LMS */ }
+      }
+    }
+    root.addEventListener('dragstart', () => { active = true; }, true);
+    const stop = () => { active = false; };
+    root.addEventListener('dragend', stop, true);
+    root.addEventListener('drop', stop, true);
+    document.addEventListener('dragover', onDragOver);
+  }
+
   function mountCategorize(host, cfg, api){
     const imgH = Number(cfg.imgHeight) || 70;
     const card = document.createElement('section');
@@ -657,10 +711,12 @@
       if(!hasPool) return allItems.slice();
       // Bucket items by category; first pass picks one per category so every
       // category has at least one item (assuming poolSize >= category count).
+      // Multi-category items are bucketed by their first category.
       const buckets = {};
       cats.forEach(c => { buckets[c.id] = []; });
       allItems.forEach(it => {
-        if(buckets[it.categoryId]) buckets[it.categoryId].push(it);
+        const first = catIds(it)[0];
+        if(buckets[first]) buckets[first].push(it);
       });
       Object.values(buckets).forEach(arr => window.BlockUtils.shuffle(arr));
       const picked = [];
@@ -681,16 +737,45 @@
       return picked;
     }
 
+    // Chip key: chips that look the same (text + image) are interchangeable.
+    const lookKey = it => JSON.stringify([String(api.utils.l(it.text) || '').trim(), it.image || '']);
+
     function buildRound(){
       wrapHost.innerHTML = '';
-      items = pickItems();
+      // One chip per (item, category): an item listed for "c1, c2" yields
+      // two chips. items[i] = { it, expected } from here on.
+      const catSet = new Set(cats.map(c => c.id));
+      items = [];
+      pickItems().forEach(it => {
+        const ids = catIds(it).filter(id => catSet.has(id));
+        (ids.length ? ids : ['']).forEach(id => items.push({ it, expected: id }));
+      });
       assigned = items.map(() => null);
       chips = [];
       dropZones = {};
+      let selected = null;   // chip picked by click/tap, waiting for a target
+
+      const hint = document.createElement('div');
+      hint.className = 'cat-hint';
+      hint.textContent = api.utils.t('block.match-pairs.categorizeHint');
+      wrapHost.appendChild(hint);
 
       const wrap = document.createElement('div');
       wrap.className = 'cat-wrap';
       wrapHost.appendChild(wrap);
+
+      function select(idx){
+        if(selected != null && chips[selected]) chips[selected].classList.remove('is-selected');
+        selected = (idx == null || selected === idx) ? null : idx;
+        if(selected != null) chips[selected].classList.add('is-selected');
+        wrap.classList.toggle('has-selection', selected != null);
+      }
+      function moveTo(idx, categoryId){
+        assigned[idx] = categoryId;
+        chips[idx].classList.remove('cat-chip-correct', 'cat-chip-wrong');
+        if(categoryId == null) poolList.appendChild(chips[idx]);
+        else dropZones[categoryId].list.appendChild(chips[idx]);
+      }
 
       const pool = document.createElement('div');
       pool.className = 'cat-pool';
@@ -733,7 +818,7 @@
       const itemOrder = items.map((_, i) => i);
       if(cfg.shuffle !== false) window.BlockUtils.shuffle(itemOrder);
 
-      chips = items.map((it, idx) => {
+      chips = items.map(({ it }, idx) => {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'cat-chip';
@@ -757,11 +842,11 @@
           try { e.dataTransfer.setData('text/plain', String(idx)); } catch(_){}
         });
         chip.addEventListener('dragend', () => chip.classList.remove('is-dragging'));
-        chip.addEventListener('click', () => {
-          if(assigned[idx] != null){
-            assigned[idx] = null;
-            poolList.appendChild(chip);
-          }
+        // Tap/click alternative to dragging (works on touch screens and with
+        // the keyboard): pick the chip, then click a category or the pool.
+        chip.addEventListener('click', e => {
+          e.stopPropagation();
+          select(idx);
         });
         return chip;
       });
@@ -779,13 +864,20 @@
           target.classList.remove('is-drop-target');
           const itemIdx = Number(e.dataTransfer.getData('text/plain'));
           if(Number.isNaN(itemIdx) || !chips[itemIdx]) return;
-          assigned[itemIdx] = categoryId;
-          if(categoryId == null) poolList.appendChild(chips[itemIdx]);
-          else dropZones[categoryId].list.appendChild(chips[itemIdx]);
+          moveTo(itemIdx, categoryId);
+          select(null);
+        });
+        // Click/tap target for a picked chip.
+        target.addEventListener('click', () => {
+          if(selected == null) return;
+          moveTo(selected, categoryId);
+          select(null);
         });
       }
       cats.forEach(c => attachDrop(dropZones[c.id].zone, c.id));
       attachDrop(pool, null);
+      // New chips and category labels (also after "Neu generieren"): typeset $…$.
+      api.utils.renderMath(wrapHost);
     }
 
     const btnRow = document.createElement('div');
@@ -804,6 +896,7 @@
     card.appendChild(btnRow);
     const fb = api.utils.feedbackBox(card);
     host.appendChild(card);
+    enableDragAutoScroll(card);
 
     checkBtn.addEventListener('click', () => {
       // Nothing assigned to a category yet: prompt instead of recording a 0.
@@ -811,13 +904,24 @@
         fb.bad(api.utils.t('block.match-pairs.pleaseAssignAtLeastOneTerm'));
         return;
       }
+      // Chips that look identical are interchangeable: per look-alike group,
+      // each category accepts as many chips as the group expects there.
+      const ok = items.map(() => false);
+      const groups = {};
+      items.forEach((d, idx) => { (groups[lookKey(d.it)] = groups[lookKey(d.it)] || []).push(idx); });
+      Object.values(groups).forEach(idxs => {
+        const quota = {};
+        idxs.forEach(i => { quota[items[i].expected] = (quota[items[i].expected] || 0) + 1; });
+        idxs.forEach(i => {
+          const a = assigned[i];
+          if(a != null && quota[a] > 0){ quota[a]--; ok[i] = true; }
+        });
+      });
       let correct = 0;
       chips.forEach((chip, idx) => {
-        const expected = items[idx].categoryId;
-        const actual   = assigned[idx];
         chip.classList.remove('cat-chip-correct', 'cat-chip-wrong');
-        if(actual === expected){ chip.classList.add('cat-chip-correct'); correct++; }
-        else                    { chip.classList.add('cat-chip-wrong'); }
+        if(ok[idx]){ chip.classList.add('cat-chip-correct'); correct++; }
+        else        { chip.classList.add('cat-chip-wrong'); }
       });
       const maxPoints = Number(cfg.maxPoints) || items.length;
       const pts = Math.round((correct / items.length) * maxPoints * 100) / 100;

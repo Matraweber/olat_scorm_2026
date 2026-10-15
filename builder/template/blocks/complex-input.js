@@ -182,9 +182,11 @@
           return callFn(id, arg);
         }
         if(id === 'i' || id === 'I') return C.i();
-        if(id === 'pi' || id === 'PI') return C.fromReal(Math.PI);
-        if(id === 'e')  return C.fromReal(Math.E);
-        if(vars && id in vars){
+        // A variable named pi/e wins over the constant.
+        const isVar = !!(vars && id in vars);
+        if(!isVar && (id === 'pi' || id === 'PI')) return C.fromReal(Math.PI);
+        if(!isVar && id === 'e')  return C.fromReal(Math.E);
+        if(isVar){
           const v = vars[id];
           if(typeof v === 'number') return C.fromReal(v);
           if(v && typeof v === 'object' && 're' in v) return v;
@@ -266,25 +268,47 @@
       const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
       return cfg.questionTemplate || t('block.complex-input.summary.empty');
     },
+    // Course-wide variables: fine if some draw of the block's own variables
+    // gives a finite result.
+    acceptsGlobals(cfg, globals){
+      const U = window.BlockUtils;
+      if(!cfg.formula) return true;
+      const tries = (cfg.variables || []).length ? (cfg.integerAnswers ? 2000 : 200) : 1;
+      for(let i = 0; i < tries; i++){
+        const local = {};
+        (cfg.variables || []).forEach(v => {
+          if(!v || !v.name) return;
+          const min = Number(v.min), max = Number(v.max);
+          if(!isFinite(min) || !isFinite(max)) return;
+          const val = min + Math.random() * (max - min);
+          local[v.name] = v.integer ? Math.round(val) : U.roundVarValue(val, false, v, cfg);
+        });
+        const r = evalComplexExpr(cfg.formula, U.withGlobalVars(local, cfg.variables, globals));
+        if(r && C.isFinite(r) && (!cfg.integerAnswers || (U.isWholeNumber(r.re) && U.isWholeNumber(r.im)))) return true;
+      }
+      return false;
+    },
     validate(cfg){
       const t = (window.BlockUtils && window.BlockUtils.t) || (k => k);
       const w = [];
       if(!cfg.questionTemplate || !String(cfg.questionTemplate).trim()) w.push(t('block.complex-input.validate.missingQuestion'));
       if(!cfg.formula || !String(cfg.formula).trim()) w.push(t('block.complex-input.validate.missingFormula'));
       // Sanity-check the formula parses with sample variables.
-      if(cfg.formula && (cfg.variables || []).length > 0){
+      const usesGlobals = !!(window.BlockUtils && window.BlockUtils.globalVarsUsedBy(cfg).length);
+      if(cfg.formula && ((cfg.variables || []).length > 0 || usesGlobals)){
         const SAMPLES = 200;
         let invalid = 0;
         for(let i = 0; i < SAMPLES; i++){
-          const vars = {};
+          const local = {};
           (cfg.variables || []).forEach(v => {
             const min = Number(v.min), max = Number(v.max);
             if(!isFinite(min) || !isFinite(max)) return;
             let val = min + Math.random() * (max - min);
             if(v.integer) val = Math.round(val);
-            else val = Math.round(val * 100) / 100;
-            vars[v.name] = val;
+            else val = window.BlockUtils.roundVarValue(val, false, v, cfg);
+            local[v.name] = val;
           });
+          const vars = window.BlockUtils.withGlobalVars(local, cfg.variables, window.BlockUtils.genGlobalVarValues());
           const r = evalComplexExpr(cfg.formula, vars);
           if(!r || !C.isFinite(r)) invalid++;
         }
@@ -347,9 +371,12 @@
               onChange:(val, item, set) => { if(val != null && item.min != null && val < item.min) set('min', val); }
             },
             { key:'integer', label:'Nur Ganzzahlen', labelKey:'block.complex-input.field.variables.item.integer.label',
-              type:'boolean', default:true }
+              type:'boolean', default:true },
+            ...window.BlockUtils.varItemFormatFields(item => !!item.integer)
           ]
         },
+        // Task-wide defaults for decimal variables. Unset = decimal (as before).
+        ...window.BlockUtils.varFormatSchemaFields({ defaultDisplay: 'decimal' }),
 
         { type:'section', label:'Lösung', labelKey:'block.complex-input.field._sec_sol.label', key:'_sec_sol' },
         { key:'formula', label:'Lösungs-Formel (komplex)', labelKey:'block.complex-input.field.formula.label',
@@ -357,6 +384,7 @@
           placeholder:'(a+b*i)*(c-d*i)', placeholderKey:'block.complex-input.field.formula.placeholder',
           help:'i ist die imaginäre Einheit. Operatoren: + - * / ^.  Funktionen: re(z), im(z), abs(z), conj(z), arg(z), sqrt(z), exp(z), ln(z), sin(x), cos(x). Variablen aus der Liste werden als reell eingesetzt.',
           helpKey:'block.complex-input.field.formula.help' },
+        window.BlockUtils.integerAnswersSchemaField({ helpKey: 'block.complex-input.field.integerAnswers.help' }),
         { key:'tolerance', label:'Toleranz  (|Δ|)', labelKey:'block.complex-input.field.tolerance.label',
           type:'number', step:'any',
           help:'Akzeptierter Abstand zwischen Antwort und Lösung in der komplexen Ebene.',
@@ -386,36 +414,42 @@
           if(!isFinite(min) || !isFinite(max)) return;
           let val = min + Math.random() * (max - min);
           if(v.integer) val = Math.round(val);
-          else val = Math.round(val * 100) / 100;
+          else val = u.roundVarValue(val, false, v, config);
           out[v.name] = val;
         });
-        return out;
+        return u.withGlobalVars(out, config.variables);
       }
       function fillTemplate(tpl, vars){
-        function fmt(v){ return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100); }
+        // Decimals + display per variable (default here: always decimal, as before).
+        const formats = u.varFormats(config.variables, config, 'decimal');
+        const fmt = (v, name) => u.formatVarValue(v, formats[name]);
         return String(tpl || '').replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName) => {
           if(match.startsWith('$')){
             return match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name) => {
-              if(name in vars) return '{' + fmt(vars[name]) + '}';
+              if(name in vars) return '{' + fmt(vars[name], name) + '}';
               return m;
             });
           }
-          if(plainName && plainName in vars) return fmt(vars[plainName]);
+          if(plainName && plainName in vars) return fmt(vars[plainName], plainName);
           return match;
         });
       }
+      // "Nur ganzzahlige Lösungen": real and imaginary part whole.
+      const intOnly = !!config.integerAnswers;
+      const usable = z => !!z && C.isFinite(z) && (!intOnly || (u.isWholeNumber(z.re) && u.isWholeNumber(z.im)));
       function chooseNew(showMsg){
-        const MAX_TRIES = 200;
+        const MAX_TRIES = intOnly ? 2000 : 200;
         let vars = null, expected = null;
         for(let t = 0; t < MAX_TRIES; t++){
           vars = genVars();
           expected = evalComplexExpr(config.formula || '0', vars);
-          if(expected && C.isFinite(expected)) break;
+          if(usable(expected)) break;
         }
-        if(!expected || !C.isFinite(expected)){
-          fb.bad(u.t('block.complex-input.feedback.notGeneratable'));
+        if(!usable(expected)){
+          fb.bad(u.t(intOnly ? 'block.complex-input.feedback.notGeneratableInteger' : 'block.complex-input.feedback.notGeneratable'));
           return;
         }
+        if(intOnly) expected = { re: Math.round(expected.re), im: Math.round(expected.im) };
         current = { vars, expected };
         inp.value = '';
         qText.textContent = fillTemplate(u.l(config.questionTemplate), vars);
@@ -444,7 +478,14 @@
 
       chooseNew(false);
       api.initScore(config.maxPoints || 1);
-      return {};
+      return {
+        getVars: () => (current && current.vars) || {},
+        showSolution(){
+          if(!current || !current.expected) return;
+          inp.value = formatComplex(current.expected);
+          fb.ok(u.t('utils.resume.solved'));
+        }
+      };
     },
     preview(host, config){
       const t = window.BlockUtils.t;
