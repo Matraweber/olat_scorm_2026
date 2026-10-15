@@ -13,6 +13,7 @@ Entwickelt am Umwelt-Campus Birkenfeld, Hochschule Trier.
 - [Builder-Workflow](#builder-workflow)
 - [Mehrsprachigkeit (Deutsch / Englisch)](#mehrsprachigkeit-deutsch--englisch)
 - [Block-Kategorien](#block-kategorien)
+- [Funktionen der Lerneinheit](#funktionen-der-lerneinheit)
 - [Persistenz: Autosave, JSON, SCORM-ZIP](#persistenz-autosave-json-scorm-zip)
 - [Tastaturkürzel](#tastaturkürzel)
 - [Cache-Buster bumpen](#cache-buster-bumpen)
@@ -53,9 +54,11 @@ Python 3 muss installiert sein. Auf macOS bereits enthalten, unter Windows ggf. 
 ### Manuell starten
 
 ```bash
-python3 -m http.server 8765 --bind 127.0.0.1
+python3 serve.py 8765        # Windows: py -3 serve.py 8765
 # danach im Browser: http://localhost:8765/builder/
 ```
+
+`serve.py` ist ein kleiner Python-Server, der bei jeder Antwort `Cache-Control: no-cache` mitschickt (geänderte Dateien kommen sofort an), mehrere Anfragen gleichzeitig bedient (ZIP-Export) und Byte-Ranges unterstützt (Vorspulen im Tutorial-Video). Notfalls geht auch `python3 -m http.server 8765 --bind 127.0.0.1`, dann aber ohne diese drei Punkte.
 
 ---
 
@@ -64,15 +67,22 @@ python3 -m http.server 8765 --bind 127.0.0.1
 ```
 olat_scorm_2026/
 ├── README.md                 Dieses Dokument
+├── ARCHITECTURE.md           Entwickler-Dokumentation
 ├── start.sh / start.bat      Lokalen Server starten
+├── serve.py                  Der lokale Server (von start.* benutzt)
 ├── bump-version.sh / .bat    Cache-Buster in builder/index.html erhöhen
+├── tutorial/                 Video-Tutorial (de/en)
+├── package.json, test/, test.bat, eslint.config.mjs   Tests und Lint (optional, siehe unten)
 └── builder/                  Builder-Applikation
     ├── index.html
     ├── builder.css
+    ├── i18n/                 Texte der Builder-Oberfläche (de, en)
     ├── js/                   Builder-Logik (ES-Module)
     ├── template/             Block-Definitionen + SCORM-Runtime
+    │   ├── index.html        Einstiegsseite der Lerneinheit (wird beim Export befüllt)
     │   ├── blocks/           Eine Datei pro Block-Typ
-    │   ├── block-icons.js    SVG-Icons aller Blöcke
+    │   ├── i18n/             Texte des SCORM-Players und der Blöcke (de, en)
+    │   ├── block-icons.js    SVG-Icons aller Blöcke (nur im Builder)
     │   ├── runtime.js        Wird in jedes SCORM-ZIP eingebettet
     │   ├── styles.css        Runtime-Styles im SCORM-Paket
     │   ├── imsmanifest.xml   SCORM-1.2-Manifest-Template
@@ -98,9 +108,12 @@ olat_scorm_2026/
 | `form.js` | Schema-getriebener Form-Renderer (Dispatcher + einfache Felder) |
 | `form-media.js` | Upload-Felder (Bild, Audio, Video, Datei) |
 | `form-math.js` | Math-Textarea + Formel-Eingabe mit KaTeX-Toolbar |
-| `form-specialized.js` | Block-spezifische Felder (zone-editor, unit-pair, unit-from-to) |
+| `form-specialized.js` | Block-spezifische Felder (zone-editor, unit-pair, unit-from-to, Auswahl-Matrix, Freie Tabelle) |
 | `math-toolbar-data.js` | Symboltabelle der Mathe-Toolbar (Pi, Wurzel, etc.) |
-| `preview.js` | Block-Vorschau im Canvas + Welcome-Detail |
+| `preview.js` | Block-Vorschau auf der Canvas, Messung für „Höhe für SCORM anpassen“ |
+| `block-help.js` | Inhalte der „Was ist das?“-Kästen je Block-Typ |
+| `image-shrink.js` | Verkleinert hochgeladene Bilder (max. 2000 px) |
+| `i18n.js`, `lang-menu.js` | Übersetzungen der Oberfläche, Sprachumschalter |
 | `io.js` | JSON-Im/Export, SCORM-ZIP-Generierung, Preview-Iframe |
 | `folder-browser.js` | Header-Dropdown mit Ordner-Tree für SCORM-ZIPs |
 | `canvas.js` | Snap-Algorithmus, Block-Summary, Auto-Fit-Höhen |
@@ -127,6 +140,9 @@ Vom leeren Builder bis zum SCORM-Paket:
 - **Shift + Klick** für Mehrfachauswahl
 - **Strg/Cmd + Mausrad** zum Zoomen
 - **Bild per Drag & Drop** auf die Canvas erzeugt automatisch einen Image-Block am Drop-Punkt
+- **↕** passt die Blockhöhe an die Vorschau im Builder an, **⇳** an die fertige Lerneinheit (der Block muss dort nicht scrollen)
+- **Tabs** pro Aufgabe: aktivieren, mit `+` ergänzen, mit `×` schließen, Namen direkt im Tab bearbeiten
+- **Komposition:** Beschriftungen per Doppelklick bearbeiten (Enter speichert, Shift+Enter = neue Zeile, darunter eine Live-Vorschau)
 
 ---
 
@@ -182,13 +198,26 @@ Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. 
 
 ---
 
+## Funktionen der Lerneinheit
+
+Ausführlich erklärt mit Beispielen sind diese Funktionen auf der **Willkommen-Seite des Builders**; jeder Block hat zusätzlich einen „Was ist das?“-Kasten. Kurzüberblick:
+
+- **Zufallsvariablen** in Rechenblöcken (`{a}` im Text, `a` in der Formel), mit Nachkommastellen, Bruch-/Kommadarstellung und „Nur ganzzahlige Lösungen“. **Globale Variablen** in den Kopfdaten gelten in allen Aufgaben; „Globale Werte neu generieren“ setzt die betroffenen Aufgaben zurück.
+- **Bewertung:** Teilpunkte, Abzug für falsche Antworten, begrenzte Versuche (optional mit Abzug pro Versuch), Hinweis und Lösungsweg (KaTeX, mit aktuellen Werten), „Antwort nach Prüfen sperren“, Zeitlimit pro Block oder für die ganze Lerneinheit.
+- **Kopfdaten** setzen Standards für alle Blöcke; im Block bedeutet „Wie Lerneinheit“, dass dieser Standard gilt.
+- **Aufgabenpools:** pro Durchlauf N zufällige Aufgaben aus einem Pool.
+- **Vorlagen:** Aufgaben-Vorlagen (ganze Aufgabe) und Block-Vorlagen (★ am Block). Beide liegen im Browser (`localStorage`), nicht in der Lerneinheit, und gelten nur für diesen Browser und diese Adresse.
+- **In OLAT:** Fortschrittsbalken; Unterbrechen und Fortsetzen mit denselben Zufallswerten, Punkten, Sperren, Timern und Eingaben (Zuordnungen per Ziehen ausgenommen). OLAT erhält Punkte, Status (bestanden/nicht bestanden nach der Bestehensschwelle) und Bearbeitungszeit.
+
+---
+
 ## Persistenz: Autosave, JSON, SCORM-ZIP
 
 ### Autosave (lokal)
 
 - Jede Änderung am Kurs wird mit 800 ms Debounce in `localStorage` gespeichert
 - Bei Reload bietet der Builder an, den letzten Stand wiederherzustellen
-- `Strg + S` löst ein sofortiges Speichern aus
+- `Strg + S` überschreibt die ZIP-Datei, die zuletzt aus der Ordneransicht geöffnet oder über den Speichern-Dialog von „SCORM-ZIP erzeugen“ gespeichert wurde; sonst sichert es sofort im Browser
 - Der Status oben im Header zeigt „Gespeichert" / „Wird gespeichert..." / „Nicht gespeichert"
 
 `localStorage` ist auf ca. 5-10 MB beschränkt. Bei sehr großen eingebetteten Medien (Videos > 10 MB) kann das Autosave fehlschlagen. Der SCORM-Export funktioniert trotzdem.
@@ -215,7 +244,7 @@ Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. 
 ### SCORM-ZIP
 
 - Erzeugt ein SCORM-1.2-konformes ZIP mit `imsmanifest.xml`, allen Blocks und Runtime-Files
-- Eingebettete Medien (Bilder, Audio) werden als Data-URLs im ZIP transportiert
+- Hochgeladene Medien (Bilder, Audio, Video, Dateien) werden als eigene Dateien im Ordner `media/` des ZIPs abgelegt und beim Laden wieder eingebettet
 - YouTube/Vimeo-Videos bleiben als Embed-Links erhalten
 
 ### Datei-Upload-Limits
@@ -229,6 +258,8 @@ Im Block-Picker werden Blöcke pro Kategorie nach Nutzungshäufigkeit sortiert. 
 
 Bei großen Videos einen YouTube/Vimeo-Link einbetten (unbegrenzte Größe).
 
+Große Fotos werden beim Hochladen automatisch auf höchstens 2000 px (längere Seite) verkleinert und als JPEG gespeichert; PNG bleibt verlustfrei. Abschaltbar in den Kopfdaten unter „Bilder“ oder pro Upload mit „Original behalten“. Die Warnschwelle für Bilder betrifft deshalb vor allem PNG-Screenshots und Originale.
+
 ---
 
 ## Tastaturkürzel
@@ -238,7 +269,7 @@ Bei großen Videos einen YouTube/Vimeo-Link einbetten (unbegrenzte Größe).
 | Shortcut | Aktion |
 |---|---|
 | `?` | Tastaturkürzel-Übersicht ein-/ausblenden |
-| `Strg/Cmd + S` | Sofort speichern |
+| `Strg/Cmd + S` | Speichern (geöffnete ZIP-Datei überschreiben, sonst Sicherung im Browser) |
 | `Strg/Cmd + Shift + S` | SCORM-ZIP exportieren |
 | `Strg/Cmd + Z` / `Y` | Rückgängig / Wiederherstellen |
 | `Strg/Cmd + A` | Alle Blöcke der Aufgabe markieren |
@@ -253,7 +284,7 @@ Innerhalb des Komposition-Editors gibt es zusätzliche Shortcuts (`V` = Verschie
 
 ## Cache-Buster bumpen
 
-`builder/index.html` lädt das CSS mit einem Query-Parameter (`?v=N`). Nach Änderungen an `builder.css` muss `N` erhöht werden, damit Nutzer-Browser nicht die alte Version cachen.
+`builder/index.html` lädt CSS, Runtime-Skripte, Sprachdateien und alle Block-Dateien mit einem Query-Parameter (`?v=N`). Wird der Builder über einen Server ohne No-Cache-Header ausgeliefert, sorgt ein höheres `N` dafür, dass Browser nicht die alte Version aus dem Cache nehmen. Mit `serve.py` (also `start.sh`/`start.bat`) ist das weniger kritisch, weil jede Antwort `Cache-Control: no-cache` trägt.
 
 ### macOS / Linux
 
@@ -274,7 +305,7 @@ Beide Scripts:
 - ersetzen es durch `N+1` (oder den übergebenen Wert)
 - bestätigen das Ergebnis (`Bumped cache-buster: v=110 -> v=111`)
 
-Nach jeder produktiven Änderung an `builder.css` bumpen. Bei reinen JS-Änderungen weniger kritisch.
+Vor dem Weitergeben oder Veröffentlichen einer geänderten Version bumpen. Die ES-Module unter `builder/js/` haben keinen `?v=`; für sie verlässt sich der Builder auf die No-Cache-Header.
 
 ---
 
@@ -283,6 +314,8 @@ Nach jeder produktiven Änderung an `builder.css` bumpen. Bei reinen JS-Änderun
 Block-Typen sind selbst-registrierende Module unter `builder/template/blocks/`. Eine Datei pro Block.
 
 ### Skelett
+
+Das Skelett zeigt feste deutsche Texte, damit es kurz bleibt. Die mitgelieferten Blöcke nutzen stattdessen Übersetzungsschlüssel (`labelKey`, `descKey`, `categoryKey`, in Feldern `labelKey`/`helpKey`/`placeholderKey`), deren Texte in `builder/template/i18n/de.js` und `en.js` stehen.
 
 ```javascript
 (function(){
@@ -365,18 +398,26 @@ Damit der neue Block sowohl im Builder als auch im exportierten SCORM-ZIP funkti
 
    Das Array wird in der angegebenen Reihenfolge geladen.
 
+3. **`builder/js/block-help.js`** sowie `blockHelp` in `builder/i18n/de.js`/`en.js`: Inhalt des „Was ist das?“-Kastens.
+4. **Test:** mindestens ein Bewertungstest unter `test/blocks/` (der Smoke-Test `test/mount-audit.test.mjs` prüft neue Blöcke automatisch mit).
+
 Anschließend `./bump-version.sh` ausführen.
 
 ### Verfügbare Schema-Field-Typen
 
 | Type | Renderer |
 |---|---|
-| `text`, `textarea`, `number`, `select`, `checkbox` | Standard-Inputs |
+| `text`, `textarea`, `number`, `select`, `boolean` | Standard-Inputs (`boolean` = Checkbox) |
 | `color` | Farb-Picker |
 | `image`, `audio`, `video`, `file` | Datei-Upload mit MIME-Validierung |
 | `math-textarea` | Mathe-Toolbar (LaTeX-Eingabe mit Live-KaTeX-Preview) |
-| `list` | Wiederholbare Sub-Schema-Liste mit add/remove |
-| `section`, `action` | Layout-Helfer |
+| `formula-text` | Einzeilige Lösungs-Formel mit Formel-Hilfen |
+| `list` | Wiederholbare Sub-Schema-Liste mit add/remove (`itemSchema`) |
+| `group` | Gruppiert Unterfelder in einem Rahmen |
+| `zone-editor`, `unit-pair`, `unit-from-to`, `choice-matrix`, `grid-table` | Spezial-Editoren einzelner Blöcke |
+| `section`, `action` | Layout-Helfer (Zwischenüberschrift, Button) |
+
+Jedes Feld kann `showIf: cfg => …` haben (nur anzeigen, wenn die Bedingung gilt). Bewertete Blöcke bekommen die gemeinsamen Felder (Antwort sperren, Zeitlimit, Versuche/Hinweis/Lösungsweg) automatisch angehängt.
 
 ### Block-API-Lifecycle
 
@@ -387,8 +428,12 @@ Anschließend `./bump-version.sh` ausführen.
 | `summary(cfg)` | optional | Task-Liste, Block-Karten-Header |
 | `validate(cfg)` | optional | Pre-Export-Check (Warnungen) |
 | `builderSchema()` | ja | rechte Konfig-Pane |
-| `mount(host, cfg, api)` | ja | SCORM-Runtime und Vorschau-Modal |
-| `preview(host, cfg)` | optional | Builder-Canvas-Vorschau (sonst `mount`) |
+| `mount(host, cfg, api)` | ja | SCORM-Runtime und Builder-Canvas (dort in einem Shadow-DOM) |
+| `preview(host, cfg)` | optional | Vorschau auf der Willkommen-Seite; auf der Canvas nur, falls `mount` scheitert |
+| `maxPointsFor(cfg)` | optional | Maximalpunkte, wenn sie nicht einfach `cfg.maxPoints` sind |
+| `acceptsGlobals(cfg, werte)` | optional | Prüft, ob globale Variablen-Werte die Bedingungen des Blocks erfüllen (z. B. „Nur ganzzahlige Lösungen“) |
+
+`mount()` kann ein Objekt zurückgeben, das die Runtime nutzt: `getVars()` (aktuelle Variablenwerte für Hinweis/Lösungsweg), `showSolution()` (Lösung eintragen, beim Fortsetzen gelöster Blöcke) und `destroy()`. Details in [`ARCHITECTURE.md`](ARCHITECTURE.md#runtime-ablauf).
 
 ---
 
@@ -396,22 +441,20 @@ Anschließend `./bump-version.sh` ausführen.
 
 Für tiefer gehende Informationen zum Code-Aufbau, den vier Ebenen (UI-Shell, State, Render-Dispatcher, Blocks), den Datenflüssen beim Speichern und Abspielen sowie häufigen Fallstricken siehe [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-### Tests und Benchmark
+### Tests
 
-Optional, nicht zwingend für Anwender. Voraussetzung: Node 18+.
+Optional, nicht zwingend für Anwender (der Builder läuft weiter nur mit `start.bat` / `serve.py`). Voraussetzung: Node 18+, Python 3 und ein installiertes Edge oder Chrome. Es wird kein eigener Browser heruntergeladen.
 
 ```bash
 npm install               # einmalig
-npm test                  # gesamte Test-Suite (~1 Minute)
-npm run lint              # ESLint
-npm run bench             # SCORM-ZIP-Build- und Block-Mount-Performance
-npm run test:visual       # visuelle Regression aller Blöcke (Pixel-Diff)
-npm run test:visual:update  # Baselines nach gewollter visueller Änderung neu erzeugen
+npm test                  # gesamte Test-Suite (~50 Sekunden)
+npm test -- blocks        # nur Tests, deren Pfad "blocks" enthält
+npm run lint              # ESLint (Warnungen erlaubt, Fehler nicht)
 ```
 
-Der Benchmark druckt min/median/p95 für realistische Kurs-Größen aus. Vor und nach einer Performance-Änderung laufen lassen und die Tabellen vergleichen.
+Unter Windows startet ein Doppelklick auf `test.bat` dasselbe (inkl. `npm install` beim ersten Mal). Der Browser lässt sich mit `TEST_BROWSER=chrome` (bzw. `msedge`, `chromium`) wählen, der Port mit `TEST_PORT` (Standard 8766). Auf langsamen Rechnern verdoppelt `TEST_PERF_FACTOR=2` die Zeitgrenzen.
 
-Die visuelle Regression rendert jeden Block im Runtime-Stil und vergleicht ihn pixelgenau mit einer Baseline in `test/visual/baselines/`. Bei einer Abweichung landet ein Diff-Bild in `test/visual/diffs/`. Nach einer beabsichtigten optischen Änderung die Baselines mit `npm run test:visual:update` neu erzeugen. Baselines sind maschinenspezifisch (Antialiasing) und werden lokal gehalten.
+Abgedeckt sind die Bewertung der wichtigsten Blöcke, die Hilfsfunktionen (Formeln, LaTeX, Variablen), die Sprachdateien (doppelte bzw. fehlende Schlüssel), Zeitgrenzen für die langsamen Pfade (Start einer großen Lerneinheit mit globalen Variablen, globales Neu-Generieren, Builder mit vielen Blöcken, ZIP-Export), Builder-Abläufe (Vorlagen, Validierung, Textfeld-Editor, Bildverkleinerung, „Höhe für SCORM anpassen") und die exportierte Lerneinheit mit nachgebautem LMS (globale Variablen, Versuche/Hinweis/Lösungsweg, Fortsetzen, Pools, Sprachwechsel, Abschlussmeldung). Details in [`ARCHITECTURE.md`](ARCHITECTURE.md#tests).
 
 ---
 
