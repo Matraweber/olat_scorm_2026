@@ -135,6 +135,13 @@ const de = {
     savePicker: {
       description: 'SCORM-Paket (ZIP)'
     },
+    unsaved: {
+      title: 'Ungespeicherte Lerneinheit',
+      message: 'Die aktuelle Lerneinheit wurde noch nicht als SCORM-ZIP gespeichert. Beim Wechseln gehen die Änderungen verloren.',
+      save: 'Als SCORM-ZIP speichern und wechseln',
+      discard: 'Verwerfen und wechseln',
+      cancel: 'Abbrechen'
+    },
     unknownZip: {
       title: 'Unbekanntes ZIP-Format?',
       message: 'Diese ZIP-Datei enthält keine tasks.json. Wahrscheinlich wurde sie nicht mit dem SCORM Builder erzeugt. Trotzdem versuchen, sie zu laden?',
@@ -227,12 +234,66 @@ const de = {
         heading: 'Frageblöcke (Standard für die ganze Lerneinheit)',
         note: 'Gilt für alle Frageblöcke mit Zufallspool. Einzelne Aufgaben können das überschreiben.',
         lockAfterCheck: {
-          label: 'Nach Korrektur sperren',
+          label: 'Neu-Generieren nach Prüfen sperren',
           help: 'Nach dem ersten Prüfen kann keine neue Aufgabe mehr generiert werden.'
         },
         hideRegenerate: {
           label: 'Neu-Generieren ausblenden',
           help: 'Kein „Neu generieren"-Knopf; die erste Zufallsaufgabe muss gelöst werden.'
+        },
+        lockAnswers: {
+          label: 'Antwort nach Prüfen sperren',
+          help: 'Gilt für alle bewerteten Blöcke: Nach dem Prüfen kann die Antwort nicht mehr geändert werden (ein Versuch). „Neu generieren" gibt die Eingabe für die neue Aufgabe wieder frei.'
+        }
+      },
+      timer: {
+        heading: 'Zeitlimit (ganze Lerneinheit)',
+        enabled: {
+          label: 'Zeitlimit für die Lerneinheit',
+          help: 'Ein Countdown läuft über alle Aufgaben hinweg (auch beim Wechseln der Aufgabe). Bei 0 wird die Lerneinheit automatisch abgeschlossen und bewertet.'
+        },
+        minutes: 'Minuten',
+        seconds: 'Sekunden'
+      },
+      images: {
+        heading: 'Bilder',
+        shrink: {
+          label: 'Große Bilder beim Hochladen verkleinern',
+          help: 'Fotos werden auf höchstens 2000 px (längere Seite) verkleinert und als JPEG gespeichert, typischerweise rund 90 % kleiner. Screenshots/PNG bleiben verlustfrei. In der Lerneinheit ist kein Unterschied sichtbar. Betrifft nur neu hochgeladene Bilder.'
+        }
+      },
+      pools: {
+        heading: 'Aufgabenpools',
+        note: 'Pro Durchlauf werden aus jedem Pool zufällig so viele Aufgaben gezogen wie eingestellt; Aufgaben ohne Pool sind immer dabei. Die Zuordnung erfolgt im Kopf der jeweiligen Aufgabe. Beim Fortsetzen bleibt die Auswahl gleich.',
+        listLabel: 'Pools',
+        itemLabel: 'Pool',
+        name: 'Name',
+        namePlaceholder: 'z. B. Statik',
+        draw: 'Anzahl gezogener Aufgaben',
+        drawPlaceholder: 'leer = alle',
+        usage: '{draw} von {n} Aufgaben werden gezogen',
+        empty: 'noch keine Aufgabe zugeordnet'
+      },
+      globalVars: {
+        heading: 'Globale Variablen (ganze Lerneinheit)',
+        note: 'Zufallsvariablen, die in allen Aufgaben gelten. Sie werden in Blöcken wie eigene Variablen benutzt: {F} in Texten, F in Formeln. Eine Block-Variable mit gleichem Namen hat Vorrang. Die Werte werden einmal pro Durchlauf gezogen.',
+        listLabel: 'Globale Variablen',
+        itemLabel: 'Globale Variable',
+        listHelp: 'Funktioniert in Numerischer Eingabe, Komposition, Tabelle (Werte und Freie Tabelle) und Komplexen Zahlen.',
+        name: 'Name',
+        namePlaceholder: 'z. B. F',
+        min: 'von',
+        max: 'bis',
+        integer: 'Nur Ganzzahlen',
+        usageHead: 'Verwendet in:',
+        unused: 'noch in keiner Aufgabe verwendet',
+        button: {
+          label: 'Button „Globale Werte neu generieren“ anzeigen',
+          help: 'Im Kopfbereich der Lerneinheit. Zieht neue Werte und setzt alle Aufgaben zurück, in denen globale Variablen vorkommen (mit Rückfrage). Der „Neu generieren“-Button eines Blocks ändert nur dessen eigene Variablen.'
+        },
+        lock: {
+          label: 'Globales Neu-Generieren nach Prüfen sperren',
+          help: 'Sobald in einer betroffenen Aufgabe eine Antwort geprüft wurde, ist der Button gesperrt. Unabhängig davon ist er gesperrt, solange dort Antworten gesperrt sind („Antwort nach Prüfen sperren“).'
         }
       }
     },
@@ -378,7 +439,7 @@ const de = {
       },
       tipResize: {
         title: 'Größe ändern',
-        body: 'Unten rechts an jedem Block die Ecke ziehen, oder den Knopf „Höhe an Inhalt anpassen" verwenden.'
+        body: 'Unten rechts an jedem Block die Ecke ziehen. ↕ passt die Höhe an die Vorschau im Builder an, ⇳ an die fertige Lerneinheit, damit der Block dort nicht scrollen muss.'
       },
       tipMultiSelect: {
         title: 'Mehrfach-Auswahl',
@@ -390,12 +451,147 @@ const de = {
       },
       tipTabs: {
         title: 'Tabs (optional)',
-        body: 'Pro Aufgabe können zwei Tabs aktiviert werden, beispielsweise „Visualisierung" und „Aufgabe".'
+        body: 'Pro Aufgabe können Tabs aktiviert werden, beispielsweise „Visualisierung" und „Aufgabe". Mit + kommen weitere Tabs dazu, mit × wird ein Tab geschlossen; der Name lässt sich im aktiven Tab direkt bearbeiten.'
       },
       tipTemplates: {
         title: 'Vorlagen speichern',
         body: 'Eine fertige Aufgabe als Vorlage speichern („Vorlage" im Aufgaben-Header). Sie steht beim nächsten Mal sofort zur Verfügung.'
       }
+    },
+    variables: {
+      title: 'Zufallsvariablen',
+      lead: 'Rechenblöcke (Numerische Eingabe, Komposition, Tabelle, Komplexe Eingabe) ziehen Zahlen aus Bereichen, die du festlegst. So bekommt jede Person eigene Werte, und „Neu generieren“ liefert eine neue Aufgabe derselben Art.',
+      local: {
+        title: 'Variablen im Block',
+        body: 'Im Block unter „Zufallsvariablen“ Name, Bereich (von/bis) und „Nur Ganzzahlen“ festlegen. Im Text schreibst du <code>{a}</code>, in der Formel <code>a</code>.'
+      },
+      global: {
+        title: 'Globale Variablen',
+        body: 'In den Kopfdaten angelegt, gelten sie in allen Aufgaben, z. B. dieselbe Kraft F in einer ganzen Aufgabenreihe. Eine Block-Variable mit gleichem Namen hat Vorrang. „Globale Werte neu generieren“ oben in der Lerneinheit setzt alle betroffenen Aufgaben zurück.'
+      },
+      regen: {
+        title: '„Neu generieren“',
+        body: 'Zieht neue Werte für die Variablen des Blocks. Lässt sich in den Kopfdaten oder im Block nach dem Prüfen sperren oder ganz ausblenden.'
+      },
+      format: {
+        title: 'Darstellung und ganzzahlige Lösungen',
+        body: 'Nachkommastellen und Anzeige (Kommazahl, Bruch oder automatisch) pro Block oder pro Variable. „Nur ganzzahlige Lösungen“ zieht nur Werte, bei denen das Ergebnis eine ganze Zahl ist.'
+      },
+      example: '<strong>Beispiel:</strong> Aufgabentext <code>Ein Balken der Länge {l} m trägt F = {F} kN. Berechne M = F · l.</code>, Variable <code>l</code> von 2 bis 6 (ganzzahlig), <code>F</code> als globale Variable von 10 bis 50, Lösungs-Formel <code>F*l</code>. Lernende sehen z. B. „Länge 4 m … F = 25 kN“; richtig ist 100.'
+    },
+    scoring: {
+      title: 'Bewertung und Punkte',
+      lead: 'Jeder bewertete Block hat eine Punktzahl. Zusammen ergeben sie die Gesamtpunkte der Lerneinheit; ob bestanden ist, entscheidet die Bestehensschwelle in den Kopfdaten.',
+      partial: {
+        title: 'Teilpunkte',
+        body: 'Die meisten Blöcke bewerten anteilig: 3 von 4 richtigen Zuordnungen geben 75 % der Punkte. Mehrere Antwortfelder zählen einzeln.'
+      },
+      deduct: {
+        title: 'Abzug für Fehler',
+        body: 'Multiple Choice, Tabelle, Wahrheitstabelle, Hotzone und Komposition können für falsche Antworten Punkte abziehen. Die Punktzahl eines Blocks fällt nie unter 0.'
+      },
+      attempts: {
+        title: 'Versuche begrenzen',
+        body: 'Unter „Versuche, Hinweis & Lösungsweg“: Anzahl der Versuche und optional ein Abzug in % pro weiterem Versuch. Sind alle verbraucht, ist der Block gesperrt.'
+      },
+      help: {
+        title: 'Hinweis und Lösungsweg',
+        body: 'Erscheinen als Buttons am Block, nach einer einstellbaren Zahl von Fehlversuchen, mit KaTeX und den aktuellen Variablenwerten. Ein Hinweis kann Punkte kosten; der Lösungsweg sperrt die Antworten.'
+      },
+      locks: {
+        title: 'Sperren',
+        body: '„Antwort nach Prüfen sperren“ erlaubt nur einen Versuch. „Neu-Generieren nach Prüfen sperren“ verhindert, dass bis zu besonders einfachen Werten weitergewürfelt wird.'
+      },
+      timer: {
+        title: 'Zeitlimits',
+        body: 'Für die ganze Lerneinheit (bei 0 wird sie beendet) oder pro Block (sperrt dessen Antworten; läuft nur, solange die Aufgabe angezeigt wird).'
+      },
+      example: '<strong>Rechenbeispiel:</strong> Block mit 2 Punkten, 3 Versuchen, 25 % Abzug pro weiterem Versuch und 0,5 Punkten für den Hinweis. Richtig im 2. Versuch nach geöffnetem Hinweis: 2 × 75 % − 0,5 = <strong>1 Punkt</strong>.'
+    },
+    courseSettings: {
+      title: 'Kopfdaten: Standard für alle Aufgaben',
+      lead: 'Die Kopfdaten („Kopfdaten bearbeiten“) gelten für die ganze Lerneinheit: Titel, Bestehensschwelle, Standards für Frageblöcke, Zeitlimit, globale Variablen, Aufgabenpools und Bilder.',
+      inherit: {
+        title: '„Wie Lerneinheit“',
+        body: 'Einstellungen wie „Neu-Generieren nach Prüfen sperren“ oder „Antwort nach Prüfen sperren“ stehen im Block auf „Wie Lerneinheit (An/Aus)“. Dann gilt der Wert aus den Kopfdaten; „An“ oder „Aus“ im Block gilt nur für diesen Block.'
+      },
+      threshold: {
+        title: 'Bestehensschwelle',
+        body: 'Anteil der Punkte zum Bestehen, als Zahl zwischen 0 und 1: 0,5 bedeutet 50 %. Beim Beenden meldet die Lerneinheit danach „bestanden“ oder „nicht bestanden“.'
+      },
+      example: ''
+    },
+    pools: {
+      title: 'Aufgabenpools',
+      lead: 'Mit Pools bearbeitet nicht jede Person dieselben Aufgaben: Pro Durchlauf wird aus jedem Pool zufällig die eingestellte Zahl an Aufgaben gezogen. Aufgaben ohne Pool sind immer dabei.',
+      setup: {
+        title: 'Einrichten',
+        body: 'In den Kopfdaten unter „Aufgabenpools“ einen Pool mit Namen und Anzahl anlegen. Dann im Kopf jeder Aufgabe neben dem Titel den Pool wählen.'
+      },
+      run: {
+        title: 'Im Durchlauf',
+        body: 'Die Auswahl bleibt beim Fortsetzen gleich. Navigation, Fortschritt und Maximalpunktzahl beziehen sich nur auf die gezogenen Aufgaben.'
+      },
+      example: '<strong>Beispiel:</strong> 8 Statik-Aufgaben im Pool „Statik“ mit Anzahl 3, dazu eine Einführung und ein Abschluss ohne Pool: Jede Person bearbeitet 5 Aufgaben, die mittleren 3 sind zufällig ausgewählt.'
+    },
+    templates: {
+      title: 'Vorlagen',
+      lead: 'Zwei Arten von Vorlagen sparen Arbeit bei wiederkehrenden Aufgaben.',
+      task: {
+        title: 'Aufgaben-Vorlagen',
+        body: 'Eine ganze Aufgabe mit allen Blöcken: mit „★ Vorlage“ im Kopf der Aufgabe speichern. Einfügen über „+ Aufgabe“ als neue Aufgabe oder im Block-Dialog unter „Eigene Vorlagen“ in eine bestehende Aufgabe.'
+      },
+      block: {
+        title: 'Block-Vorlagen',
+        body: 'Ein einzelner Block mit allen Einstellungen: mit ★ oben am Block speichern und im Block-Dialog unter „Eigene Vorlagen“ wieder einfügen.'
+      },
+      storage: {
+        title: 'Wo sie liegen',
+        body: 'Vorlagen werden im Browser gespeichert, nicht in der Lerneinheit. Sie gelten nur für diesen Browser und diese Adresse (localhost und 127.0.0.1 zählen getrennt) und gehen beim Löschen der Browserdaten verloren.'
+      },
+      example: ''
+    },
+    saving: {
+      title: 'Speichern und Sichern',
+      lead: 'Die eigentliche Datei einer Lerneinheit ist das SCORM-ZIP. Dieselbe Datei kommt nach OLAT und lässt sich jederzeit wieder öffnen und weiterbearbeiten.',
+      zip: {
+        title: 'SCORM-ZIP',
+        body: '„SCORM-ZIP erzeugen“ (Strg+Shift+S) speichert die Lerneinheit. Wieder öffnen über „Datei → SCORM-ZIP laden …“ oder die Ordneransicht. Wurde die Datei aus der Ordneransicht geöffnet oder über den Speichern-Dialog gespeichert, überschreibt Strg+S sie danach direkt.'
+      },
+      autosave: {
+        title: 'Automatische Sicherung',
+        body: 'Der Builder sichert laufend im Browser. Nach einem Absturz oder versehentlichem Schließen bietet er beim nächsten Start „Wiederherstellen“ an. Das ersetzt nicht das ZIP.'
+      },
+      guard: {
+        title: 'Ungespeicherte Änderungen',
+        body: 'Vor „Neu“ oder dem Öffnen einer anderen Datei fragt der Builder nach, wenn die aktuelle Lerneinheit noch nicht als ZIP gespeichert ist.'
+      },
+      images: {
+        title: 'Bilder',
+        body: 'Große Fotos werden beim Hochladen auf höchstens 2000 px verkleinert; das hält das ZIP klein. Für Detailbilder gibt es am Bildfeld „Original behalten“.'
+      },
+      example: ''
+    },
+    lms: {
+      title: 'In OLAT: Was Lernende erleben',
+      lead: 'Die Lerneinheit läuft in OLAT als SCORM-1.2-Paket. Mit „Vorschau“ siehst du sie vorher genau so, wie Lernende sie sehen.',
+      progress: {
+        title: 'Fortschritt',
+        body: 'Ein Balken zeigt, wie viele Aufgaben erledigt sind. Erledigt heißt: Alle bewerteten Blöcke der Aufgabe sind gelöst.'
+      },
+      resume: {
+        title: 'Unterbrechen und fortsetzen',
+        body: 'Wer die Lerneinheit schließt, macht später an derselben Stelle weiter: mit denselben Zufallswerten, Punkten, Sperren, Timern und Eingaben. Gelöste Aufgaben zeigen ihre Lösung. Zuordnungen per Ziehen werden nicht gespeichert.'
+      },
+      report: {
+        title: 'Was OLAT bekommt',
+        body: 'Erreichte und maximale Punkte, den Status (beim Beenden „bestanden“ oder „nicht bestanden“ nach der Bestehensschwelle, vorher „unvollständig“) und die Bearbeitungszeit.'
+      },
+      finish: {
+        title: 'Beenden',
+        body: '„Test beenden“ auf der letzten Aufgabe schließt die Lerneinheit ab und zeigt das Ergebnis. Danach wird kein Fortsetzen-Stand mehr gespeichert.'
+      },
+      example: ''
     },
     languages: {
       title: 'Mehrsprachige Lerneinheiten',
@@ -417,6 +613,31 @@ const de = {
         body: 'Das ZIP enthält nur die tatsächlich benutzten Sprachen. Der Kurs startet in der Sprache, die beim Export im Builder aktiv war. Felder ohne Übersetzung fallen auf die Erstsprache zurück.'
       }
     },
+    katex: {
+      title: 'Formeln mit KaTeX',
+      lead: 'In Aufgabentexten, Antwortmöglichkeiten, Beschriftungen der Komposition, Tabellenzellen sowie Hinweis und Lösungsweg lassen sich Formeln setzen. Formeln stehen zwischen <code>$…$</code> (im Text) oder <code>$$…$$</code> (eigene Zeile, zentriert). Zufallsvariablen schreibt man als <code>{a}</code>; in der Lerneinheit steht dort der gezogene Wert.',
+      colInput: 'Eingabe',
+      colResult: 'Ergebnis',
+      colNote: 'Wofür',
+      ex: {
+        fraction: 'Bruch',
+        scripts: 'Hochzahl und Index',
+        sqrt: 'Wurzel',
+        greek: 'Griechische Buchstaben, Grad',
+        cdot: 'Malpunkt',
+        text: 'Vektorpfeil, normaler Text im Index',
+        variables: 'Variablen {a}, {b} (hier mit a = 3, b = 4)',
+        display: 'Abgesetzte Formel mit Summe'
+      },
+      tip: {
+        umlauts: 'Wörter und Umlaute in Formeln in <code>\\text{…}</code> setzen, z. B. <code>$F_{\\text{Lager}}$</code>.',
+        varsInMath: 'Hat der Block Variablen namens a und b, wird <code>{a}</code> auch in <code>\\frac{a}{b}</code> durch den Wert ersetzt. Soll dort der Buchstabe stehen, ein Leerzeichen einfügen: <code>\\frac{ a}{ b}</code>.',
+        dollar: 'Ein Dollarzeichen, das keine Formel beginnen soll, als <code>\\$</code> schreiben.',
+        check: 'Die Vorschau im Builder zeigt sofort, ob eine Formel funktioniert; fehlerhafte Formeln erscheinen rot.'
+      },
+      linkIntro: 'Alle Befehle, die KaTeX versteht:',
+      linkText: 'katex.org/docs/supported'
+    },
     shortcuts: {
       title: 'Tastaturkürzel',
       lead: 'Auf der Canvas verfügbar:',
@@ -434,6 +655,8 @@ const de = {
       deselect: 'Auswahl aufheben',
       undo: 'Rückgängig',
       redo: 'Wiederherstellen',
+      save: 'Speichern (überschreibt die geöffnete ZIP-Datei, sonst Sicherung im Browser)',
+      saveAs: 'SCORM-ZIP erzeugen',
       zoom: 'Canvas zoomen'
     },
     foot: {
@@ -455,6 +678,7 @@ const de = {
     categoryGeneral: 'Allgemein',
     userTemplatesHead: 'Eigene Vorlagen',
     noTemplates: 'Keine Vorlagen verfügbar.',
+    noBlockTemplatesHint: 'Noch keine eigenen Vorlagen in diesem Browser. Block-Vorlage anlegen: Block in einer Aufgabe auswählen und oben am Block auf ★ (Als Block-Vorlage speichern) klicken. Vorlagen werden im Browser gespeichert, gelten also nur für diesen Browser und diese Adresse (z. B. localhost:8765).',
     insert: 'Einfügen',
     renamePrompt: 'Neuer Name:',
     templateInserted: 'Vorlage "{name}" eingefügt.',
@@ -467,6 +691,8 @@ const de = {
     templateSaved: 'Vorlage "{name}" gespeichert.',
     templateBasedOn: 'Vorlage basiert auf: {base}',
     templateBadge: 'Vorlage',
+    taskTemplateBadge: 'Aufgaben-Vorlage',
+    taskTemplateBlocks: 'Fügt {n} Block/Blöcke aus dieser Aufgaben-Vorlage ein',
     gradedBadge: 'gewertet',
     deleteTemplateAction: 'Vorlage löschen',
     deleteBlockTemplateTitle: 'Block-Vorlage löschen?',
@@ -477,23 +703,33 @@ const de = {
   taskPane: {
     taskLabel: 'Aufgabe {n}',
     titlePlaceholder: 'Titel der Aufgabe (in der Navigation sichtbar)',
+    poolTitle: 'Aufgabenpool (Kopfdaten): Aufgaben eines Pools werden pro Durchlauf zufällig gezogen',
+    poolNone: 'Kein Pool (immer dabei)',
+    poolOption: 'Pool: {name}',
     addBlock: '+ Block',
     addBlockTitle: 'Block hinzufügen',
     saveTemplate: '★ Vorlage',
     saveTemplateTitle: 'Aufgabe als Vorlage speichern',
     tabsDisable: 'Tabs deaktivieren',
     tabsEnable: '+ Tabs aktivieren',
-    tabsDisableTitle: 'Tabs entfernen (nur Tab 1 wird behalten)',
-    tabsEnableTitle: '2 Tabs aktivieren: Visualisierung + Aufgabe',
+    tabsDisableTitle: 'Alle Tabs entfernen (nur Tab 1 und seine Blöcke werden behalten)',
+    tabsEnableTitle: 'Tabs aktivieren (startet mit „Visualisierung" und „Aufgabe"; weitere Tabs mit +)',
     tabsDisableConfirmTitle: 'Tabs deaktivieren?',
-    tabsDisableConfirmMessageSingular: 'Tab 2 enthält {n} Block. Beim Deaktivieren gehen diese verloren.',
-    tabsDisableConfirmMessagePlural: 'Tab 2 enthält {n} Blöcke. Beim Deaktivieren gehen diese verloren.',
+    tabsDisableConfirmMessageSingular: 'Die Tabs ab Tab 2 enthalten {n} Block. Beim Deaktivieren geht er verloren.',
+    tabsDisableConfirmMessagePlural: 'Die Tabs ab Tab 2 enthalten {n} Blöcke. Beim Deaktivieren gehen diese verloren.',
     tabsDisableConfirmLabel: 'Deaktivieren',
     zoomOutTitle: 'Verkleinern (Strg + Mausrad)',
     zoomInTitle: 'Vergrößern (Strg + Mausrad)',
     zoomResetTitle: 'Zoom 100%',
     tabSwitchTitle: 'Tab wechseln',
     tabFallbackTitle: 'Tab {n}',
+    tabRenameTitle: 'Klicken zum Umbenennen',
+    tabCloseTitle: 'Tab schließen',
+    tabAddTitle: 'Tab hinzufügen',
+    tabCloseConfirmTitle: 'Tab schließen?',
+    tabCloseConfirmMessageSingular: 'Dieser Tab enthält {n} Block. Beim Schließen geht er verloren.',
+    tabCloseConfirmMessagePlural: 'Dieser Tab enthält {n} Blöcke. Beim Schließen gehen diese verloren.',
+    tabCloseConfirmLabel: 'Schließen',
     dropRejectedSingular: 'Datei ignoriert: nur Bilddateien können auf die Canvas gezogen werden.',
     dropRejectedPlural: '{n} Dateien ignoriert: nur Bilddateien können auf die Canvas gezogen werden.',
     fileValidationError: '„{name}": {error}',
@@ -502,7 +738,11 @@ const de = {
     imageAddedPlural: '{n} Bilder als Blöcke hinzugefügt.',
     canvas: {
       gradedSuffix: ' · gewertet',
-      fitHeightTitle: 'Höhe an Inhalt anpassen',
+      fitHeightTitle: 'Höhe an Inhalt anpassen (Builder-Vorschau)',
+      fitScormTitle: 'Höhe für SCORM anpassen: so hoch, dass der Block in der fertigen Lerneinheit nicht scrollen muss (gemessen wie in der SCORM-Datei, mit Platz für Rückmeldungen)',
+      fitScormFailed: 'Die Höhe konnte für diesen Block nicht gemessen werden.',
+      fitScormUnchanged: 'Die Höhe passt bereits.',
+      fitScormDone: 'Höhe auf {h} px gesetzt.',
       saveAsTemplateTitle: 'Als Block-Vorlage speichern',
       resizeTitle: 'Größe ändern',
       saveTemplateDialog: {
@@ -559,7 +799,32 @@ const de = {
       single: {
         title: 'Konfiguration: {label}',
         unknownType: 'Block-Typ "{type}" ist nicht registriert.',
-        noSchema: 'Dieser Block hat keine Konfiguration.'
+        noSchema: 'Dieser Block hat keine Konfiguration.',
+        lockAnswersLabel: 'Antwort nach Prüfen sperren',
+        lockAnswersHelp: 'Nach dem Prüfen kann die Antwort nicht mehr geändert werden. „Wie Lerneinheit" folgt der Einstellung in den Kopfdaten.',
+        timerEnabledLabel: 'Zeitlimit für diesen Block',
+        timerEnabledHelp: 'Countdown im Block. Er läuft nur, solange die Aufgabe (bzw. der Tab) angezeigt wird, und pausiert beim Wechseln. Bei 0 wird die Antwort gesperrt.',
+        timerMinutes: 'Minuten',
+        timerSeconds: 'Sekunden'
+      },
+      support: {
+        section: 'Versuche, Hinweis & Lösungsweg',
+        attemptsLimit: 'Lösungsversuche begrenzen',
+        attemptsLimitHelp: 'Jedes Prüfen zählt als Versuch. Sind alle Versuche verbraucht, werden die Antworten (und „Neu generieren“) gesperrt.',
+        maxAttempts: 'Anzahl Versuche',
+        attemptPenalty: 'Abzug pro weiterem Versuch (%)',
+        attemptPenaltyHelp: 'Beispiel 25: im 2. Versuch höchstens 75 %, im 3. höchstens 50 % der Punkte. 0 = kein Abzug.',
+        hintEnabled: 'Hinweis anbieten',
+        hintEnabledHelp: 'Nach der eingestellten Zahl von Fehlversuchen erscheint am Block ein Button „Hinweis“. KaTeX und Variablen ({a}) mit den aktuellen Werten möglich.',
+        hintText: 'Hinweistext',
+        hintAfter: 'Hinweis nach … Fehlversuchen (0 = sofort)',
+        hintPenalty: 'Punktabzug für das Öffnen des Hinweises',
+        solutionEnabled: 'Lösungsweg anbieten',
+        solutionEnabledHelp: 'Button „Lösungsweg“ am Block. Wird er geöffnet, bevor die Aufgabe gelöst ist, werden die Antworten gesperrt. KaTeX und Variablen ({a}) möglich.',
+        solutionText: 'Lösungsweg',
+        solutionAfter: 'Lösungsweg nach … Fehlversuchen',
+        solutionAfterPlaceholder: 'leer = wenn alle Versuche verbraucht (ohne Begrenzung: 3)',
+        solutionWhenCorrect: 'Lösungsweg auch nach richtiger Antwort anzeigen'
       },
       warnings: {
         title: 'Hinweise ({n})',
@@ -575,6 +840,37 @@ const de = {
   },
 
   form: {
+    gridTable: {
+      corner: 'Zeile / Spalte',
+      kindInherit: 'wie Spalte',
+      kind: { text: 'Text', numeric: 'Zahl-Antwort', textAnswer: 'Text-Antwort', choice: 'Auswahl (Dropdown)' },
+      optionsPlaceholder: 'Richtig | Falsch 1 | Falsch 2',
+      graded: 'Punkte',
+      gradedTitle: 'Angehakt: Zelle zählt für die Punkte. Aus: wird nur geprüft und markiert (z. B. Hilfsfeld).',
+      cellPoints: 'Punkte je Zelle einzeln festlegen',
+      cellPointsTitle: 'An: jede bewertete Zelle bekommt eine eigene Punktzahl, die Gesamtpunktzahl ist deren Summe. Aus: „Punkte (gesamt)“ wird gleichmäßig verteilt.',
+      pointsTitle: 'Punkte für diese Zelle',
+      textPlaceholder: 'Text ($…$, {a} möglich)',
+      formulaPlaceholder: 'Formel, z. B. a*b',
+      tolPlaceholder: '± (leer = Standard)',
+      answersPlaceholder: 'Antwort(en): a | b',
+      addRow: 'Zeile hinzufügen',
+      addCol: 'Spalte hinzufügen',
+      removeRow: 'Zeile entfernen',
+      removeCol: 'Spalte entfernen',
+      hint: 'Typ oben pro Spalte wählen; links kann eine Zeile den Typ überschreiben. Text-Antworten: mehrere erlaubte Antworten mit | trennen. Auswahl: Optionen mit | trennen, die erste ist die richtige (wird gemischt angezeigt). „Punkte“ abwählen: Zelle wird geprüft, zählt aber nicht.'
+    },
+    choiceMatrix: {
+      corner: 'Zeile / Spalte',
+      rowPlaceholder: 'Zeile {n}',
+      colPlaceholder: 'Spalte {n}',
+      addRow: 'Zeile hinzufügen',
+      addCol: 'Spalte hinzufügen',
+      removeRow: 'Zeile entfernen',
+      removeCol: 'Spalte entfernen',
+      cellTitle: 'Angehakt = richtige Antwort',
+      hint: 'Zeilen und Spalten benennen; angehakte Kästchen sind die richtigen Antworten.'
+    },
     upload: {
       noFile: 'Keine Datei ausgewählt.',
       tooLarge: 'Datei ist zu groß ({size}). Maximum: {max}.',
@@ -604,7 +900,10 @@ const de = {
       urlPlaceholder: 'oder URL/Pfad eingeben',
       image: {
         clear: 'Bild entfernen',
-        embedded: 'Bild eingebettet ({size})'
+        embedded: 'Bild eingebettet ({size})',
+        keepOriginal: 'Original behalten (nicht verkleinern)',
+        keepOriginalHelp: 'Für Detailbilder, in die hineingezoomt werden soll. Sonst werden große Bilder automatisch auf höchstens 2000 px verkleinert.',
+        shrunk: 'Bild verkleinert: {from} → {to} ({w} × {h} px)'
       },
       audio: {
         clear: 'Audio entfernen',
@@ -677,7 +976,16 @@ const de = {
     defaultTitle: 'Aufgabe',
     validation: {
       noTasks: 'Lerneinheit enthält keine Aufgaben.',
-      emptyCourseTitle: 'Kurstitel ist leer.'
+      emptyCourseTitle: 'Kurstitel ist leer.',
+      shadowsGlobalVar: 'Variable „{name}“ überdeckt die gleichnamige globale Variable (in diesem Block gilt die Block-Variable).',
+      globalVarNoName: 'Globale Variable {n}: Name fehlt.',
+      globalVarBadName: 'Globale Variable „{name}“: Name darf nur Buchstaben (a-z, A-Z), Ziffern und Unterstrich enthalten.',
+      globalVarDuplicate: 'Globale Variable „{name}“ ist mehrfach definiert.',
+      globalVarRange: 'Globale Variable „{name}“: Min ({min}) ist größer als Max ({max}).',
+      globalVarUnused: 'Globale Variable „{name}“ wird in keiner Aufgabe verwendet.',
+      poolUnnamed: 'Pool {n}',
+      poolEmpty: 'Aufgabenpool „{name}“ enthält keine Aufgaben.',
+      poolDrawTooBig: 'Aufgabenpool „{name}“: Es sollen {draw} Aufgaben gezogen werden, er enthält aber nur {n}.'
     },
     toast: {
       saveTemplatesFailed: 'Vorlagen konnten nicht gespeichert werden: {msg}',
@@ -710,290 +1018,314 @@ const de = {
   },
 
   blockHelp: {
+    common: {
+      graded: 'Unten im Einstellungsbereich hat jeder bewertete Block außerdem: „Antwort nach Prüfen sperren“, ein Zeitlimit sowie „Versuche, Hinweis & Lösungsweg“. „Wie Lerneinheit“ übernimmt die Einstellung aus den Kopfdaten.'
+    },
     heading: {
-      summary: 'Überschrift. Strukturiert die Aufgabe und gibt thematische Kapitel an.',
+      summary: 'Überschrift zur Gliederung einer Aufgabe.',
       steps: {
-        1: 'Text in das Feld eintragen.',
-        2: 'Größe nach Bedarf wählen (H2 ist Standard für Unterabschnitte).'
+        1: 'Text eintragen.',
+        2: 'Größe wählen: Groß (h2, Standard), Mittel (h3) oder Klein (h4).'
       }
     },
     richText: {
-      summary: 'Fließtext mit einfachen Formatierungen (Fett, Kursiv, Listen, Links).',
+      summary: 'Fließtext mit Formatierungen (fett, kursiv, Listen, Links) und Formeln.',
       steps: {
-        1: 'Inhalt in den Editor schreiben.',
-        2: 'Formatierungs-Toolbar oben für Hervorhebungen verwenden.'
+        1: 'Inhalt eintragen; HTML ist erlaubt.',
+        2: 'Formeln zwischen <code>$…$</code> setzen, z. B. <code>$a^2 + b^2 = c^2$</code>.'
       },
       tips: {
-        1: 'Für Formeln innerhalb des Textes Dollarzeichen wie in LaTeX nutzen, z. B. $a^2 + b^2 = c^2$.'
+        1: 'Platzhalter wie <code>{a}</code> werden hier nicht durch Werte ersetzt. Für Texte mit Zufallswerten den Aufgabentext eines Frageblocks verwenden.'
       }
     },
     noteBox: {
-      summary: 'Farbig hinterlegter Hinweis-Kasten, um wichtige Punkte vom Fließtext abzuheben.',
+      summary: 'Farbiger Hinweiskasten, um Wichtiges vom Text abzuheben.',
       steps: {
-        1: 'Stil wählen: Info, Warnung, Tipp oder Definition.',
-        2: 'Text eintragen.'
+        1: 'Stil wählen: Info (grün), Warnung (gelb) oder Tipp (blau).',
+        2: 'Titel und Inhalt eintragen; HTML und Formeln sind erlaubt.'
       }
     },
     image: {
-      summary: 'Eingebettetes Bild. Wird als Data-URL ins SCORM-Paket aufgenommen.',
+      summary: 'Bild mit Alternativtext und optionaler Bildunterschrift; wird ins SCORM-Paket eingebettet.',
       steps: {
-        1: 'Datei auswählen oder per Drag-and-Drop auf die Canvas ziehen.',
-        2: 'Alt-Text für Barrierefreiheit eintragen.'
+        1: 'Datei hochladen, eine URL eintragen oder das Bild direkt auf die Zeichenfläche ziehen.',
+        2: 'Alternativtext für Screenreader eintragen.'
       },
       tips: {
-        1: 'Bilder über 2 MB sollten vorher komprimiert werden, sonst wächst das ZIP unnötig.'
+        1: 'Große Fotos werden beim Hochladen automatisch auf höchstens 2000 px verkleinert. Abschalten: in den Kopfdaten unter „Bilder“ oder per „Original behalten“ am Bildfeld.',
+        2: '„Breite“ nimmt CSS-Werte wie <code>400px</code>, <code>60%</code> oder <code>auto</code>.'
       }
     },
     audio: {
-      summary: 'Audio-Player mit Standard-Browser-Controls.',
+      summary: 'Audio-Player mit den Bedienelementen des Browsers.',
       steps: {
-        1: 'Audio-Datei hochladen (mp3, ogg, wav).',
-        2: 'Optional: Beschriftung eintragen.'
+        1: 'Audiodatei hochladen (mp3, ogg, wav) oder eine URL eintragen.',
+        2: 'Optional Titel und Bildunterschrift eintragen.'
+      },
+      tips: {
+        1: 'Hochgeladene Dateien werden ins ZIP eingebettet und vergrößern es entsprechend.'
       }
     },
     video: {
-      summary: 'Video-Player. Lokale Datei oder YouTube/Vimeo-Embed.',
+      summary: 'Video-Player für eigene Dateien oder YouTube/Vimeo.',
       steps: {
-        1: 'Bei lokalem Video: Datei hochladen (mp4 empfohlen).',
-        2: 'Bei YouTube/Vimeo: kompletten Link einfügen, der Builder erkennt das Format automatisch.'
+        1: 'Datei hochladen (mp4 empfohlen) oder einen YouTube-/Vimeo-Link einfügen; das Format wird automatisch erkannt.',
+        2: 'Bei eigenen Dateien optional ein Vorschaubild festlegen.'
       },
       tips: {
-        1: 'Lokale Videos über 10 MB blähen das SCORM-ZIP stark auf. YouTube/Vimeo-Links sind in der Größe unbegrenzt.'
+        1: 'Eigene Videos stecken im ZIP und machen es groß. YouTube/Vimeo nicht, sie brauchen beim Abspielen aber Internetzugang.'
       }
     },
     fileDownload: {
-      summary: 'Liste herunterladbarer Dateien (PDFs, Arbeitsblätter, Code-Beispiele).',
+      summary: 'Datei zum Herunterladen, z. B. PDF, Arbeitsblatt oder Code-Beispiel.',
       steps: {
-        1: 'Pro Datei eine Zeile anlegen, Datei hochladen, Beschriftung eintragen.'
-      }
-    },
-    divider: {
-      summary: 'Horizontale Trennlinie als visueller Abschnittsabschluss.',
-      steps: {
-        1: 'Einfach platzieren. Keine weitere Konfiguration.'
-      }
-    },
-    code: {
-      summary: 'Quellcode-Block mit Syntax-Hervorhebung.',
-      steps: {
-        1: 'Sprache wählen.',
-        2: 'Code in das Textfeld einfügen, Einrückung bleibt erhalten.'
+        1: 'Datei hochladen oder eine URL eintragen.',
+        2: 'Anzeigenamen und optional eine Beschreibung eintragen.'
       }
     },
     summary: {
-      summary: 'Zusammenfassungs-Block mit Titel und Stichpunkten. Eignet sich für Schluss-Kapitel.',
+      summary: 'Zusammenfassung mit Überschrift und Stichpunkten, z. B. als Abschluss einer Lerneinheit.',
       steps: {
-        1: 'Titel angeben.',
-        2: 'Pro Punkt eine Überschrift und einen Erklärungstext eintragen.'
+        1: 'Überschrift eintragen.',
+        2: 'Pro Stichpunkt eine Kernaussage (wird fett) und optional eine Erläuterung eintragen.'
       }
     },
     survey: {
-      summary: 'Unbenotete Umfrage. Wird beim Lernenden angezeigt, fließt aber nicht in die Punkte ein.',
+      summary: 'Umfrage ohne Bewertung: Sternebewertung, Einfachauswahl oder Freitext.',
       steps: {
-        1: 'Frage formulieren.',
-        2: 'Antwortoptionen anlegen. Keine Markierung als richtig oder falsch.'
+        1: 'Fragen anlegen und für jede den Fragetyp wählen.',
+        2: 'Bei Einfachauswahl die Antwortoptionen eintragen, eine pro Zeile.'
       },
       tips: {
-        1: 'Sinnvoll für Selbsteinschätzungen oder Stimmungsabfragen am Anfang oder Ende einer Einheit.'
+        1: 'Zählt nicht zu den Punkten. Gut für Selbsteinschätzungen am Anfang oder Ende einer Einheit.'
+      }
+    },
+    divider: {
+      summary: 'Horizontale Trennlinie zwischen Abschnitten.',
+      steps: {
+        1: 'Einfach platzieren; es gibt keine Einstellungen.'
+      }
+    },
+    code: {
+      summary: 'Quellcode in Schrift mit fester Breite; Einrückungen bleiben erhalten.',
+      steps: {
+        1: 'Optional Titel und Sprache eintragen; beides erscheint als Beschriftung über dem Code.',
+        2: 'Code in das Textfeld einfügen.'
       }
     },
     multipleChoice: {
-      summary: 'Multiple-Choice-Frage mit einer oder mehreren richtigen Antworten.',
+      summary: 'Frage mit einer oder mehreren richtigen Antworten; Antworten als Text, Bild oder beides.',
       steps: {
         1: 'Frage formulieren.',
-        2: 'Antwortoptionen anlegen, richtige mit Häkchen markieren.'
+        2: 'Antworten anlegen und die richtigen mit „Ist richtig“ markieren.',
+        3: 'Für mehrere richtige Antworten „Mehrfachauswahl erlauben“ einschalten.'
       },
       tips: {
-        1: 'Bei mehreren richtigen Antworten gibt es automatisch Teilpunkte (z. B. 1 von 2 richtigen Antworten = 50 %).',
-        2: 'Optionen werden für jeden Lernenden gemischt angezeigt.',
-        3: '„Falsche bestrafen" zieht für jede falsche Auswahl Punkte ab.'
-      }
-    },
-    cloze: {
-      summary: 'Lückentext: Wörter im Fließtext werden durch Eingabefelder oder Dropdowns ersetzt.',
-      steps: {
-        1: 'Text mit Lücken in die Vorlage schreiben.',
-        2: 'Lücke einbauen: <code>{{Antwort}}</code> für freie Eingabe, <code>{{a|b|c}}</code> für Alternativen, <code>{{=richtig|falsch1|falsch2}}</code> für Dropdown.'
-      },
-      tips: {
-        1: '„Groß/Klein ignorieren" lässt zu, dass „berlin" als „Berlin" gewertet wird.',
-        2: 'Mehrere richtige Schreibweisen mit | trennen, z. B. <code>{{Hund|dog|chien}}</code>.'
-      }
-    },
-    textInput: {
-      summary: 'Frei einzugebende Text-Antwort. Vergleichsmodus regelt die Strenge.',
-      steps: {
-        1: 'Frage formulieren.',
-        2: 'Richtige Antworten eintragen.',
-        3: 'Vergleichsmodus wählen.'
-      },
-      tips: {
-        1: '„Groß/Klein ignorieren" ist Standard. „Genau" nur bei Code oder kontextsensitiven Schreibweisen.',
-        2: '„Regex" für Muster wie <code>\\d{4}</code> (Jahreszahl).',
-        3: '„Stichworte" gibt Teilpunkte für jedes gefundene Stichwort.'
-      }
-    },
-    matchPairs: {
-      summary: 'Zuordnung per Drag-and-Drop. 1:1 für klassische Paare, Kategorisierung für mehrere Begriffe pro Kategorie.',
-      steps: {
-        1: 'Modus wählen: Paare oder Kategorisierung.',
-        2: 'Bei Paaren: links und rechts paarweise eintragen.',
-        3: 'Bei Kategorisierung: Kategorien anlegen, dann Begriffe der jeweiligen Kategorie zuordnen.'
-      },
-      tips: {
-        1: 'Bilder und Text lassen sich mischen. Bilder über 1 MB komprimieren.',
-        2: 'Punkte werden anteilig vergeben: 3 von 4 richtigen Zuordnungen = 75 %.'
-      }
-    },
-    sortList: {
-      summary: 'Sortierliste: Lernender bringt Begriffe per Drag-and-Drop in die richtige Reihenfolge.',
-      steps: {
-        1: 'Elemente in der korrekten Reihenfolge eintragen.',
-        2: 'Der Lernende sieht sie gemischt und muss sie sortieren.'
-      },
-      tips: {
-        1: 'Punkte pro Element in korrekter Position. Bei 4 Elementen und 2 korrekt = 2 Punkte.'
-      }
-    },
-    hotzone: {
-      summary: 'Klick-auf-Bild-Aufgabe. Der Lernende klickt richtige Bereiche im Bild an.',
-      steps: {
-        1: 'Bild hochladen.',
-        2: 'Rechteckige Zonen über die richtigen Bildbereiche legen.'
-      },
-      tips: {
-        1: 'Zonen-Koordinaten sind normiert (0 bis 1). Bei Bildwechsel mit gleichem Seitenverhältnis bleiben sie gültig.',
-        2: 'Mehrere Zonen pro Bild möglich; Punkte werden anteilig vergeben.'
+        1: 'Teilpunkte: Jede richtige Auswahl bringt Punkte ÷ Anzahl richtiger Antworten. „Falsche Auswahl abziehen“ zieht pro falschem Kreuz ab; die Punktzahl fällt nie unter 0.',
+        2: '„Anzahl auswählbarer Antworten begrenzen“ sperrt weitere Kästchen, sobald das Maximum erreicht ist.',
+        3: '„Antworten mischen“ ordnet die Antworten in jedem Durchlauf neu an.'
       }
     },
     numericInput: {
-      summary: 'Numerische Eingabe mit Toleranz, Variablen und automatisch generierter Aufgabe.',
+      summary: 'Rechenaufgabe mit Zufallsvariablen; die richtige Lösung berechnet eine Formel.',
       steps: {
-        1: 'Frage-Vorlage mit Platzhaltern wie <code>{a}</code> formulieren.',
-        2: 'Variablen mit Min/Max-Bereich anlegen.',
-        3: 'Lösungs-Formel eintragen, z. B. <code>a*b</code> oder <code>sqrt(a^2+b^2)</code>.'
+        1: 'Frage-Vorlage mit Platzhaltern wie <code>{a}</code> schreiben (KaTeX möglich).',
+        2: 'Variablen mit Bereich anlegen (von, bis, ganzzahlig oder Nachkommastellen).',
+        3: 'Lösungs-Formel eintragen, z. B. <code>a*b</code> oder <code>sqrt(a^2+b^2)</code>, und die Toleranz festlegen.'
       },
       tips: {
-        1: 'Bei jedem „Neu generieren" zieht der Builder neue Werte aus den Variablenbereichen.',
-        2: 'Toleranz definiert die akzeptierte Abweichung vom Sollwert.',
-        3: 'Mit „Term vereinfachen" wird die Antwort als gekürzter Bruch erwartet.'
+        1: '„Weitere Antwortfelder“: mehrere Ergebnisse mit eigener Formel, Bezeichnung (z. B. „x =“) und Einheit; Teilpunkte pro Feld.',
+        2: '„Nur ganzzahlige Lösungen“ zieht nur Werte mit ganzzahligem Ergebnis. „Unlösbare Aufgaben zulassen“: Hat die Formel kein Ergebnis, ist „X“ die richtige Antwort.',
+        3: 'Winkel in Formeln sind standardmäßig in Grad (<code>sin(30)</code> = 0,5); auf Bogenmaß umstellbar.',
+        4: '„Term vereinfachen“: Brüche müssen gekürzt eingegeben werden.',
+        5: 'Globale Variablen aus den Kopfdaten lassen sich wie eigene verwenden.'
       }
     },
-    unitConvert: {
-      summary: 'Einheiten-Umrechnung (Länge, Zeit, Masse, Geschwindigkeit, Energie, etc.).',
+    textInput: {
+      summary: 'Freie Textantwort; die Auswertungsart bestimmt, wie streng verglichen wird.',
       steps: {
-        1: 'Größenart wählen (z. B. Länge).',
-        2: 'Quell- und Ziel-Einheiten festlegen.',
-        3: 'Wertebereich definieren.'
+        1: 'Frage formulieren.',
+        2: 'Akzeptierte Antworten eintragen.',
+        3: 'Auswertungsart wählen.'
       },
       tips: {
-        1: 'Bei „Mit Bruch" sind auch gebrochene Zahlen als Antwort zulässig.',
-        2: 'Dezimaltrennzeichen ist Komma; der Builder akzeptiert aber auch Punkt.'
+        1: '„Exakt“ (Standard) ignoriert Groß-/Kleinschreibung. „Manuell“ wählt die Vergleichsart pro Eintrag.',
+        2: '„Regulärer Ausdruck“ für Muster wie <code>\\d{4}</code> (vierstellige Zahl).',
+        3: '„Schlüsselwörter“ gibt Teilpunkte für jeden gefundenen Begriff.'
       }
     },
-    table: {
-      summary: 'Tabelle mit variablen Spalten und Eingabefeldern. Für mehrere Berechnungen in einer Aufgabe.',
+    cloze: {
+      summary: 'Lückentext mit Eingabefeldern oder Auswahllisten.',
       steps: {
-        1: 'Spalten anlegen, pro Spalte Typ wählen: Zufallswert, Formel oder Freitext-Eingabe.',
-        2: 'Zeilenanzahl und Variablenbereich festlegen.'
+        1: 'Text mit Lücken schreiben.',
+        2: 'Lücken einbauen: <code>{{Antwort}}</code> Eingabefeld, <code>{{a|b}}</code> Eingabefeld mit mehreren richtigen Schreibweisen, <code>{{=richtig|falsch1|falsch2}}</code> Auswahlliste (erste Option ist richtig).'
       },
       tips: {
-        1: 'Formel-Spalten verwenden die Werte der vorherigen Spalten in derselben Zeile.',
-        2: 'Schrittweiten bestimmen, ob Werte in 1er-, 0.5er- oder anderen Sprüngen gewürfelt werden.'
+        1: '„Groß-/Kleinschreibung ignorieren“ wertet „berlin“ wie „Berlin“.',
+        2: '„Dropdown-Optionen mischen“ ändert die Reihenfolge in den Auswahllisten.',
+        3: 'Punkte werden anteilig pro richtiger Lücke vergeben.'
       }
     },
-    equationSystem: {
-      summary: 'Lineares Gleichungssystem mit 2 oder 3 Variablen, zufällig oder mit eigenen Varianten.',
+    matchPairs: {
+      summary: 'Zuordnung per Ziehen oder Antippen: 1 zu 1 oder Kategorisierung.',
       steps: {
-        1: 'Modus wählen: zufällig generiert oder eigene Varianten.',
-        2: 'Bei „Zufällig": Variablen, Koeffizienten- und Lösungsbereich festlegen.',
-        3: 'Bei „Manuell": Gleichungen direkt eingeben, z. B. <code>2x + y = 5</code>.'
+        1: 'Modus wählen.',
+        2: '1 zu 1: Paare mit linker und rechter Seite eintragen (Text, Bild oder beides).',
+        3: 'Kategorisierung: Kategorien mit ID anlegen, dann Elemente mit „Zugehörige Kategorie-ID(s)“ zuordnen.'
       },
       tips: {
-        1: 'Im manuellen Modus prüft der Builder, ob das System eindeutig lösbar ist.',
-        2: 'Punkte werden pro richtig gelöster Variable vergeben.'
+        1: 'Ein Element kann zu mehreren Kategorien gehören: IDs mit Komma trennen. Gleich aussehende Elemente sind untereinander austauschbar.',
+        2: 'Statt Ziehen geht auch Antippen: erst das Element, dann das Ziel. Praktisch auf Tablets und bei langen Listen.',
+        3: '„Anzahl Aufgaben pro Durchlauf“ zieht eine Auswahl; Punkte werden anteilig vergeben (3 von 4 richtig = 75 %).'
+      }
+    },
+    hotzone: {
+      summary: 'Bildaufgabe: Lernende klicken die richtigen Bereiche eines Bildes an.',
+      steps: {
+        1: 'Bild hochladen.',
+        2: 'Mit „Hotzonen einzeichnen“ Rechtecke über die richtigen Bereiche ziehen.'
+      },
+      tips: {
+        1: 'Punkte anteilig pro gefundener Zone; „Punkte für falsche Antworten abziehen“ wertet Fehlklicks.',
+        2: 'Zonen werden relativ zum Bild gespeichert und passen auch bei anderer Bildgröße.',
+        3: 'Optional zeigt die Korrektur nicht gefundene Zonen an.'
+      }
+    },
+    sortList: {
+      summary: 'Sortierliste: Elemente per Ziehen in die richtige Reihenfolge bringen.',
+      steps: {
+        1: 'Aufgabentext eintragen.',
+        2: 'Items in der richtigen Reihenfolge anlegen; angezeigt werden sie gemischt.'
+      },
+      tips: {
+        1: 'Punkte anteilig: Anteil der Items an der richtigen Position × Punkte.',
+        2: 'Formeln (<code>$…$</code>) in den Items sind möglich.'
+      }
+    },
+    complexQuestion: {
+      summary: 'Komplexe Zahl aus der Gaußschen Zahlenebene ablesen.',
+      steps: {
+        1: 'Aufgaben-Pool mit Real- und Imaginärteil anlegen.',
+        2: 'Festlegen, was gefragt wird (kartesisch, polar, beides oder konjugiert), und Toleranzen setzen.'
+      },
+      tips: {
+        1: '„Zufällig wählen“ nimmt in jedem Durchlauf eine Zahl aus dem Pool.'
       }
     },
     functionQuestion: {
-      summary: 'Funktions-Graph mit Frage zu Funktionswerten, Nullstellen, Schnittpunkten oder Extrema.',
+      summary: 'Funktionsgraph mit Frage zu Funktionswerten, Nullstellen, Schnittpunkten oder Extrema.',
       steps: {
         1: 'Funktion eingeben, z. B. <code>x^2 - 3</code> oder <code>sin(x)</code>.',
-        2: 'Frage-Modus wählen: Funktionswert, Nullstellen, y-Achsenabschnitt, Extrempunkte, oder eigene Frage.',
+        2: 'Festlegen, was gefragt wird: Funktionswert, Nullstellen, y-Achsenabschnitt, Extrempunkte oder eigene Frage.',
         3: 'Sichtbaren Bereich (x/y) festlegen.'
       },
       tips: {
         1: 'Bei mehreren Nullstellen werden alle erwartet; die Reihenfolge ist egal.',
-        2: 'Für Extrempunkte werden die Koordinaten als (x; y) eingegeben.'
-      }
-    },
-    complexQuestion: {
-      summary: 'Komplexe Zahl aus einem Plot in der Gaußschen Zahlenebene ablesen.',
-      steps: {
-        1: 'Pool von Punkten anlegen.',
-        2: 'Modus wählen: kartesisch (Re, Im), polar (|z|, φ), beides oder konjugiert.'
-      }
-    },
-    complexInput: {
-      summary: 'Komplexe Zahl als Antwort. Wie numerische Eingabe, aber mit Operationen auf komplexen Zahlen.',
-      steps: {
-        1: 'Frage-Vorlage formulieren, z. B. <code>$(a + bi)(c - di)</code>.',
-        2: 'Variablen mit Bereichen anlegen.',
-        3: 'Lösungs-Formel eintragen, z. B. <code>(a + b*i) * (c - d*i)</code>.'
-      },
-      tips: {
-        1: 'Eingabeformate für Lernende: <code>3+4i</code>, <code>-i</code>, <code>1/2+3/4i</code>.'
+        2: 'Extrempunkte werden als (x; y) eingegeben.'
       }
     },
     vectorQuestion: {
-      summary: 'Vektor aus einem 2D-Plot ablesen. Frage nach Komponenten, Betrag oder Winkel.',
+      summary: 'Vektor aus einem 2D-Plot ablesen: Komponenten, Betrag, Winkel oder Einheitsvektor.',
       steps: {
-        1: 'Pool von Vektoren anlegen.',
-        2: 'Frage-Modus wählen: Komponenten, Betrag, Winkel, Einheitsvektor oder alle.',
-        3: 'Winkel-Einheit setzen (Grad oder Radiant).'
-      }
-    },
-    truthTable: {
-      summary: 'Boolesche Wahrheitstabelle. Lernender füllt Spalte aus, der Builder vergleicht jeden Zeilenwert.',
-      steps: {
-        1: 'Ausdruck eingeben, z. B. <code>a and b</code>, <code>not (a or b)</code>.',
-        2: 'Variablennamen mit Komma trennen.'
-      },
-      tips: {
-        1: 'Erlaubte Operatoren: and, or, not, xor (sowie &&, ||, !).',
-        2: 'Jede Zeile gibt einen Punkt; 2^N Zeilen für N Variablen.'
+        1: 'Vektor-Pool anlegen.',
+        2: 'Festlegen, was gefragt wird.',
+        3: 'Winkeleinheit wählen (Grad oder Radiant) und Toleranzen setzen.'
       }
     },
     numberBase: {
-      summary: 'Zahlensystem-Umrechnung: Binär, Oktal, Dezimal und Hexadezimal.',
+      summary: 'Umrechnung zwischen Binär-, Oktal-, Dezimal- und Hexadezimalsystem.',
       steps: {
-        1: 'Richtungs-Preset wählen oder eigene Richtungen festlegen.',
-        2: 'Wertebereich angeben (dezimal).'
+        1: 'Umrechnungs-Preset wählen oder eigene Richtungen festlegen.',
+        2: 'Wertebereich (dezimal) angeben.'
       },
       tips: {
-        1: 'Hex-Antworten werden case-insensitive geprüft; Prefix <code>0x</code> ist erlaubt.'
+        1: 'Hex-Antworten werden ohne Rücksicht auf Groß-/Kleinschreibung geprüft; das Präfix <code>0x</code> ist erlaubt.'
       }
     },
-    composition: {
-      summary: 'Vektor-Editor für eigene geometrische Konstruktionen und Beschriftungen. Optional mit Lücken zur Eingabe.',
+    unitConvert: {
+      summary: 'Einheiten umrechnen: Länge, Zeit, Masse, Geschwindigkeit, Energie, Druck, Temperatur und mehr.',
       steps: {
-        1: 'Eine Vorlage einfügen (Rechteck, Dreieck, Pythagoras, Kreis), oder Formen einzeln über die Toolbar hinzufügen.',
-        2: 'Beschriftungen mit <code>{a}</code> für Variablen und <code>{1}</code> für Antwortfelder einfügen.',
-        3: 'Bewertungs-Modus wählen: Anzeige, Verstanden-Button oder Mit Lösung.'
+        1: 'Umrechnungen anlegen: Richtung (von → nach) und Wertebereich.',
+        2: 'Frage-Vorlage mit <code>{value}</code>, <code>{fromUnit}</code> und <code>{toUnit}</code> schreiben.'
       },
       tips: {
-        1: 'Variablen werden bei jedem Start neu gewürfelt; die Lösungs-Formel rechnet damit.',
-        2: 'Mehrere Slots in einem Label: <code>{1}</code>, <code>{2}</code>, … können untereinander verrechnet werden (<code>{1*}</code> als Antwort von Slot 1 in einer anderen Formel).'
+        1: 'Die Toleranz ist relativ: 0,01 bedeutet 1 % Abweichung.',
+        2: 'Komma und Punkt werden als Dezimaltrennzeichen akzeptiert.',
+        3: '„Richtung zufällig vertauschen“ fragt auch rückwärts.'
+      }
+    },
+    truthTable: {
+      summary: 'Boolesche Wahrheitstabelle: Lernende füllen die Ergebnisspalte aus.',
+      steps: {
+        1: 'Ausdruck eingeben, z. B. <code>a and b</code> oder <code>not (a or b)</code>.',
+        2: 'Variablennamen mit Komma getrennt eintragen.'
+      },
+      tips: {
+        1: 'Erlaubte Operatoren: and, or, not, xor (sowie &&, ||, !).',
+        2: 'Punkte anteilig pro richtiger Zeile; optional Abzug für falsche Zeilen. N Variablen ergeben 2^N Zeilen.'
+      }
+    },
+    table: {
+      summary: 'Tabelle in vier Arten: Wertetabelle, Richtig/Falsch-Aussagen, Auswahl-Matrix oder Freie Tabelle.',
+      steps: {
+        1: '„Art der Tabelle“ wählen.',
+        2: 'Wertetabelle: Variablen und Spalten (Zufallswert, Formel, Text oder Antwortspalte) anlegen und die Zeilenzahl festlegen.',
+        3: 'Richtig/Falsch: Aussagen eintragen und für jede richtig oder falsch wählen.',
+        4: 'Auswahl-Matrix: Zeilen und Spalten anlegen und die richtigen Kreuze im Raster setzen.',
+        5: 'Freie Tabelle: Zeilen und Spalten frei anlegen; jede Zelle ist Text, Zahl-Antwort (mit Formel), Text-Antwort oder Auswahlliste.'
+      },
+      tips: {
+        1: 'Wertetabelle: Formeln rechnen mit den Werten derselben Zeile; jede Zeile wird neu gezogen.',
+        2: 'Freie Tabelle: Mit „Punkte“ an der Zelle legst du fest, ob sie zählt; „Punkte je Zelle einzeln festlegen“ gibt jeder Zelle eigene Punkte.',
+        3: 'Bei Richtig/Falsch, Matrix und Freier Tabelle können falsche Antworten Punkte abziehen.'
+      }
+    },
+    equationSystem: {
+      summary: 'Lineares Gleichungssystem mit 2 oder 3 Variablen, zufällig erzeugt oder mit eigenen Varianten.',
+      steps: {
+        1: 'Modus wählen: zufällige Werte oder eigene Varianten.',
+        2: 'Zufällig: Variablen sowie Koeffizienten- und Lösungsbereich festlegen.',
+        3: 'Eigene Varianten: Gleichungen direkt eingeben, z. B. <code>2x + y = 5</code>.'
+      },
+      tips: {
+        1: 'Eigene Varianten werden live geprüft; ein nicht eindeutig lösbares System wird gemeldet.',
+        2: 'Punkte werden anteilig pro richtig gelöster Variable vergeben.'
       }
     },
     functionSandbox: {
-      summary: 'Interaktiver Funktionsplot zum Erkunden. Lernende ändern Parameter und sehen den Effekt sofort.',
+      summary: 'Interaktiver Funktionsplot zum Erkunden: Lernende verschieben Regler und sehen die Wirkung sofort.',
       steps: {
-        1: 'Funktion mit Platzhaltern für Parameter eintragen.',
-        2: 'Parameter mit Min/Max/Schrittweite anlegen.',
+        1: 'Funktion mit Parametern eintragen.',
+        2: 'Regler mit Bereich, Schrittweite und Startwert anlegen.',
         3: 'Sichtbaren x/y-Bereich festlegen.'
       },
       tips: {
         1: 'Keine Bewertung, reines Lernwerkzeug. Ergänzt eine Funktionsfrage gut.'
+      }
+    },
+    composition: {
+      summary: 'Zeichenfläche für eigene Skizzen und Konstruktionen, optional mit Antwortfeldern, Ja/Nein-Feldern, Klick- oder Hotspot-Aufgabe.',
+      steps: {
+        1: 'Vorlage einfügen oder Formen über die Werkzeugleiste hinzufügen.',
+        2: 'Beschriftungen per Doppelklick bearbeiten: <code>{a}</code> für Variablen, <code>{1}</code> für Antwortfelder; Formeln und Formatierung (B, I, x²) sind möglich.',
+        3: 'Bewertungsart wählen; bei „Mit Lösung“ über „Formel ▾“ die Lösung jedes Antwortfelds festlegen.'
+      },
+      tips: {
+        1: 'Im Textfeld-Editor: Enter speichert, Shift+Enter erzeugt eine neue Zeile, darunter erscheint eine Live-Vorschau.',
+        2: '<code>{1*}</code> zeigt die Antwort aus Feld 1 an und lässt sich in späteren Formeln weiterverwenden.',
+        3: 'Ein Ja/Nein-Feld kommt über die Werkzeugleiste dazu; richtige Antwort und Punkte stellst du bei der Form ein.'
+      }
+    },
+    complexInput: {
+      summary: 'Komplexe Zahl als Antwort; aufgebaut wie die Numerische Eingabe, aber mit komplexen Zahlen.',
+      steps: {
+        1: 'Frage-Vorlage schreiben, z. B. <code>Berechne $({a} + {b}i)({c} - {d}i)$</code>.',
+        2: 'Reelle Variablen mit Bereichen anlegen.',
+        3: 'Lösungs-Formel eintragen, z. B. <code>(a + b*i) * (c - d*i)</code>.'
+      },
+      tips: {
+        1: 'Eingabeformate für Lernende: <code>3+4i</code>, <code>-i</code>, <code>1/2+3/4i</code>.',
+        2: '„Nur ganzzahlige Lösungen“: Real- und Imaginärteil der Lösung sind ganzzahlig.'
       }
     }
   },

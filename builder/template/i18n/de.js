@@ -75,22 +75,90 @@
         on: 'An',
         off: 'Aus',
         inherit: 'Wie Lerneinheit ({state})',
-        lockAfterCheckLabel: 'Nach Korrektur sperren',
+        lockAfterCheckLabel: 'Neu-Generieren nach Prüfen sperren',
         lockAfterCheckHelp: 'Nach dem ersten Prüfen kann keine neue Aufgabe mehr generiert werden. „Wie Lerneinheit" folgt der Einstellung in den Kopfdaten.',
         noRegenerateLabel: 'Neu-Generieren ausblenden',
         noRegenerateHelp: 'Kein „Neu generieren"-Knopf; die erste Zufallsaufgabe muss gelöst werden. „Wie Lerneinheit" folgt den Kopfdaten.',
         lockedTitle: 'Nach der Korrektur gesperrt'
+      },
+      varFormat: {
+        decimals: {
+          label: 'Nachkommastellen (Zufallszahlen)',
+          help: 'Wie viele Nachkommastellen nicht-ganzzahlige Variablen erhalten (0–6). Einzelne Variablen können abweichen.'
+        },
+        display: {
+          label: 'Darstellung von Kommazahlen',
+          help: 'Wie nicht-ganzzahlige Variablen im Text erscheinen. Einzelne Variablen können abweichen.',
+          auto: 'Automatisch (einfacher Bruch, sonst Kommazahl)',
+          decimal: 'Immer als Kommazahl (z. B. 0.75)',
+          fraction: 'Immer als Bruch (z. B. 3/4)'
+        },
+        item: {
+          decimals: { label: 'Nachkommastellen (leer = wie Aufgabe)' },
+          display: {
+            label: 'Darstellung',
+            inherit: 'Wie Aufgabe',
+            auto: 'Automatisch',
+            decimal: 'Kommazahl',
+            fraction: 'Bruch'
+          }
+        }
+      },
+      resume: {
+        solved: 'Bereits gelöst – die Lösung ist eingetragen.'
+      },
+      integerAnswers: {
+        label: 'Nur ganzzahlige Lösungen',
+        help: 'Es werden nur Aufgaben gestellt, deren Lösungen ganze Zahlen sind.'
+      },
+      penalty: {
+        label: 'Punkte für falsche Antworten abziehen',
+        help: 'Jede falsche Antwort zieht Punkte ab; die Gesamtpunktzahl fällt nie unter 0. Offen Gelassenes zählt 0.',
+        pointsLabel: 'Abzug pro falscher Antwort (Punkte)',
+        pointsPlaceholder: 'leer = so viel wie eine richtige Antwort bringt',
+        pointsHelp: 'Leer lassen: Abzug entspricht dem Wert einer richtigen Antwort.'
+      },
+      angleUnit: {
+        label: 'Winkel in Formeln',
+        help: 'Gilt für sin, cos, tan, arcsin, arccos, arctan (= asin, acos, atan). sind(), cosd() … rechnen immer in Grad.',
+        deg: 'Grad (°), z. B. sin(30) = 0,5',
+        rad: 'Bogenmaß (rad), z. B. sin(pi/6) = 0,5'
       }
     },
 
     runtime: {
       legacyNoteTitle: 'Hinweis',
-      scorePill: {
-        taskLabel: 'Aufgabe: ',
-        totalLabel: 'Gesamt: '
-      },
       tabs: {
         fallbackTitle: 'Tab {n}'
+      },
+      timer: {
+        courseLabel: 'Restzeit: {time}',
+        courseExpired: 'Die Zeit ist abgelaufen. Die Lerneinheit wurde automatisch abgeschlossen.',
+        blockLabel: '{time}',
+        blockExpired: 'Zeit abgelaufen'
+      },
+      help: {
+        attempts: 'Versuch {n} / {max}',
+        attemptsUsed: 'Keine Versuche mehr',
+        attemptPenalty: '−{pct} % pro weiterem Versuch',
+        hintButton: 'Hinweis',
+        solutionButton: 'Lösungsweg',
+        hintTitle: 'Hinweis',
+        solutionTitle: 'Lösungsweg',
+        hintPenalty: 'Das Öffnen des Hinweises kostet {pts} Punkt(e).',
+        solutionLocks: 'Nach dem Öffnen des Lösungswegs sind die Antworten gesperrt.',
+        open: 'Anzeigen',
+        cancel: 'Abbrechen',
+        close: 'Schließen'
+      },
+      globalRegen: {
+        button: 'Globale Werte neu generieren',
+        title: 'Zieht neue Werte für die globalen Variablen und setzt alle Aufgaben zurück, in denen sie vorkommen.',
+        lockedTitle: 'Gesperrt: In einer betroffenen Aufgabe wurde bereits geprüft bzw. sind Antworten gesperrt.',
+        confirmTitle: 'Globale Werte neu generieren?',
+        confirmMessage: 'Antworten und Punkte in {n} Aufgabe(n) werden zurückgesetzt:',
+        confirm: 'Neu generieren',
+        cancel: 'Abbrechen'
       },
       error: {
         unknownBlockTypeHtml: 'Unbekannter Block-Typ: {type}',
@@ -232,6 +300,7 @@
         },
         feedback: {
           notGeneratable: 'Aufgabe nicht generierbar: Formel ergibt mit den aktuellen Variablenbereichen kein gültiges Ergebnis. Bitte Formel oder Variablen anpassen.',
+          notGeneratableInteger: 'Aufgabe nicht generierbar: Mit den aktuellen Variablenbereichen ergibt sich keine Lösung mit ganzzahligem Real- und Imaginärteil. Bereiche oder Formel anpassen oder „Nur ganzzahlige Lösungen“ ausschalten.',
           newGenerated: 'Neue Aufgabe generiert.',
           noTaskLoaded: 'Keine Aufgabe geladen.',
           invalidComplex: 'Bitte eine komplexe Zahl eingeben, z. B. „3+4i", „-i" oder „5".',
@@ -243,6 +312,7 @@
           acceptedHint: 'Akzeptiert: a+bi, -i, Brüche wie 1/2+3/4i.'
         },
         field: {
+          integerAnswers: { help: 'Es werden nur Aufgaben gestellt, deren Lösung ganzzahligen Real- und Imaginärteil hat (z. B. 3 - 2i).' },
           blockTitle: {
             label: 'Überschrift',
             placeholder: 'Komplexe Eingabe'
@@ -827,7 +897,8 @@
           },
           maxPoints: {
             label: 'Punkte'
-          }
+          },
+          penalizeWrong: { help: 'Jeder Klick außerhalb aller Zonen zieht Punkte ab; die Gesamtpunktzahl fällt nie unter 0.' }
         },
         noImage: '(Kein Bild gesetzt)',
         noImageShort: '(Kein Bild)',
@@ -879,15 +950,15 @@
       },
       'match-pairs': {
         label: 'Zuordnung (Drag & Drop)',
-        description: 'Linke Begriffe per Drag-and-Drop mit den richtigen rechten verbinden.',
+        description: 'Begriffe paarweise verbinden oder in Kategorien einsortieren, per Ziehen oder Antippen.',
         summary: {
           pairs: '{count} Paare',
-          categorize: '{cats} Kategorien, {items} Begriffe'
+          categorize: '{cats} Kategorien, {items} Elemente'
         },
         validate: {
           minTwoCategories: 'Mindestens zwei Kategorien erforderlich.',
-          minTwoItems: 'Mindestens zwei Begriffe erforderlich.',
-          itemMissingCategory: 'Mindestens ein Begriff hat keine gültige Kategorie.',
+          minTwoItems: 'Mindestens zwei Elemente erforderlich.',
+          itemMissingCategory: 'Mindestens ein Element hat keine gültige Kategorie.',
           minTwoPairs: 'Mindestens zwei Paare erforderlich.',
           pairEmptySide: 'Mindestens ein Paar hat eine leere Seite.'
         },
@@ -911,11 +982,12 @@
         newTaskGenerated: 'Neue Aufgabe generiert.',
         slotRemoveHint: 'Klicken oder zurückziehen zum Entfernen',
         previewTag: 'Drag & Drop-Zuordnung',
-        noCategoriesOrItems: '(Keine Kategorien oder Begriffe definiert.)',
-        poolLabel: 'Begriffe',
-        pleaseAssignAtLeastOneTerm: 'Bitte mindestens einen Begriff zuordnen.',
-        categorizeAllCorrect: 'Alle {total} Begriffe richtig zugeordnet. {pts} / {max} Punkte.',
+        noCategoriesOrItems: '(Keine Kategorien oder Elemente definiert.)',
+        poolLabel: 'Elemente',
+        pleaseAssignAtLeastOneTerm: 'Bitte mindestens ein Element zuordnen.',
+        categorizeAllCorrect: 'Alle {total} Elemente richtig zugeordnet. {pts} / {max} Punkte.',
         categorizeScoreLine: '{correct} von {total} richtig. {pts} / {max} Punkte.',
+        categorizeHint: 'Elemente in die passende Kategorie ziehen – oder Element antippen und dann die Kategorie antippen. Zurück: Element antippen, dann den Bereich „Elemente“ antippen.',
         field: {
           blockTitle: {
             label: 'Überschrift',
@@ -944,7 +1016,7 @@
             label: 'Zuordnungs-Modus',
             option: {
               pairs: '1 zu 1 (jeder Begriff hat genau einen Partner)',
-              categorize: 'Kategorisierung (mehrere Begriffe pro Kategorie)'
+              categorize: 'Kategorisierung (mehrere Elemente pro Kategorie)'
             }
           },
           sec_q: {
@@ -1001,11 +1073,11 @@
             }
           },
           sec_items: {
-            label: 'Begriffe'
+            label: 'Elemente'
           },
           items: {
-            label: 'Begriffe',
-            itemLabel: 'Begriff'
+            label: 'Elemente',
+            itemLabel: 'Element'
           },
           item: {
             text: {
@@ -1016,7 +1088,8 @@
               label: 'Bild (optional)'
             },
             categoryId: {
-              label: 'Zugehörige Kategorie-ID',
+              label: 'Zugehörige Kategorie-ID(s)',
+              help: 'Mehrere IDs mit Komma (z. B. c1, c2): Das Element erscheint dann einmal pro Kategorie. Gleich aussehende Elemente sind beim Zuordnen austauschbar.',
               placeholder: 'c1'
             }
           },
@@ -1032,7 +1105,7 @@
           },
           poolSize: {
             label: 'Anzahl Aufgaben pro Durchlauf  (0 = alle)',
-            help: 'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Begriffen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.'
+            help: 'Bei 1:1: zufällige Auswahl von N Paaren aus dem Pool. Bei Kategorisierung: zufällige Auswahl von N Elementen (Kategorien bleiben gleich). Schaltet den „Neu generieren"-Button frei.'
           },
           sec_score: {
             label: 'Bewertung'
@@ -1053,7 +1126,9 @@
           questionEmpty: 'Frage ist leer.',
           minTwoChoices: 'Mindestens zwei Antwortmöglichkeiten erforderlich.',
           noCorrect: 'Keine richtige Antwort markiert.',
-          allCorrect: 'Alle Antworten als richtig markiert.'
+          allCorrect: 'Alle Antworten als richtig markiert.',
+          capBelowCorrect: 'Es sind nur {max} Antworten auswählbar, aber {correct} richtig. Volle Punktzahl ist so nicht erreichbar.',
+          choiceEmpty: 'Antwort {n} hat weder Text noch Bild.'
         },
         preview: {
           question: 'Welche Hauptstadt gehört zu Deutschland?',
@@ -1096,7 +1171,10 @@
             itemLabel: 'Antwort',
             item: {
               text: {
-                label: 'Antworttext'
+                label: 'Antworttext (optional, wenn ein Bild gesetzt ist)'
+              },
+              image: {
+                label: 'Bild (optional)'
               },
               correct: {
                 label: 'Ist richtig'
@@ -1109,8 +1187,19 @@
           multi: {
             label: 'Mehrfachauswahl erlauben'
           },
+          limitSelections: {
+            label: 'Anzahl auswählbarer Antworten begrenzen',
+            help: 'Ist die Höchstzahl erreicht, lassen sich weitere Antworten erst wählen, wenn eine abgewählt wird.'
+          },
+          maxSelections: {
+            label: 'Höchstens auswählbar'
+          },
           shuffle: {
             label: 'Antworten mischen'
+          },
+          imageHeight: {
+            label: 'Bildhöhe in den Antworten (px)',
+            help: 'Maximale Höhe der Antwortbilder. Die Breite passt sich automatisch an.'
           },
           sectionScoring: {
             label: 'Bewertung'
@@ -1125,11 +1214,18 @@
           penalizeWrong: {
             label: 'Falsche Auswahl abziehen',
             help: 'Bei Teilpunkten: falsch angekreuzte Antworten ziehen jeweils einen Teilpunkt ab (min. 0).'
+          },
+          penaltyPoints: {
+            label: 'Abzug pro falscher Auswahl (Punkte)',
+            placeholder: 'leer = ein Teilpunkt',
+            help: 'Leer lassen: Abzug entspricht einem Teilpunkt (Punkte ÷ Anzahl richtiger Antworten). Gilt bei Mehrfachauswahl mit Teilpunkten; die Gesamtpunktzahl fällt nie unter 0.'
           }
         },
+        limitHint: 'Höchstens {max} Antworten auswählbar ({n} von {max} gewählt).',
         partialDetail: 'Teilweise richtig: {pts} / {max} Punkte ({correctSelected} von {correctTotal} richtig{wrongSuffix}).',
         wrongSuffix: ', {wrong} falsch',
-        questionEmpty: '(Frage leer)'
+        questionEmpty: '(Frage leer)',
+        imageAlt: 'Antwort {n} (Bild)'
       },
       'note-box': {
         label: 'Hinweisbox',
@@ -1247,6 +1343,8 @@
         validate: {
           templateMissing: 'Frage-Vorlage fehlt.',
           formulaMissing: 'Lösungsformel fehlt.',
+          extraFormulaMissing: 'Antwortfeld {n}: Lösungsformel fehlt (Feld wird ignoriert).',
+          integerNever: '„Nur ganzzahlige Lösungen“: In keiner Stichprobe war die Lösung ganzzahlig. Variablen auf „Nur Ganzzahlen“ stellen oder Formel/Bereiche anpassen.',
           varNameInvalid: 'Variable {index} („{name}"): Name darf nur Buchstaben (a-z, A-Z), Ziffern und Unterstrich enthalten.',
           varRangeInverted: 'Variable „{name}": Min ({min}) ist größer als Max ({max}).',
           formulaAlwaysInvalid: 'Formel ergibt mit den aktuellen Variablenbereichen IMMER ein ungültiges Ergebnis (z. B. Division durch 0, Wurzel aus Negativem). Formel oder Bereiche anpassen.',
@@ -1317,9 +1415,33 @@
             placeholder: 'z. B. m/s oder kg',
             help: 'Wird neben dem Antwortfeld angezeigt. Die Einheit in der Frage selbst gehört in den Fragetext.'
           },
+          answerPrefix: {
+            label: 'Bezeichnung vor dem Antwortfeld (optional)',
+            placeholder: 'z. B. x =',
+            help: 'Steht links vor dem Eingabefeld, z. B. ein Variablenname. $…$ für Formeln möglich.'
+          },
+          extraAnswers: {
+            label: 'Weitere Antwortfelder',
+            itemLabel: 'Antwortfeld',
+            help: 'Jedes Feld hat eine eigene Formel (gleiche Zufallsvariablen). Teilpunkte pro richtigem Feld.',
+            item: {
+              prefix: { label: 'Bezeichnung davor', placeholder: 'z. B. y =' },
+              formula: { label: 'Lösungs-Formel' },
+              unit: { label: 'Einheit dahinter', placeholder: 'z. B. m' },
+              tolerance: { label: 'Toleranz (±), leer = wie oben' }
+            }
+          },
           simplifyFractions: {
             label: 'Term vereinfachen',
             help: 'Aktiv: Studierende müssen den gekürzten Bruch eingeben. „10/20" wird als falsch gewertet, „1/2" ist korrekt. Aus: alle äquivalenten Eingaben werden akzeptiert.'
+          },
+          integerAnswers: {
+            label: 'Nur ganzzahlige Lösungen',
+            help: 'Es werden nur Aufgaben gestellt, deren Lösungen (alle Antwortfelder) ganze Zahlen sind.'
+          },
+          allowImpossible: {
+            label: 'Unlösbare Aufgaben zulassen (Antwort „X“)',
+            help: 'Hat eine Formel für die gezogenen Werte kein Ergebnis (z. B. Wurzel aus Negativem, Division durch 0), wird die Aufgabe trotzdem gestellt. Richtig ist dann die Eingabe „X“.'
           },
           sectionScoring: {
             label: 'Bewertung'
@@ -1330,13 +1452,18 @@
         },
         answerWithUnit: 'Antwort ({unit})',
         answerPlaceholder: 'Zahl oder Bruch (z. B. 0.75 oder 3/4)',
+        answerPlaceholderX: 'Zahl, Bruch oder X (falls unlösbar)',
+        impossibleSolution: 'X (unlösbar)',
         feedback: {
           notGeneratable: 'Aufgabe nicht generierbar: Formel führt mit den aktuellen Variablenbereichen immer zu einem ungültigen Ergebnis (z. B. Division durch 0). Variablenbereiche oder Formel anpassen.',
           newTask: 'Neue Aufgabe generiert.',
           solutionUnavailable: 'Lösung konnte nicht berechnet werden (Formel prüfen).',
           enterValidNumber: 'Bitte eine gültige Zahl oder Bruch (z. B. 3/4) eingeben.',
+          enterValidNumberOrX: 'Bitte eine gültige Zahl, einen Bruch (z. B. 3/4) oder „X“ (unlösbar) eingeben.',
+          notGeneratableInteger: 'Aufgabe nicht generierbar: Mit den aktuellen Variablenbereichen ergibt sich keine ganzzahlige Lösung. Bereiche oder Formel anpassen oder „Nur ganzzahlige Lösungen“ ausschalten.',
           needSimplifiedFraction: 'Bitte gekürzten Bruch eingeben (z. B. 1/2 statt 2/4).',
-          correctWithSolution: 'Korrekt. (Lösung: {solution})'
+          correctWithSolution: 'Korrekt. (Lösung: {solution})',
+          partial: '{n} von {total} Feldern richtig: {pts} / {max} Punkte.'
         },
         preview: {
           taskPlaceholder: '(Aufgabe)',
@@ -1515,10 +1642,60 @@
       },
       table: {
         label: 'Tabelle',
-        description: 'Werte-Tabelle mit Spalten als Variable, Text, berechnet oder Eingabefeld.',
+        description: 'Wertetabelle, Richtig/Falsch-Aussagen, Auswahl-Matrix oder freie Tabelle mit Antwortzellen.',
         defaultTitle: 'Wertetabelle',
         emptyState: '(Keine Spalten oder keine Antwort-Spalte definiert.)',
         summary: '{cols} Spalten, {rows} Zeilen',
+        grid: {
+          summary: '{rows} × {cols} Tabelle, {answers} Antwortfelder',
+          empty: '(Keine Zeilen oder Spalten definiert.)',
+          solutionTitle: 'Lösung: {solution}',
+          validate: {
+            needRowsCols: 'Mindestens eine Zeile und eine Spalte erforderlich.',
+            noAnswerCell: 'Keine Antwortzelle: mindestens eine Spalte oder Zeile auf „Zahl-Antwort“, „Text-Antwort“ oder „Auswahl“ stellen.',
+            missingFormula: 'Zeile {row}, Spalte {col}: Lösungsformel fehlt.',
+            missingAnswers: 'Zeile {row}, Spalte {col}: keine erlaubte Antwort eingetragen.',
+            missingOptions: 'Zeile {row}, Spalte {col}: Auswahl braucht mindestens zwei Optionen (mit | getrennt, die erste ist richtig).',
+            noGradedCell: 'Keine Antwortzelle zählt für die Punkte („Punkte“ ist überall abgewählt). Dann zählen alle Antwortzellen.'
+          },
+          feedback: {
+            noAnswerCells: 'Diese Tabelle hat keine Antwortfelder.',
+            fillAtLeastOne: 'Bitte mindestens ein Feld ausfüllen.',
+            allCorrect: 'Alle {total} bewerteten Felder richtig. {pts} / {max} Punkte.',
+            summary: '{correct} von {total} bewerteten Feldern richtig, {wrong} falsch: {pts} / {max} Punkte.'
+          }
+        },
+        mx: {
+          summary: '{rows} × {cols} Auswahl-Matrix',
+          empty: '(Keine Zeilen oder Spalten definiert.)',
+          validate: {
+            needRowsCols: 'Mindestens eine Zeile und eine Spalte erforderlich.',
+            emptyLabel: 'Mindestens eine Zeile oder Spalte hat keinen Namen.',
+            noCorrect: 'Keine richtige Antwort angehakt.',
+            singleNeedsOne: '„Pro Zeile nur eine Antwort“: Jede Zeile braucht genau ein angehaktes Kästchen.'
+          },
+          feedback: {
+            tickAtLeastOne: 'Bitte mindestens ein Kästchen ankreuzen.',
+            allCorrect: 'Alles richtig angekreuzt. {pts} / {max} Punkte.',
+            summary: '{hits} von {total} richtigen Kreuzen, {wrong} falsch: {pts} / {max} Punkte.'
+          }
+        },
+        tf: {
+          summary: '{n} Aussagen (Richtig/Falsch)',
+          empty: '(Keine Aussagen definiert.)',
+          colUnanswered: 'Unbeantwortet',
+          colTrue: 'Richtig',
+          colFalse: 'Falsch',
+          validate: {
+            noStatements: 'Mindestens eine Aussage erforderlich.',
+            emptyStatement: 'Aussage {n} ist leer.'
+          },
+          feedback: {
+            answerAtLeastOne: 'Bitte mindestens eine Aussage als richtig oder falsch markieren.',
+            allCorrect: 'Alle {total} Aussagen richtig beurteilt. {pts} / {max} Punkte.',
+            summary: '{correct} von {total} richtig, {wrong} falsch, {open} unbeantwortet: {pts} / {max} Punkte.'
+          }
+        },
         typeShort: {
           var: 'Zufallswert',
           answer: 'Antwortfeld',
@@ -1542,6 +1719,67 @@
           defaultQuestion: 'Berechnen Sie $f(x) = 2x + 1$ für die gegebenen Werte.'
         },
         field: {
+          integerAnswers: {
+            valuesHelp: 'Jede Zeile wird so gezogen, dass alle Antwort-Spalten ganze Zahlen ergeben.',
+            gridHelp: 'Die Variablen werden so gezogen, dass alle Zahl-Antworten der Tabelle ganze Zahlen sind.'
+          },
+          mode: {
+            label: 'Art der Tabelle',
+            help: 'Richtig/Falsch: pro Zeile eine Aussage, die als richtig oder falsch markiert wird. Auswahl-Matrix: Zeilen × Spalten zum Ankreuzen. Freie Tabelle: Text- und Antwortzellen (Zahl oder Text) beliebig anordnen.',
+            option: {
+              values: 'Wertetabelle (Variablen, Formeln, Eingabefelder)',
+              truefalse: 'Richtig/Falsch-Aussagen',
+              matrix: 'Auswahl-Matrix (Zeilen × Spalten ankreuzen)',
+              grid: 'Freie Tabelle (Text- und Antwortzellen frei anordnen)'
+            }
+          },
+          sectionGrid: { label: 'Tabelle' },
+          grid: { label: 'Zeilen, Spalten und Zellen' },
+          gridTolerance: { label: 'Toleranz für Zahl-Antworten (±)', help: 'Gilt für alle Zahl-Antworten ohne eigene Toleranz.' },
+          gridIgnoreCase: { label: 'Groß-/Kleinschreibung bei Text-Antworten ignorieren' },
+          sectionGridLayout: { label: 'Darstellung' },
+          gridLines: { label: 'Gitterlinien anzeigen' },
+          gridHeaderRow: { label: 'Erste Zeile ist Kopfzeile' },
+          gridHeaderCol: { label: 'Erste Spalte ist Kopfspalte' },
+          gridHeaderColWidth: { label: 'Breite der Kopfspalte (px, leer = automatisch)' },
+          gridHeaderColGap: { label: 'Abstand nach der Kopfspalte (px)' },
+          gridHeaderRowGap: { label: 'Abstand nach der Kopfzeile (px)' },
+          sectionMatrix: { label: 'Matrix' },
+          matrix: { label: 'Zeilen, Spalten und richtige Antworten' },
+          matrixSingle: {
+            label: 'Pro Zeile nur eine Antwort',
+            help: 'An: Auswahlknöpfe statt Kästchen, je Zeile ist genau eine Spalte wählbar.'
+          },
+          matrixShuffle: { label: 'Zeilen mischen' },
+          matrixScoring: {
+            label: 'Bewertung der Matrix',
+            help: 'Pro Kreuz: jedes richtige Kreuz gibt Teilpunkte. Pro Zeile: nur komplett richtig angekreuzte Zeilen zählen.',
+            option: { cell: 'Pro Kreuz (Teilpunkte)', row: 'Pro Zeile (ganz richtig)' }
+          },
+          sectionStatements: { label: 'Aussagen' },
+          statements: {
+            label: 'Aussagen',
+            itemLabel: 'Aussage',
+            help: 'Jede Aussage wird eine Zeile. $…$ für Formeln, Zeilenumbrüche bleiben erhalten.',
+            text: { label: 'Aussage' },
+            correct: { label: 'Die Aussage ist', option: { true: 'richtig', false: 'falsch' } }
+          },
+          tfUnanswered: {
+            label: 'Spalte „Unbeantwortet“ anzeigen',
+            help: 'Vorausgewählt; so lassen sich Aussagen bewusst offen lassen (0 Punkte statt Abzug).'
+          },
+          tfShuffle: { label: 'Aussagen mischen' },
+          tfLabelTrue: { label: 'Spaltenkopf „Richtig“ (optional)' },
+          tfLabelFalse: { label: 'Spaltenkopf „Falsch“ (optional)' },
+          penalizeWrong: {
+            label: 'Punkte für falsche Antworten abziehen',
+            help: 'Jede falsche Antwort zieht Punkte ab, die Gesamtpunktzahl fällt dabei nie unter 0. Unbeantwortetes zählt 0.'
+          },
+          penaltyPoints: {
+            label: 'Abzug pro falscher Antwort (Punkte)',
+            placeholder: 'leer = so viel wie eine richtige Antwort bringt',
+            help: 'Leer lassen: Abzug entspricht dem Wert einer richtigen Antwort (Punkte geteilt durch Anzahl der Aussagen bzw. richtigen Kreuze/Zeilen).'
+          },
           blockTitle: {
             label: 'Überschrift',
             placeholder: 'Wertetabelle'
@@ -1595,6 +1833,7 @@
             label: 'Spalten'
           },
           columns: {
+            listLabel: 'Spalten',
             label: {
               label: 'Spaltenkopf',
               placeholder: 'z. B. f(x) = 2*x + 1',
@@ -1658,6 +1897,9 @@
             unit: {
               label: 'Einheit (optional)',
               placeholder: 'z. B. cm'
+            },
+            decimals: {
+              label: 'Nachkommastellen (leer = wie Tabelle)'
             },
             fraction: {
               label: 'Als Bruch anzeigen',
@@ -1824,7 +2066,8 @@
           },
           maxPoints: {
             label: 'Punkte'
-          }
+          },
+          penalizeWrong: { help: 'Jede falsch ausgefüllte Zeile zieht Punkte ab; die Gesamtpunktzahl fällt nie unter 0. Mit „?“ offen gelassene Zeilen zählen 0.' }
         },
         defaultTitle: 'Wahrheitstabelle',
         expressionLabel: 'Ausdruck',
@@ -2089,7 +2332,8 @@
           rect: 'Rechteck',
           label: 'Beschriftung',
           coords: 'Koordinatensystem',
-          image: 'Bild'
+          image: 'Bild',
+          yesno: 'Ja/Nein-Feld'
         },
         polygonByCount: {
           3: 'Dreieck',
@@ -2123,7 +2367,13 @@
         display: {
           fallback: 'Form {n}',
           label: 'Beschriftung „{text}"',
-          imageEmpty: 'Bild  (leer)'
+          imageEmpty: 'Bild  (leer)',
+          yesno: 'Ja/Nein-Feld  ({answer}, {pts} P.)'
+        },
+        yesno: {
+          yes: 'Ja',
+          no: 'Nein',
+          placeholder: 'Ja/Nein'
         },
         preview: {
           shapeSingular: 'Form',
@@ -2136,6 +2386,7 @@
           },
           imagePlaceholder: 'Bild auswählen…',
           labelInputPlaceholder: 'z. B. a oder {a}',
+          previewHead: 'Vorschau · Enter = speichern · Shift+Enter = neue Zeile · Esc = abbrechen',
           hint: {
             multi: '{count} Formen ausgewählt. Ziehen verschiebt alle • Pfeiltasten nudgen (⇧ +10 px) • ⌘/Ctrl + D / C / V • ⌫ löscht • Esc hebt auf.',
             single: 'Form ausgewählt. Ziehen verschiebt sie • Pfeiltasten verschieben pixelweise (⇧ +10 px) • ⌘/Ctrl + Z / ⇧Z rückgängig / wiederherstellen • ⌘/Ctrl + D dupliziert • ⌘/Ctrl + C / V kopiert / fügt ein • ⌫ löscht • Esc hebt die Auswahl auf.',
@@ -2144,6 +2395,7 @@
           }
         },
         field: {
+          integerAnswers: { help: 'Die Variablen werden so gezogen, dass alle per Formel berechneten Antwortfelder ganze Zahlen ergeben.' },
           blockTitle: { label: 'Überschrift', placeholder: 'Komposition' },
           _sec_canvas: { label: 'Zeichenfläche' },
           canvasWidth: { label: 'Breite (px)' },
@@ -2161,10 +2413,11 @@
               hotspot: 'Hotspot-Aufgabe (Bereiche markieren)'
             }
           },
-          prompt: { label: 'Aufgabentext (optional)', help: 'Wird oberhalb der Komposition angezeigt.' },
-          maxPoints: { label: 'Maximalpunkte' },
+          prompt: { label: 'Aufgabentext (optional)', help: 'Wird oberhalb der Komposition angezeigt. Variablen als {name} werden durch die aktuellen Werte ersetzt (wie in den Beschriftungen), $…$ für Formeln.' },
+          maxPoints: { label: 'Maximalpunkte', help: 'Gilt für die Antwortfelder {1}, {2} … (zusammen). Ja/Nein-Felder bringen ihre eigenen Punkte zusätzlich.' },
           tolerance: { label: 'Toleranz', help: 'Zulässige Abweichung der Antwort vom berechneten Wert. 0.01 bedeutet ±0,01. Wird auf alle Lösungsfelder angewendet, die keine eigene Toleranz haben.' },
-          penalizeWrong: { label: 'Falsche Klicks abziehen', help: 'Klick auf eine NICHT als korrekt markierte Form zieht Punkte ab.' },
+          penalizeWrong: { label: 'Punkte für falsche Antworten abziehen', help: 'Klick-Modus: jeder Klick auf eine nicht als korrekt markierte Form. Lückentext: jedes falsch beantwortete Ja/Nein-Feld. Die Gesamtpunktzahl fällt nie unter 0.' },
+          penaltyPoints: { help: 'Leer lassen: Klick-Modus = Wert einer richtigen Form, Ja/Nein = die Punkte des jeweiligen Feldes.' },
           _sec_vars: { label: 'Zufallsvariablen' },
           variables: {
             label: 'Variablen',
@@ -2193,11 +2446,19 @@
               correctText: { label: 'Lösung (Lücke)' },
               isTarget: { label: 'Zielzone (Hotspot-Modus)' },
               isMarker: { label: 'Beweglicher Marker (Hotspot-Modus)' },
-              markerTargetIdx: { label: 'Index der korrekten Zielzone' }
+              markerTargetIdx: { label: 'Index der korrekten Zielzone' },
+              yesnoCorrect: { label: 'Richtige Antwort (Ja/Nein-Feld)' },
+              yesnoPoints: { label: 'Punkte (Ja/Nein-Feld)' }
             }
           }
         },
         toolbar: {
+          yesno: {
+            correctLabel: 'Richtig:',
+            correctTitle: 'Welche Antwort ist richtig?',
+            pointsLabel: 'Punkte:',
+            pointsTitle: 'Punkte für dieses Feld (Standard 1)'
+          },
           tool: {
             move: 'Verschieben-Werkzeug (V)',
             select: 'Auswahl-Werkzeug (S): Rahmen aufziehen für Mehrfachauswahl'
@@ -2254,7 +2515,17 @@
           label: {
             textPlaceholder: 'z. B. a oder {a}',
             textTitle: 'Text-Inhalt des Labels',
-            fontSizeTitle: 'Schriftgröße'
+            fontSizeTitle: 'Schriftgröße',
+            boldAll: 'Ganz fett',
+            boldAllTitle: 'Ganzes Textfeld fett darstellen (einzelne Wörter: markieren und B-Button)',
+            format: {
+              bold: 'Fett (<b>…</b>)',
+              italic: 'Kursiv (<i>…</i>)',
+              underline: 'Unterstrichen (<u>…</u>)',
+              sup: 'Hochgestellt (<sup>…</sup>)',
+              sub: 'Tiefgestellt (<sub>…</sub>)',
+              lineBreak: 'Zeilenumbruch (<br>, auch Umschalt+Enter beim Bearbeiten im Bild)'
+            }
           },
           insert: {
             title: 'Variable oder Sonderzeichen einfügen',
@@ -2298,6 +2569,7 @@
             mirrorTitle: 'Spiegelung: zeigt die Schüler-Antwort aus Slot {slot} an (auch nutzbar in Formeln)',
             hint: '<strong>{N}</strong>: Antwortfeld · <strong>{N*}</strong>: Schüler-Antwort weiternutzen (im Text oder in einer Formel)',
             variablesHead: 'Variablen',
+            globalVariablesHead: 'Globale Variablen (Kopfdaten)',
             symbolsHead: 'Sonderzeichen'
           },
           grading: {
@@ -2309,8 +2581,15 @@
             helpSqrt: 'Wurzel',
             helpPi: 'Kreiszahl π',
             helpSquare: 'Quadrieren',
+            trigSelectTitle: 'Winkelfunktion einfügen (Einheit siehe „Winkel in“ unten)',
+            trigSelectPlaceholder: 'sin/cos…',
+            angleUnitLabel: 'Winkel in',
+            angleUnitTitle: 'Gilt für sin, cos, tan, arcsin, arccos, arctan (= asin, acos, atan) in allen Formeln dieses Blocks. sind(), cosd() … rechnen immer in Grad.',
+            angleUnitDeg: 'Grad (°), z. B. sin(30) = 0,5',
+            angleUnitRad: 'Bogenmaß (rad), z. B. sin(pi/6) = 0,5',
             varsSelectTitle: 'Variable in die Formel einfügen',
             varsSelectPlaceholder: 'Variable…',
+            globalSuffix: 'global',
             slotSelectTitle: 'Schüler-Antwort eines anderen Slots in die Formel einfügen',
             slotSelectPlaceholder: 'Antwort {N*}…',
             multiSlotHintOne: 'Slot <strong>{slot}</strong>: Formel für die erwartete Antwort.',

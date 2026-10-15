@@ -72,22 +72,90 @@
         on: 'On',
         off: 'Off',
         inherit: 'Inherit from learning unit ({state})',
-        lockAfterCheckLabel: 'Lock after check',
+        lockAfterCheckLabel: 'Lock Regenerate button after check',
         lockAfterCheckHelp: 'After the first check, no new task can be generated. "Inherit from learning unit" follows the setting in Course info.',
         noRegenerateLabel: 'Hide Regenerate button',
         noRegenerateHelp: 'No "Regenerate" button; the first random task must be solved. "Inherit from learning unit" follows Course info.',
         lockedTitle: 'Locked after check'
+      },
+      varFormat: {
+        decimals: {
+          label: 'Decimal places (random numbers)',
+          help: 'How many decimal places non-integer variables get (0–6). Individual variables can differ.'
+        },
+        display: {
+          label: 'Display of decimal numbers',
+          help: 'How non-integer variables appear in the text. Individual variables can differ.',
+          auto: 'Automatic (simple fraction, otherwise decimal)',
+          decimal: 'Always as decimal (e.g. 0.75)',
+          fraction: 'Always as fraction (e.g. 3/4)'
+        },
+        item: {
+          decimals: { label: 'Decimal places (empty = like the task)' },
+          display: {
+            label: 'Display',
+            inherit: 'Like the task',
+            auto: 'Automatic',
+            decimal: 'Decimal',
+            fraction: 'Fraction'
+          }
+        }
+      },
+      resume: {
+        solved: 'Already solved – the solution has been filled in.'
+      },
+      integerAnswers: {
+        label: 'Whole-number solutions only',
+        help: 'Only tasks whose solutions are whole numbers are generated.'
+      },
+      penalty: {
+        label: 'Deduct points for wrong answers',
+        help: 'Every wrong answer deducts points; the total never drops below 0. Unanswered counts 0.',
+        pointsLabel: 'Deduction per wrong answer (points)',
+        pointsPlaceholder: 'empty = as much as one correct answer earns',
+        pointsHelp: 'Leave empty: the deduction equals the value of one correct answer.'
+      },
+      angleUnit: {
+        label: 'Angles in formulas',
+        help: 'Applies to sin, cos, tan, arcsin, arccos, arctan (= asin, acos, atan). sind(), cosd() … always use degrees.',
+        deg: 'Degrees (°), e.g. sin(30) = 0.5',
+        rad: 'Radians, e.g. sin(pi/6) = 0.5'
       }
     },
 
     runtime: {
       legacyNoteTitle: 'Note',
-      scorePill: {
-        taskLabel: 'Task: ',
-        totalLabel: 'Total: '
-      },
       tabs: {
         fallbackTitle: 'Tab {n}'
+      },
+      timer: {
+        courseLabel: 'Time left: {time}',
+        courseExpired: 'Time is up. The learning unit was finished automatically.',
+        blockLabel: '{time}',
+        blockExpired: 'Time is up'
+      },
+      help: {
+        attempts: 'Attempt {n} / {max}',
+        attemptsUsed: 'No attempts left',
+        attemptPenalty: '−{pct} % per further attempt',
+        hintButton: 'Hint',
+        solutionButton: 'Worked solution',
+        hintTitle: 'Hint',
+        solutionTitle: 'Worked solution',
+        hintPenalty: 'Opening the hint costs {pts} point(s).',
+        solutionLocks: 'Once the worked solution is opened, the answers are locked.',
+        open: 'Show',
+        cancel: 'Cancel',
+        close: 'Close'
+      },
+      globalRegen: {
+        button: 'Regenerate global values',
+        title: 'Draws new values for the global variables and resets every task that uses them.',
+        lockedTitle: 'Locked: a task that uses them has already been checked or has locked answers.',
+        confirmTitle: 'Regenerate global values?',
+        confirmMessage: 'Answers and points in {n} task(s) will be reset:',
+        confirm: 'Regenerate',
+        cancel: 'Cancel'
       },
       error: {
         unknownBlockTypeHtml: 'Unknown block type: {type}',
@@ -229,6 +297,7 @@
         },
         feedback: {
           notGeneratable: 'Task cannot be generated: the formula produces no valid result within the current variable ranges. Please adjust the formula or the variables.',
+          notGeneratableInteger: 'Task cannot be generated: the current variable ranges give no solution with a whole-number real and imaginary part. Adjust the ranges or the formula, or turn off "Whole-number solutions only".',
           newGenerated: 'New task generated.',
           noTaskLoaded: 'No task loaded.',
           invalidComplex: 'Please enter a complex number, e.g. "3+4i", "-i" or "5".',
@@ -240,6 +309,7 @@
           acceptedHint: 'Accepted: a+bi, -i, fractions such as 1/2+3/4i.'
         },
         field: {
+          integerAnswers: { help: 'Only tasks whose solution has a whole-number real and imaginary part are generated (e.g. 3 - 2i).' },
           blockTitle: {
             label: 'Heading',
             placeholder: 'Complex input'
@@ -824,7 +894,8 @@
           },
           maxPoints: {
             label: 'Points'
-          }
+          },
+          penalizeWrong: { help: 'Every click outside all zones deducts points; the total never drops below 0.' }
         },
         noImage: '(No image set)',
         noImageShort: '(No image)',
@@ -876,15 +947,15 @@
       },
       'match-pairs': {
         label: 'Match pairs (drag & drop)',
-        description: 'Match terms on the left with the correct partners on the right using drag-and-drop.',
+        description: 'Match terms in pairs or sort them into categories, by dragging or tapping.',
         summary: {
           pairs: '{count} pairs',
-          categorize: '{cats} categories, {items} terms'
+          categorize: '{cats} categories, {items} items'
         },
         validate: {
           minTwoCategories: 'At least two categories are required.',
-          minTwoItems: 'At least two terms are required.',
-          itemMissingCategory: 'At least one term has no valid category.',
+          minTwoItems: 'At least two items are required.',
+          itemMissingCategory: 'At least one item has no valid category.',
           minTwoPairs: 'At least two pairs are required.',
           pairEmptySide: 'At least one pair has an empty side.'
         },
@@ -908,11 +979,12 @@
         newTaskGenerated: 'New task generated.',
         slotRemoveHint: 'Click or drag back to remove',
         previewTag: 'Drag & drop matching',
-        noCategoriesOrItems: '(No categories or terms defined.)',
-        poolLabel: 'Terms',
-        pleaseAssignAtLeastOneTerm: 'Please assign at least one term.',
-        categorizeAllCorrect: 'All {total} terms assigned correctly. {pts} / {max} points.',
+        noCategoriesOrItems: '(No categories or items defined.)',
+        poolLabel: 'Items',
+        pleaseAssignAtLeastOneTerm: 'Please assign at least one item.',
+        categorizeAllCorrect: 'All {total} items assigned correctly. {pts} / {max} points.',
         categorizeScoreLine: '{correct} of {total} correct. {pts} / {max} points.',
+        categorizeHint: 'Drag each item into its category, or tap an item and then tap the category. To move it back: tap the item, then tap the "Items" area.',
         field: {
           blockTitle: {
             label: 'Heading',
@@ -941,7 +1013,7 @@
             label: 'Matching mode',
             option: {
               pairs: '1 to 1 (each term has exactly one partner)',
-              categorize: 'Categorization (multiple terms per category)'
+              categorize: 'Categorization (multiple items per category)'
             }
           },
           sec_q: {
@@ -998,11 +1070,11 @@
             }
           },
           sec_items: {
-            label: 'Terms'
+            label: 'Items'
           },
           items: {
-            label: 'Terms',
-            itemLabel: 'Term'
+            label: 'Items',
+            itemLabel: 'Item'
           },
           item: {
             text: {
@@ -1013,7 +1085,8 @@
               label: 'Image (optional)'
             },
             categoryId: {
-              label: 'Associated category ID',
+              label: 'Associated category ID(s)',
+              help: 'Several IDs separated by commas (e.g. c1, c2): the element then appears once per category. Identical-looking elements are interchangeable when sorting.',
               placeholder: 'c1'
             }
           },
@@ -1029,7 +1102,7 @@
           },
           poolSize: {
             label: 'Tasks per round  (0 = all)',
-            help: 'In 1:1 mode: random selection of N pairs from the pool. In categorization mode: random selection of N terms (categories stay the same). Enables the "Regenerate" button.'
+            help: 'In 1:1 mode: random selection of N pairs from the pool. In categorization mode: random selection of N items (categories stay the same). Enables the "Regenerate" button.'
           },
           sec_score: {
             label: 'Scoring'
@@ -1050,7 +1123,9 @@
           questionEmpty: 'Question is empty.',
           minTwoChoices: 'At least two answer choices are required.',
           noCorrect: 'No correct answer marked.',
-          allCorrect: 'All answers marked as correct.'
+          allCorrect: 'All answers marked as correct.',
+          capBelowCorrect: 'Only {max} answers can be selected, but {correct} are correct. Full points cannot be reached.',
+          choiceEmpty: 'Answer {n} has neither text nor an image.'
         },
         preview: {
           question: 'Which capital belongs to Germany?',
@@ -1093,7 +1168,10 @@
             itemLabel: 'Answer',
             item: {
               text: {
-                label: 'Answer text'
+                label: 'Answer text (optional if an image is set)'
+              },
+              image: {
+                label: 'Image (optional)'
               },
               correct: {
                 label: 'Is correct'
@@ -1106,8 +1184,19 @@
           multi: {
             label: 'Allow multiple selection'
           },
+          limitSelections: {
+            label: 'Limit the number of selectable answers',
+            help: 'Once the maximum is reached, further answers can only be selected after deselecting one.'
+          },
+          maxSelections: {
+            label: 'Maximum selectable'
+          },
           shuffle: {
             label: 'Shuffle answers'
+          },
+          imageHeight: {
+            label: 'Image height in the answers (px)',
+            help: 'Maximum height of the answer images. The width adjusts automatically.'
           },
           sectionScoring: {
             label: 'Scoring'
@@ -1122,11 +1211,18 @@
           penalizeWrong: {
             label: 'Deduct for wrong selection',
             help: 'With partial credit: each incorrectly ticked answer deducts one partial point (min. 0).'
+          },
+          penaltyPoints: {
+            label: 'Deduction per wrong selection (points)',
+            placeholder: 'empty = one partial point',
+            help: 'Leave empty: the deduction equals one partial point (points ÷ number of correct answers). Applies to multiple selection with partial credit; the total never drops below 0.'
           }
         },
+        limitHint: 'Select at most {max} answers ({n} of {max} selected).',
         partialDetail: 'Partly correct: {pts} / {max} points ({correctSelected} of {correctTotal} correct{wrongSuffix}).',
         wrongSuffix: ', {wrong} wrong',
-        questionEmpty: '(Question empty)'
+        questionEmpty: '(Question empty)',
+        imageAlt: 'Answer {n} (image)'
       },
       'note-box': {
         label: 'Note box',
@@ -1244,6 +1340,8 @@
         validate: {
           templateMissing: 'Question template missing.',
           formulaMissing: 'Solution formula missing.',
+          extraFormulaMissing: 'Answer field {n}: solution formula missing (the field is ignored).',
+          integerNever: '"Whole-number solutions only": no sample produced a whole-number solution. Set variables to "Integers only" or adjust formula/ranges.',
           varNameInvalid: 'Variable {index} ("{name}"): name may only contain letters (a-z, A-Z), digits and underscore.',
           varRangeInverted: 'Variable "{name}": min ({min}) is greater than max ({max}).',
           formulaAlwaysInvalid: 'Formula ALWAYS produces an invalid result with the current variable ranges (e.g. division by 0, root of a negative). Adjust formula or ranges.',
@@ -1314,9 +1412,33 @@
             placeholder: 'e.g. m/s or kg',
             help: 'Shown next to the answer field. Any unit in the question itself belongs in the question text.'
           },
+          answerPrefix: {
+            label: 'Label before the answer field (optional)',
+            placeholder: 'e.g. x =',
+            help: 'Shown to the left of the input, e.g. a variable name. $…$ works for formulas.'
+          },
+          extraAnswers: {
+            label: 'Additional answer fields',
+            itemLabel: 'Answer field',
+            help: 'Each field has its own formula (same random variables). Partial points per correct field.',
+            item: {
+              prefix: { label: 'Label before', placeholder: 'e.g. y =' },
+              formula: { label: 'Solution formula' },
+              unit: { label: 'Unit after', placeholder: 'e.g. m' },
+              tolerance: { label: 'Tolerance (±), empty = as above' }
+            }
+          },
           simplifyFractions: {
             label: 'Simplify term',
             help: 'On: students must enter the reduced fraction. "10/20" is rejected, "1/2" is correct. Off: all equivalent inputs are accepted.'
+          },
+          integerAnswers: {
+            label: 'Whole-number solutions only',
+            help: 'Only tasks whose solutions (all answer fields) are whole numbers are generated.'
+          },
+          allowImpossible: {
+            label: 'Allow impossible tasks (answer "X")',
+            help: 'If a formula has no result for the drawn values (e.g. root of a negative, division by 0), the task is still asked. The correct answer is then "X".'
           },
           sectionScoring: {
             label: 'Scoring'
@@ -1327,13 +1449,18 @@
         },
         answerWithUnit: 'Answer ({unit})',
         answerPlaceholder: 'Number or fraction (e.g. 0.75 or 3/4)',
+        answerPlaceholderX: 'Number, fraction or X (if impossible)',
+        impossibleSolution: 'X (no solution)',
         feedback: {
           notGeneratable: 'Task not generatable: formula always yields an invalid result with the current variable ranges (e.g. division by 0). Adjust variable ranges or formula.',
           newTask: 'New task generated.',
           solutionUnavailable: 'Solution could not be computed (check formula).',
           enterValidNumber: 'Please enter a valid number or fraction (e.g. 3/4).',
+          enterValidNumberOrX: 'Please enter a valid number, a fraction (e.g. 3/4) or "X" (no solution).',
+          notGeneratableInteger: 'Task not generatable: no whole-number solution with the current variable ranges. Adjust ranges or formula, or turn off "Whole-number solutions only".',
           needSimplifiedFraction: 'Please enter a reduced fraction (e.g. 1/2 instead of 2/4).',
-          correctWithSolution: 'Correct. (Solution: {solution})'
+          correctWithSolution: 'Correct. (Solution: {solution})',
+          partial: '{n} of {total} fields correct: {pts} / {max} points.'
         },
         preview: {
           taskPlaceholder: '(Task)',
@@ -1512,10 +1639,60 @@
       },
       table: {
         label: 'Table',
-        description: 'Value table with columns as variable, text, computed or input field.',
+        description: 'Value table, true/false statements, choice matrix or free table with answer cells.',
         defaultTitle: 'Value table',
         emptyState: '(No columns or no answer column defined.)',
         summary: '{cols} columns, {rows} rows',
+        grid: {
+          summary: '{rows} × {cols} table, {answers} answer fields',
+          empty: '(No rows or columns defined.)',
+          solutionTitle: 'Solution: {solution}',
+          validate: {
+            needRowsCols: 'At least one row and one column are required.',
+            noAnswerCell: 'No answer cell: set at least one column or row to "Number answer", "Text answer" or "Choice".',
+            missingFormula: 'Row {row}, column {col}: solution formula missing.',
+            missingAnswers: 'Row {row}, column {col}: no accepted answer entered.',
+            missingOptions: 'Row {row}, column {col}: a choice needs at least two options (separated by |, the first one is correct).',
+            noGradedCell: 'No answer cell counts for points ("Points" is unticked everywhere). All answer cells will count then.'
+          },
+          feedback: {
+            noAnswerCells: 'This table has no answer fields.',
+            fillAtLeastOne: 'Please fill in at least one field.',
+            allCorrect: 'All {total} graded fields correct. {pts} / {max} points.',
+            summary: '{correct} of {total} graded fields correct, {wrong} wrong: {pts} / {max} points.'
+          }
+        },
+        mx: {
+          summary: '{rows} × {cols} choice matrix',
+          empty: '(No rows or columns defined.)',
+          validate: {
+            needRowsCols: 'At least one row and one column are required.',
+            emptyLabel: 'At least one row or column has no name.',
+            noCorrect: 'No correct answer ticked.',
+            singleNeedsOne: '"One answer per row": every row needs exactly one ticked box.'
+          },
+          feedback: {
+            tickAtLeastOne: 'Please tick at least one box.',
+            allCorrect: 'Everything ticked correctly. {pts} / {max} points.',
+            summary: '{hits} of {total} correct ticks, {wrong} wrong: {pts} / {max} points.'
+          }
+        },
+        tf: {
+          summary: '{n} statements (true/false)',
+          empty: '(No statements defined.)',
+          colUnanswered: 'Unanswered',
+          colTrue: 'True',
+          colFalse: 'False',
+          validate: {
+            noStatements: 'At least one statement is required.',
+            emptyStatement: 'Statement {n} is empty.'
+          },
+          feedback: {
+            answerAtLeastOne: 'Please mark at least one statement as true or false.',
+            allCorrect: 'All {total} statements judged correctly. {pts} / {max} points.',
+            summary: '{correct} of {total} correct, {wrong} wrong, {open} unanswered: {pts} / {max} points.'
+          }
+        },
         typeShort: {
           var: 'Random value',
           answer: 'Answer field',
@@ -1539,6 +1716,67 @@
           defaultQuestion: 'Compute $f(x) = 2x + 1$ for the given values.'
         },
         field: {
+          integerAnswers: {
+            valuesHelp: 'Each row is drawn so that all answer columns are whole numbers.',
+            gridHelp: 'The variables are drawn so that all number answers in the table are whole numbers.'
+          },
+          mode: {
+            label: 'Table type',
+            help: 'True/false: one statement per row, to be marked as true or false. Choice matrix: rows × columns to tick. Free table: arrange text and answer cells (number or text) freely.',
+            option: {
+              values: 'Value table (variables, formulas, input fields)',
+              truefalse: 'True/false statements',
+              matrix: 'Choice matrix (tick rows × columns)',
+              grid: 'Free table (arrange text and answer cells freely)'
+            }
+          },
+          sectionGrid: { label: 'Table' },
+          grid: { label: 'Rows, columns and cells' },
+          gridTolerance: { label: 'Tolerance for number answers (±)', help: 'Applies to every number answer without its own tolerance.' },
+          gridIgnoreCase: { label: 'Ignore upper/lower case in text answers' },
+          sectionGridLayout: { label: 'Layout' },
+          gridLines: { label: 'Show grid lines' },
+          gridHeaderRow: { label: 'First row is a header row' },
+          gridHeaderCol: { label: 'First column is a header column' },
+          gridHeaderColWidth: { label: 'Header column width (px, empty = automatic)' },
+          gridHeaderColGap: { label: 'Spacing after the header column (px)' },
+          gridHeaderRowGap: { label: 'Spacing after the header row (px)' },
+          sectionMatrix: { label: 'Matrix' },
+          matrix: { label: 'Rows, columns and correct answers' },
+          matrixSingle: {
+            label: 'One answer per row',
+            help: 'On: radio buttons instead of boxes, exactly one column can be chosen per row.'
+          },
+          matrixShuffle: { label: 'Shuffle rows' },
+          matrixScoring: {
+            label: 'Matrix scoring',
+            help: 'Per tick: every correct tick earns partial points. Per row: only fully correct rows count.',
+            option: { cell: 'Per tick (partial points)', row: 'Per row (fully correct)' }
+          },
+          sectionStatements: { label: 'Statements' },
+          statements: {
+            label: 'Statements',
+            itemLabel: 'Statement',
+            help: 'Each statement becomes one row. $…$ for formulas; line breaks are kept.',
+            text: { label: 'Statement' },
+            correct: { label: 'The statement is', option: { true: 'true', false: 'false' } }
+          },
+          tfUnanswered: {
+            label: 'Show "Unanswered" column',
+            help: 'Preselected, so statements can be left open on purpose (0 points instead of a deduction).'
+          },
+          tfShuffle: { label: 'Shuffle statements' },
+          tfLabelTrue: { label: '"True" column header (optional)' },
+          tfLabelFalse: { label: '"False" column header (optional)' },
+          penalizeWrong: {
+            label: 'Deduct points for wrong answers',
+            help: 'Every wrong answer deducts points; the total never drops below 0. Unanswered counts 0.'
+          },
+          penaltyPoints: {
+            label: 'Deduction per wrong answer (points)',
+            placeholder: 'empty = as much as one correct answer earns',
+            help: 'Leave empty: the deduction equals the value of one correct answer (points divided by the number of statements or correct ticks/rows).'
+          },
           blockTitle: {
             label: 'Heading',
             placeholder: 'Value table'
@@ -1592,6 +1830,7 @@
             label: 'Columns'
           },
           columns: {
+            listLabel: 'Columns',
             label: {
               label: 'Column header',
               placeholder: 'e.g. f(x) = 2*x + 1',
@@ -1655,6 +1894,9 @@
             unit: {
               label: 'Unit (optional)',
               placeholder: 'e.g. cm'
+            },
+            decimals: {
+              label: 'Decimal places (empty = like the table)'
             },
             fraction: {
               label: 'Show as fraction',
@@ -1821,7 +2063,8 @@
           },
           maxPoints: {
             label: 'Points'
-          }
+          },
+          penalizeWrong: { help: 'Every wrongly filled row deducts points; the total never drops below 0. Rows left at "?" count 0.' }
         },
         defaultTitle: 'Truth table',
         expressionLabel: 'Expression',
@@ -2086,7 +2329,8 @@
           rect: 'Rectangle',
           label: 'Label',
           coords: 'Coordinate system',
-          image: 'Image'
+          image: 'Image',
+          yesno: 'Yes/No field'
         },
         polygonByCount: {
           3: 'Triangle',
@@ -2120,7 +2364,13 @@
         display: {
           fallback: 'Shape {n}',
           label: 'Label "{text}"',
-          imageEmpty: 'Image  (empty)'
+          imageEmpty: 'Image  (empty)',
+          yesno: 'Yes/No field  ({answer}, {pts} pt.)'
+        },
+        yesno: {
+          yes: 'Yes',
+          no: 'No',
+          placeholder: 'Yes/No'
         },
         preview: {
           shapeSingular: 'shape',
@@ -2133,6 +2383,7 @@
           },
           imagePlaceholder: 'Select image…',
           labelInputPlaceholder: 'e.g. a or {a}',
+          previewHead: 'Preview · Enter = save · Shift+Enter = new line · Esc = cancel',
           hint: {
             multi: '{count} shapes selected. Drag moves all • Arrow keys nudge (⇧ +10 px) • ⌘/Ctrl + D / C / V • ⌫ deletes • Esc clears the selection.',
             single: 'Shape selected. Drag moves it • Arrow keys nudge pixel by pixel (⇧ +10 px) • ⌘/Ctrl + Z / ⇧Z undo / redo • ⌘/Ctrl + D duplicates • ⌘/Ctrl + C / V copy / paste • ⌫ deletes • Esc clears the selection.',
@@ -2141,6 +2392,7 @@
           }
         },
         field: {
+          integerAnswers: { help: 'The variables are drawn so that every answer field computed by a formula is a whole number.' },
           blockTitle: { label: 'Heading', placeholder: 'Composition' },
           _sec_canvas: { label: 'Drawing area' },
           canvasWidth: { label: 'Width (px)' },
@@ -2158,10 +2410,11 @@
               hotspot: 'Hotspot task (mark areas)'
             }
           },
-          prompt: { label: 'Task text (optional)', help: 'Shown above the composition.' },
-          maxPoints: { label: 'Maximum points' },
+          prompt: { label: 'Task text (optional)', help: 'Shown above the composition. Variables as {name} are replaced with the current values (as in the labels), $…$ for formulas.' },
+          maxPoints: { label: 'Maximum points', help: 'Applies to the answer fields {1}, {2} … (together). Yes/No fields add their own points on top.' },
           tolerance: { label: 'Tolerance', help: 'Allowed deviation between the answer and the computed value. 0.01 means ±0.01. Applied to every solution field without its own tolerance.' },
-          penalizeWrong: { label: 'Deduct wrong clicks', help: 'A click on a shape not marked correct deducts points.' },
+          penalizeWrong: { label: 'Deduct points for wrong answers', help: 'Click mode: every click on a shape not marked correct. Fill-in-the-blanks: every wrongly answered yes/no field. The total never drops below 0.' },
+          penaltyPoints: { help: 'Leave empty: click mode = value of one correct shape, yes/no = the points of that field.' },
           _sec_vars: { label: 'Random variables' },
           variables: {
             label: 'Variables',
@@ -2190,11 +2443,19 @@
               correctText: { label: 'Solution (blank)' },
               isTarget: { label: 'Target zone (hotspot mode)' },
               isMarker: { label: 'Movable marker (hotspot mode)' },
-              markerTargetIdx: { label: 'Index of the correct target zone' }
+              markerTargetIdx: { label: 'Index of the correct target zone' },
+              yesnoCorrect: { label: 'Correct answer (yes/no field)' },
+              yesnoPoints: { label: 'Points (yes/no field)' }
             }
           }
         },
         toolbar: {
+          yesno: {
+            correctLabel: 'Correct:',
+            correctTitle: 'Which answer is correct?',
+            pointsLabel: 'Points:',
+            pointsTitle: 'Points for this field (default 1)'
+          },
           tool: {
             move: 'Move tool (V)',
             select: 'Selection tool (S): drag a box for multi-select'
@@ -2251,7 +2512,17 @@
           label: {
             textPlaceholder: 'e.g. a or {a}',
             textTitle: 'Text content of the label',
-            fontSizeTitle: 'Font size'
+            fontSizeTitle: 'Font size',
+            boldAll: 'All bold',
+            boldAllTitle: 'Show the whole label in bold (single words: select them and use the B button)',
+            format: {
+              bold: 'Bold (<b>…</b>)',
+              italic: 'Italic (<i>…</i>)',
+              underline: 'Underline (<u>…</u>)',
+              sup: 'Superscript (<sup>…</sup>)',
+              sub: 'Subscript (<sub>…</sub>)',
+              lineBreak: 'Line break (<br>, also Shift+Enter when editing on the canvas)'
+            }
           },
           insert: {
             title: 'Insert variable or special character',
@@ -2295,6 +2566,7 @@
             mirrorTitle: 'Mirror: shows the student answer from slot {slot} (also usable in formulas)',
             hint: '<strong>{N}</strong>: answer field · <strong>{N*}</strong>: reuse the student answer (in text or in a formula)',
             variablesHead: 'Variables',
+            globalVariablesHead: 'Global variables (course settings)',
             symbolsHead: 'Special characters'
           },
           grading: {
@@ -2306,8 +2578,15 @@
             helpSqrt: 'Square root',
             helpPi: 'Pi (π)',
             helpSquare: 'Square',
+            trigSelectTitle: 'Insert a trig function (unit: see "Angles in" below)',
+            trigSelectPlaceholder: 'sin/cos…',
+            angleUnitLabel: 'Angles in',
+            angleUnitTitle: 'Applies to sin, cos, tan, arcsin, arccos, arctan (= asin, acos, atan) in every formula of this block. sind(), cosd() … always use degrees.',
+            angleUnitDeg: 'Degrees (°), e.g. sin(30) = 0.5',
+            angleUnitRad: 'Radians, e.g. sin(pi/6) = 0.5',
             varsSelectTitle: 'Insert a variable into the formula',
             varsSelectPlaceholder: 'Variable…',
+            globalSuffix: 'global',
             slotSelectTitle: 'Insert the student answer from another slot into the formula',
             slotSelectPlaceholder: 'Answer {N*}…',
             multiSlotHintOne: 'Slot <strong>{slot}</strong>: formula for the expected answer.',

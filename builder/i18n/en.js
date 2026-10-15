@@ -134,6 +134,13 @@ const en = {
     savePicker: {
       description: 'SCORM package (ZIP)'
     },
+    unsaved: {
+      title: 'Unsaved learning unit',
+      message: 'The current learning unit has not been saved as a SCORM ZIP yet. Switching will lose these changes.',
+      save: 'Save as SCORM ZIP and switch',
+      discard: 'Discard and switch',
+      cancel: 'Cancel'
+    },
     unknownZip: {
       title: 'Unknown ZIP format?',
       message: 'This ZIP file does not contain a tasks.json. It was probably not created with the SCORM Builder. Try to load it anyway?',
@@ -226,12 +233,66 @@ const en = {
         heading: 'Question blocks (defaults for the whole learning unit)',
         note: 'Applies to every question block with a random pool. Individual tasks can override this.',
         lockAfterCheck: {
-          label: 'Lock after check',
+          label: 'Lock Regenerate button after check',
           help: 'After the first check, no new task can be generated.'
         },
         hideRegenerate: {
           label: 'Hide regenerate',
           help: 'No "Regenerate" button; the first random task must be solved.'
+        },
+        lockAnswers: {
+          label: 'Lock answer after check',
+          help: 'Applies to every graded block: after checking, the answer can no longer be changed (one attempt). "Regenerate" unlocks the input for the new task.'
+        }
+      },
+      timer: {
+        heading: 'Time limit (whole learning unit)',
+        enabled: {
+          label: 'Time limit for the learning unit',
+          help: 'One countdown runs across all tasks (it keeps running when switching tasks). At 0 the learning unit is finished and scored automatically.'
+        },
+        minutes: 'Minutes',
+        seconds: 'Seconds'
+      },
+      images: {
+        heading: 'Images',
+        shrink: {
+          label: 'Shrink large images on upload',
+          help: 'Photos are scaled to at most 2000 px (longer side) and saved as JPEG, typically around 90 % smaller. Screenshots/PNG stay lossless. No visible difference in the learning unit. Only affects newly uploaded images.'
+        }
+      },
+      pools: {
+        heading: 'Task pools',
+        note: 'Per attempt, the set number of tasks is drawn at random from each pool; tasks without a pool are always included. Assign tasks in each task\'s header. A resumed attempt keeps the same selection.',
+        listLabel: 'Pools',
+        itemLabel: 'Pool',
+        name: 'Name',
+        namePlaceholder: 'e.g. Statics',
+        draw: 'Number of tasks drawn',
+        drawPlaceholder: 'empty = all',
+        usage: '{draw} of {n} tasks are drawn',
+        empty: 'no tasks assigned yet'
+      },
+      globalVars: {
+        heading: 'Global variables (whole learning unit)',
+        note: 'Random variables that apply to every task. Blocks use them like their own variables: {F} in texts, F in formulas. A block variable with the same name takes precedence. Values are drawn once per attempt.',
+        listLabel: 'Global variables',
+        itemLabel: 'Global variable',
+        listHelp: 'Works in Numeric input, Composition, Table (values and free table) and Complex numbers.',
+        name: 'Name',
+        namePlaceholder: 'e.g. F',
+        min: 'from',
+        max: 'to',
+        integer: 'Integers only',
+        usageHead: 'Used in:',
+        unused: 'not used in any task yet',
+        button: {
+          label: 'Show the "Regenerate global values" button',
+          help: 'In the header of the learning unit. Draws new values and resets every task that uses global variables (after a confirmation). A block\'s own "Regenerate" button only changes that block\'s variables.'
+        },
+        lock: {
+          label: 'Lock global regeneration after a check',
+          help: 'Once an answer has been checked in an affected task, the button is locked. It is also locked while answers there are locked ("Lock answer after check").'
         }
       }
     },
@@ -377,7 +438,7 @@ const en = {
       },
       tipResize: {
         title: 'Resize',
-        body: 'Drag the corner at the bottom right of any block, or use the "Fit height to content" button.'
+        body: 'Drag the corner at the bottom right of a block. ↕ fits the height to the builder preview, ⇳ to the finished learning unit, so the block never scrolls there.'
       },
       tipMultiSelect: {
         title: 'Multi-select',
@@ -389,12 +450,147 @@ const en = {
       },
       tipTabs: {
         title: 'Tabs (optional)',
-        body: 'Each task can have two tabs enabled, for example "Visualisation" and "Task".'
+        body: 'Each task can have tabs enabled, for example "Visualisation" and "Task". Use + to add more tabs and × to close one; the active tab\'s name can be edited in place.'
       },
       tipTemplates: {
         title: 'Save templates',
         body: 'Save a finished task as a template ("Template" in the task header). It is then available the next time you open the builder.'
       }
+    },
+    variables: {
+      title: 'Random variables',
+      lead: 'Calculation blocks (numeric input, composition, table, complex input) draw numbers from ranges you set. Every learner gets their own values, and "Regenerate" produces a new task of the same kind.',
+      local: {
+        title: 'Variables in a block',
+        body: 'In the block under "Random variables", set name, range (from/to) and "Integers only". Write <code>{a}</code> in texts and <code>a</code> in formulas.'
+      },
+      global: {
+        title: 'Global variables',
+        body: 'Defined in the course settings, they apply to every task, e.g. the same force F across a whole series of tasks. A block variable with the same name takes precedence. "Regenerate global values" at the top of the learning unit resets every affected task.'
+      },
+      regen: {
+        title: '"Regenerate"',
+        body: 'Draws new values for the block\'s variables. Can be locked after a check or hidden, in the course settings or per block.'
+      },
+      format: {
+        title: 'Display and whole-number solutions',
+        body: 'Decimal places and display (decimal, fraction or automatic) per block or per variable. "Whole-number solutions only" only draws values with a whole result.'
+      },
+      example: '<strong>Example:</strong> task text <code>A beam of length {l} m carries F = {F} kN. Compute M = F · l.</code>, variable <code>l</code> from 2 to 6 (integer), <code>F</code> as a global variable from 10 to 50, solution formula <code>F*l</code>. Learners see e.g. "length 4 m … F = 25 kN"; the answer is 100.'
+    },
+    scoring: {
+      title: 'Grading and points',
+      lead: 'Every graded block has a number of points. Together they make up the total of the learning unit; the pass threshold in the course settings decides whether it is passed.',
+      partial: {
+        title: 'Partial credit',
+        body: 'Most blocks grade proportionally: 3 of 4 correct matches give 75 % of the points. Several answer fields count individually.'
+      },
+      deduct: {
+        title: 'Deductions for mistakes',
+        body: 'Multiple choice, table, truth table, hot zone and composition can deduct points for wrong answers. A block\'s score never drops below 0.'
+      },
+      attempts: {
+        title: 'Limit attempts',
+        body: 'Under "Attempts, hint & worked solution": the number of attempts and optionally a deduction in % per further attempt. Once all are used, the block is locked.'
+      },
+      help: {
+        title: 'Hint and worked solution',
+        body: 'Appear as buttons on the block after a set number of failed checks, with KaTeX and the current variable values. A hint can cost points; the worked solution locks the answers.'
+      },
+      locks: {
+        title: 'Locks',
+        body: '"Lock answer after check" allows a single attempt. "Lock regeneration after check" stops learners from re-rolling until the values are especially easy.'
+      },
+      timer: {
+        title: 'Time limits',
+        body: 'For the whole learning unit (finished at 0) or per block (locks its answers; only runs while the task is shown).'
+      },
+      example: '<strong>Worked example:</strong> block with 2 points, 3 attempts, 25 % deduction per further attempt and 0.5 points for the hint. Correct in the 2nd attempt after opening the hint: 2 × 75 % − 0.5 = <strong>1 point</strong>.'
+    },
+    courseSettings: {
+      title: 'Course settings: defaults for all tasks',
+      lead: 'The course settings ("Edit course info") apply to the whole learning unit: title, pass threshold, defaults for question blocks, time limit, global variables, task pools and images.',
+      inherit: {
+        title: '"As in learning unit"',
+        body: 'Settings like "Lock regeneration after check" or "Lock answer after check" are set to "As in learning unit (on/off)" in the block. Then the course value applies; "On" or "Off" in the block only applies to that block.'
+      },
+      threshold: {
+        title: 'Pass threshold',
+        body: 'Share of the points needed to pass, as a number between 0 and 1: 0.5 means 50 %. When finishing, the learning unit reports "passed" or "failed" accordingly.'
+      },
+      example: ''
+    },
+    pools: {
+      title: 'Task pools',
+      lead: 'With pools, not everyone works on the same tasks: per attempt, the set number of tasks is drawn at random from each pool. Tasks without a pool are always included.',
+      setup: {
+        title: 'Set up',
+        body: 'In the course settings under "Task pools", add a pool with a name and a number. Then choose the pool in each task\'s header next to the title.'
+      },
+      run: {
+        title: 'During an attempt',
+        body: 'The selection stays the same when resuming. Navigation, progress and maximum points only cover the drawn tasks.'
+      },
+      example: '<strong>Example:</strong> 8 statics tasks in the pool "Statics" with number 3, plus an introduction and a closing task without a pool: everyone works on 5 tasks, the middle 3 chosen at random.'
+    },
+    templates: {
+      title: 'Templates',
+      lead: 'Two kinds of templates save work on recurring tasks.',
+      task: {
+        title: 'Task templates',
+        body: 'A whole task with all its blocks: save it with "★ Template" in the task header. Insert it via "+ Task" as a new task, or in the block dialog under "My templates" into an existing task.'
+      },
+      block: {
+        title: 'Block templates',
+        body: 'A single block with all its settings: save it with ★ at the top of the block and insert it again in the block dialog under "My templates".'
+      },
+      storage: {
+        title: 'Where they live',
+        body: 'Templates are stored in the browser, not in the learning unit. They only apply to this browser and this address (localhost and 127.0.0.1 count separately) and are lost when the browser data is cleared.'
+      },
+      example: ''
+    },
+    saving: {
+      title: 'Saving and backups',
+      lead: 'The actual file of a learning unit is the SCORM ZIP. The same file goes to OLAT and can be opened and edited again at any time.',
+      zip: {
+        title: 'SCORM ZIP',
+        body: '"Create SCORM ZIP" (Ctrl+Shift+S) saves the learning unit. Open it again via "File → Load SCORM ZIP …" or the folder view. Once the file was opened from the folder view or saved via the save dialog, Ctrl+S overwrites it directly.'
+      },
+      autosave: {
+        title: 'Automatic backup',
+        body: 'The builder keeps a backup in the browser. After a crash or closing by accident, it offers "Restore" on the next start. This does not replace the ZIP.'
+      },
+      guard: {
+        title: 'Unsaved changes',
+        body: 'Before "New" or opening another file, the builder asks if the current learning unit has not been saved as a ZIP yet.'
+      },
+      images: {
+        title: 'Images',
+        body: 'Large photos are shrunk to at most 2000 px on upload, which keeps the ZIP small. For detailed images there is "Keep original" at the image field.'
+      },
+      example: ''
+    },
+    lms: {
+      title: 'In OLAT: what learners experience',
+      lead: 'The learning unit runs in OLAT as a SCORM 1.2 package. "Preview" shows it beforehand exactly as learners will see it.',
+      progress: {
+        title: 'Progress',
+        body: 'A bar shows how many tasks are done. Done means: all graded blocks of the task are solved.'
+      },
+      resume: {
+        title: 'Pause and resume',
+        body: 'Learners who close the learning unit continue later where they left off: with the same random values, points, locks, timers and answers. Solved tasks show their solution. Drag-and-drop matches are not saved.'
+      },
+      report: {
+        title: 'What OLAT receives',
+        body: 'Points achieved and maximum points, the status ("passed" or "failed" by the pass threshold when finishing, "incomplete" before) and the time spent.'
+      },
+      finish: {
+        title: 'Finishing',
+        body: '"Finish test" on the last task completes the learning unit and shows the result. After that, no resume state is kept.'
+      },
+      example: ''
     },
     languages: {
       title: 'Multilingual learning units',
@@ -416,6 +612,31 @@ const en = {
         body: 'The ZIP contains only the languages actually in use. The course starts in the language that was active in the builder at export time. Fields without a translation fall back to the source language.'
       }
     },
+    katex: {
+      title: 'Formulas with KaTeX',
+      lead: 'Formulas work in task texts, answer options, composition labels, table cells, hints and worked solutions. Put them between <code>$…$</code> (inline) or <code>$$…$$</code> (own line, centred). Random variables are written as <code>{a}</code>; the learning unit shows the drawn value there.',
+      colInput: 'Input',
+      colResult: 'Result',
+      colNote: 'Used for',
+      ex: {
+        fraction: 'Fraction',
+        scripts: 'Exponent and subscript',
+        sqrt: 'Square root',
+        greek: 'Greek letters, degrees',
+        cdot: 'Multiplication dot',
+        text: 'Vector arrow, plain text in a subscript',
+        variables: 'Variables {a}, {b} (shown with a = 3, b = 4)',
+        display: 'Display formula with a sum'
+      },
+      tip: {
+        umlauts: 'Put words and umlauts inside formulas into <code>\\text{…}</code>, e.g. <code>$F_{\\text{bearing}}$</code>.',
+        varsInMath: 'If the block has variables named a and b, <code>{a}</code> inside <code>\\frac{a}{b}</code> is replaced by the value as well. To keep the letter, add a space: <code>\\frac{ a}{ b}</code>.',
+        dollar: 'Write a dollar sign that should not start a formula as <code>\\$</code>.',
+        check: 'The builder preview shows right away whether a formula works; broken formulas appear in red.'
+      },
+      linkIntro: 'All commands KaTeX understands:',
+      linkText: 'katex.org/docs/supported'
+    },
     shortcuts: {
       title: 'Keyboard shortcuts',
       lead: 'Available on the canvas:',
@@ -433,6 +654,8 @@ const en = {
       deselect: 'Clear selection',
       undo: 'Undo',
       redo: 'Redo',
+      save: 'Save (overwrites the opened ZIP file, otherwise a backup in the browser)',
+      saveAs: 'Create SCORM ZIP',
       zoom: 'Zoom the canvas'
     },
     foot: {
@@ -454,6 +677,7 @@ const en = {
     categoryGeneral: 'General',
     userTemplatesHead: 'My templates',
     noTemplates: 'No templates available.',
+    noBlockTemplatesHint: 'No templates of your own in this browser yet. To create a block template: select a block in a task and click ★ (Save as block template) at the top of the block. Templates are stored in the browser, so they only apply to this browser and this address (e.g. localhost:8765).',
     insert: 'Insert',
     renamePrompt: 'New name:',
     templateInserted: 'Template "{name}" inserted.',
@@ -466,6 +690,8 @@ const en = {
     templateSaved: 'Template "{name}" saved.',
     templateBasedOn: 'Template based on: {base}',
     templateBadge: 'Template',
+    taskTemplateBadge: 'Task template',
+    taskTemplateBlocks: 'Inserts {n} block(s) from this task template',
     gradedBadge: 'graded',
     deleteTemplateAction: 'Delete template',
     deleteBlockTemplateTitle: 'Delete block template?',
@@ -476,23 +702,33 @@ const en = {
   taskPane: {
     taskLabel: 'Task {n}',
     titlePlaceholder: 'Task title (shown in the navigation)',
+    poolTitle: 'Task pool (course settings): tasks of a pool are drawn at random per attempt',
+    poolNone: 'No pool (always included)',
+    poolOption: 'Pool: {name}',
     addBlock: '+ Block',
     addBlockTitle: 'Add a block',
     saveTemplate: '★ Template',
     saveTemplateTitle: 'Save task as a template',
     tabsDisable: 'Disable tabs',
     tabsEnable: '+ Enable tabs',
-    tabsDisableTitle: 'Remove tabs (only tab 1 is kept)',
-    tabsEnableTitle: 'Enable 2 tabs: visualisation and task',
+    tabsDisableTitle: 'Remove all tabs (only tab 1 and its blocks are kept)',
+    tabsEnableTitle: 'Enable tabs (starts with "Visualisation" and "Task"; add more with +)',
     tabsDisableConfirmTitle: 'Disable tabs?',
-    tabsDisableConfirmMessageSingular: 'Tab 2 contains {n} block. Disabling tabs will discard it.',
-    tabsDisableConfirmMessagePlural: 'Tab 2 contains {n} blocks. Disabling tabs will discard them.',
+    tabsDisableConfirmMessageSingular: 'The tabs after tab 1 contain {n} block. Disabling tabs will discard it.',
+    tabsDisableConfirmMessagePlural: 'The tabs after tab 1 contain {n} blocks. Disabling tabs will discard them.',
     tabsDisableConfirmLabel: 'Disable',
     zoomOutTitle: 'Zoom out (Ctrl + mouse wheel)',
     zoomInTitle: 'Zoom in (Ctrl + mouse wheel)',
     zoomResetTitle: 'Zoom 100%',
     tabSwitchTitle: 'Switch tab',
     tabFallbackTitle: 'Tab {n}',
+    tabRenameTitle: 'Click to rename',
+    tabCloseTitle: 'Close tab',
+    tabAddTitle: 'Add tab',
+    tabCloseConfirmTitle: 'Close tab?',
+    tabCloseConfirmMessageSingular: 'This tab contains {n} block. Closing it will discard it.',
+    tabCloseConfirmMessagePlural: 'This tab contains {n} blocks. Closing it will discard them.',
+    tabCloseConfirmLabel: 'Close',
     dropRejectedSingular: 'File ignored: only image files can be dropped on the canvas.',
     dropRejectedPlural: '{n} files ignored: only image files can be dropped on the canvas.',
     fileValidationError: '"{name}": {error}',
@@ -501,7 +737,11 @@ const en = {
     imageAddedPlural: '{n} images added as blocks.',
     canvas: {
       gradedSuffix: ' · graded',
-      fitHeightTitle: 'Fit height to content',
+      fitHeightTitle: 'Fit height to content (builder preview)',
+      fitScormTitle: 'Fit height for SCORM: tall enough that the block never scrolls in the finished learning unit (measured as in the SCORM file, with room for feedback)',
+      fitScormFailed: 'The height could not be measured for this block.',
+      fitScormUnchanged: 'The height already fits.',
+      fitScormDone: 'Height set to {h} px.',
       saveAsTemplateTitle: 'Save as block template',
       resizeTitle: 'Resize',
       saveTemplateDialog: {
@@ -558,7 +798,32 @@ const en = {
       single: {
         title: 'Configuration: {label}',
         unknownType: 'Block type "{type}" is not registered.',
-        noSchema: 'This block has no configuration.'
+        noSchema: 'This block has no configuration.',
+        lockAnswersLabel: 'Lock answer after check',
+        lockAnswersHelp: 'After checking, the answer can no longer be changed. "Inherit from learning unit" follows the setting in Course info.',
+        timerEnabledLabel: 'Time limit for this block',
+        timerEnabledHelp: 'Countdown shown in the block. It only runs while its task (or tab) is shown and pauses when switching. At 0 the answer is locked.',
+        timerMinutes: 'Minutes',
+        timerSeconds: 'Seconds'
+      },
+      support: {
+        section: 'Attempts, hint & worked solution',
+        attemptsLimit: 'Limit the number of attempts',
+        attemptsLimitHelp: 'Every check counts as an attempt. Once all attempts are used, the answers (and "Regenerate") are locked.',
+        maxAttempts: 'Number of attempts',
+        attemptPenalty: 'Deduction per further attempt (%)',
+        attemptPenaltyHelp: 'Example 25: at most 75 % of the points in the 2nd attempt, 50 % in the 3rd. 0 = no deduction.',
+        hintEnabled: 'Offer a hint',
+        hintEnabledHelp: 'After the set number of failed checks, a "Hint" button appears on the block. KaTeX and variables ({a}) with the current values are supported.',
+        hintText: 'Hint text',
+        hintAfter: 'Hint after … failed checks (0 = right away)',
+        hintPenalty: 'Points deducted for opening the hint',
+        solutionEnabled: 'Offer a worked solution',
+        solutionEnabledHelp: '"Worked solution" button on the block. Opening it before the task is solved locks the answers. KaTeX and variables ({a}) are supported.',
+        solutionText: 'Worked solution',
+        solutionAfter: 'Worked solution after … failed checks',
+        solutionAfterPlaceholder: 'empty = once all attempts are used (no limit: 3)',
+        solutionWhenCorrect: 'Also show the worked solution after a correct answer'
       },
       warnings: {
         title: 'Notes ({n})',
@@ -574,6 +839,37 @@ const en = {
   },
 
   form: {
+    gridTable: {
+      corner: 'Row / column',
+      kindInherit: 'like column',
+      kind: { text: 'Text', numeric: 'Number answer', textAnswer: 'Text answer', choice: 'Choice (dropdown)' },
+      optionsPlaceholder: 'Correct | Wrong 1 | Wrong 2',
+      graded: 'Points',
+      gradedTitle: 'Ticked: the cell counts towards the points. Off: only checked and marked (e.g. a helper field).',
+      cellPoints: 'Set points per cell individually',
+      cellPointsTitle: 'On: every graded cell gets its own points; the total is their sum. Off: "Points (total)" is split equally.',
+      pointsTitle: 'Points for this cell',
+      textPlaceholder: 'Text ($…$, {a} allowed)',
+      formulaPlaceholder: 'Formula, e.g. a*b',
+      tolPlaceholder: '± (empty = default)',
+      answersPlaceholder: 'Answer(s): a | b',
+      addRow: 'Add row',
+      addCol: 'Add column',
+      removeRow: 'Remove row',
+      removeCol: 'Remove column',
+      hint: 'Choose the type per column at the top; a row can override it on the left. Text answers: separate several accepted answers with |. Choice: separate options with |, the first one is correct (shown shuffled). Untick "Points": the cell is checked but does not count.'
+    },
+    choiceMatrix: {
+      corner: 'Row / column',
+      rowPlaceholder: 'Row {n}',
+      colPlaceholder: 'Column {n}',
+      addRow: 'Add row',
+      addCol: 'Add column',
+      removeRow: 'Remove row',
+      removeCol: 'Remove column',
+      cellTitle: 'Ticked = correct answer',
+      hint: 'Name the rows and columns; ticked boxes are the correct answers.'
+    },
     upload: {
       noFile: 'No file selected.',
       tooLarge: 'File is too large ({size}). Maximum: {max}.',
@@ -603,7 +899,10 @@ const en = {
       urlPlaceholder: 'or enter a URL or path',
       image: {
         clear: 'Remove image',
-        embedded: 'Image embedded ({size})'
+        embedded: 'Image embedded ({size})',
+        keepOriginal: 'Keep original (do not shrink)',
+        keepOriginalHelp: 'For detailed images that students should zoom into. Otherwise large images are shrunk to at most 2000 px automatically.',
+        shrunk: 'Image shrunk: {from} → {to} ({w} × {h} px)'
       },
       audio: {
         clear: 'Remove audio',
@@ -676,7 +975,16 @@ const en = {
     defaultTitle: 'Task',
     validation: {
       noTasks: 'Learning unit contains no tasks.',
-      emptyCourseTitle: 'Course title is empty.'
+      emptyCourseTitle: 'Course title is empty.',
+      shadowsGlobalVar: 'Variable "{name}" hides the global variable of the same name (the block variable applies in this block).',
+      globalVarNoName: 'Global variable {n}: name is missing.',
+      globalVarBadName: 'Global variable "{name}": the name may only contain letters (a-z, A-Z), digits and underscores.',
+      globalVarDuplicate: 'Global variable "{name}" is defined more than once.',
+      globalVarRange: 'Global variable "{name}": min ({min}) is greater than max ({max}).',
+      globalVarUnused: 'Global variable "{name}" is not used in any task.',
+      poolUnnamed: 'Pool {n}',
+      poolEmpty: 'Task pool "{name}" contains no tasks.',
+      poolDrawTooBig: 'Task pool "{name}": {draw} tasks should be drawn, but it only contains {n}.'
     },
     toast: {
       saveTemplatesFailed: 'Templates could not be saved: {msg}',
@@ -709,290 +1017,314 @@ const en = {
   },
 
   blockHelp: {
+    common: {
+      graded: 'Further down, every graded block also has: "Lock answer after check", a time limit and "Attempts, hint & worked solution". "As in learning unit" follows the course settings.'
+    },
     heading: {
-      summary: 'Heading. Structures the task and marks thematic sections.',
+      summary: 'Heading that structures a task.',
       steps: {
-        1: 'Enter the text in the field.',
-        2: 'Pick a size as needed (H2 is the default for subsections).'
+        1: 'Enter the text.',
+        2: 'Choose the size: large (h2, default), medium (h3) or small (h4).'
       }
     },
     richText: {
-      summary: 'Body text with basic formatting (bold, italic, lists, links).',
+      summary: 'Body text with formatting (bold, italic, lists, links) and formulas.',
       steps: {
-        1: 'Write the content in the editor.',
-        2: 'Use the formatting toolbar at the top for emphasis.'
+        1: 'Enter the content; HTML is allowed.',
+        2: 'Put formulas between <code>$…$</code>, e.g. <code>$a^2 + b^2 = c^2$</code>.'
       },
       tips: {
-        1: 'For inline formulas use dollar signs like in LaTeX, e.g. $a^2 + b^2 = c^2$.'
+        1: 'Placeholders like <code>{a}</code> are not replaced by values here. For texts with random values, use the task text of a question block.'
       }
     },
     noteBox: {
-      summary: 'Color-tinted callout box to highlight key points against the body text.',
+      summary: 'Coloured box that makes important points stand out.',
       steps: {
-        1: 'Pick a style: info, warning, tip or definition.',
-        2: 'Enter the text.'
+        1: 'Choose the style: info (green), warning (yellow) or tip (blue).',
+        2: 'Enter title and content; HTML and formulas are allowed.'
       }
     },
     image: {
-      summary: 'Embedded image. Bundled into the SCORM package as a data URL.',
+      summary: 'Image with alt text and an optional caption; embedded in the SCORM package.',
       steps: {
-        1: 'Pick a file or drag-and-drop it onto the canvas.',
-        2: 'Enter alt text for accessibility.'
+        1: 'Upload a file, enter a URL or drop the image straight onto the canvas.',
+        2: 'Enter an alt text for screen readers.'
       },
       tips: {
-        1: 'Compress images larger than 2 MB first, otherwise the ZIP grows unnecessarily.'
+        1: 'Large photos are shrunk to at most 2000 px on upload. To switch this off: "Images" in the course settings, or "Keep original" at the image field.',
+        2: '"Width" takes CSS values like <code>400px</code>, <code>60%</code> or <code>auto</code>.'
       }
     },
     audio: {
-      summary: 'Audio player with standard browser controls.',
+      summary: 'Audio player with the browser\'s controls.',
       steps: {
-        1: 'Upload an audio file (mp3, ogg, wav).',
-        2: 'Optional: enter a caption.'
+        1: 'Upload an audio file (mp3, ogg, wav) or enter a URL.',
+        2: 'Optionally add a title and a caption.'
+      },
+      tips: {
+        1: 'Uploaded files are embedded in the ZIP and make it larger accordingly.'
       }
     },
     video: {
-      summary: 'Video player. Local file or YouTube/Vimeo embed.',
+      summary: 'Video player for own files or YouTube/Vimeo.',
       steps: {
-        1: 'For a local video: upload the file (mp4 recommended).',
-        2: 'For YouTube/Vimeo: paste the full link, the builder detects the format automatically.'
+        1: 'Upload a file (mp4 recommended) or paste a YouTube/Vimeo link; the format is detected automatically.',
+        2: 'For own files, optionally set a poster image.'
       },
       tips: {
-        1: 'Local videos over 10 MB bloat the SCORM ZIP significantly. YouTube/Vimeo links have no size limit.'
+        1: 'Own videos live in the ZIP and make it large. YouTube/Vimeo do not, but need internet access while playing.'
       }
     },
     fileDownload: {
-      summary: 'List of downloadable files (PDFs, worksheets, code samples).',
+      summary: 'File to download, e.g. a PDF, worksheet or code sample.',
       steps: {
-        1: 'Add one row per file, upload the file, and enter a caption.'
-      }
-    },
-    divider: {
-      summary: 'Horizontal rule as a visual section break.',
-      steps: {
-        1: 'Just place it. No further configuration.'
-      }
-    },
-    code: {
-      summary: 'Source code block with syntax highlighting.',
-      steps: {
-        1: 'Pick a language.',
-        2: 'Paste the code into the text field, indentation is preserved.'
+        1: 'Upload a file or enter a URL.',
+        2: 'Enter a display name and optionally a description.'
       }
     },
     summary: {
-      summary: 'Summary block with a title and bullet points. Well suited for closing sections.',
+      summary: 'Summary with a heading and bullet points, e.g. to close a learning unit.',
       steps: {
-        1: 'Enter a title.',
-        2: 'For each point, enter a heading and an explanation.'
+        1: 'Enter the heading.',
+        2: 'For each bullet, enter a key statement (shown in bold) and optionally an explanation.'
       }
     },
     survey: {
-      summary: 'Ungraded survey. Shown to the learner but does not count towards the points.',
+      summary: 'Ungraded survey: star rating, single choice or free text.',
       steps: {
-        1: 'Write the question.',
-        2: 'Add answer choices. No marking as right or wrong.'
+        1: 'Add questions and choose a question type for each.',
+        2: 'For single choice, enter the options, one per line.'
       },
       tips: {
-        1: 'Useful for self-assessment or mood check-ins at the start or end of a unit.'
+        1: 'Does not count towards the points. Good for self-assessments at the start or end of a unit.'
+      }
+    },
+    divider: {
+      summary: 'Horizontal line between sections.',
+      steps: {
+        1: 'Just place it; there are no settings.'
+      }
+    },
+    code: {
+      summary: 'Source code in a monospaced font; indentation is kept.',
+      steps: {
+        1: 'Optionally enter a title and a language; both appear as a label above the code.',
+        2: 'Paste the code into the text field.'
       }
     },
     multipleChoice: {
-      summary: 'Multiple-choice question with one or more correct answers.',
+      summary: 'Question with one or more correct answers; answers as text, image or both.',
       steps: {
         1: 'Write the question.',
-        2: 'Add answer choices and check the correct ones.'
+        2: 'Add answers and mark the correct ones with "Is correct".',
+        3: 'For several correct answers, turn on "Allow multiple selection".'
       },
       tips: {
-        1: 'When several answers are correct, partial credit is awarded automatically (e.g. 1 out of 2 correct answers = 50 %).',
-        2: 'Choices are shuffled per learner.',
-        3: '"Penalise wrong answers" deducts points for each incorrect selection.'
-      }
-    },
-    cloze: {
-      summary: 'Cloze text: words in the body are replaced by input fields or dropdowns.',
-      steps: {
-        1: 'Write the text with gaps into the template.',
-        2: 'Add a gap: <code>{{answer}}</code> for a free input, <code>{{a|b|c}}</code> for alternatives, <code>{{=correct|wrong1|wrong2}}</code> for a dropdown.'
-      },
-      tips: {
-        1: '"Ignore case" lets "berlin" count as "Berlin".',
-        2: 'Separate multiple correct spellings with |, e.g. <code>{{Hund|dog|chien}}</code>.'
-      }
-    },
-    textInput: {
-      summary: 'Free text answer. The comparison mode controls how strict the match is.',
-      steps: {
-        1: 'Write the question.',
-        2: 'Enter the correct answers.',
-        3: 'Pick a comparison mode.'
-      },
-      tips: {
-        1: '"Ignore case" is the default. Use "Exact" only for code or case-sensitive spellings.',
-        2: '"Regex" for patterns like <code>\\d{4}</code> (a year).',
-        3: '"Keywords" awards partial credit for each keyword found.'
-      }
-    },
-    matchPairs: {
-      summary: 'Matching by drag-and-drop. 1:1 for classic pairs, categorization for several terms per category.',
-      steps: {
-        1: 'Pick a mode: pairs or categorization.',
-        2: 'For pairs: enter the left and right sides in matching order.',
-        3: 'For categorization: add categories, then assign terms to the matching category.'
-      },
-      tips: {
-        1: 'Images and text can be mixed. Compress images larger than 1 MB.',
-        2: 'Points are awarded proportionally: 3 out of 4 correct matches = 75 %.'
-      }
-    },
-    sortList: {
-      summary: 'Sort list: the learner drags terms into the correct order.',
-      steps: {
-        1: 'Enter the items in the correct order.',
-        2: 'The learner sees them shuffled and has to sort them.'
-      },
-      tips: {
-        1: 'One point per item in the correct position. With 4 items and 2 correct = 2 points.'
-      }
-    },
-    hotzone: {
-      summary: 'Click-on-image task. The learner clicks the correct areas of the image.',
-      steps: {
-        1: 'Upload an image.',
-        2: 'Place rectangular zones over the correct areas of the image.'
-      },
-      tips: {
-        1: 'Zone coordinates are normalised (0 to 1). They stay valid when the image is swapped for one with the same aspect ratio.',
-        2: 'Multiple zones per image are supported; points are awarded proportionally.'
+        1: 'Partial credit: each correct tick earns points ÷ number of correct answers. "Deduct wrong selection" deducts per wrong tick; the score never drops below 0.',
+        2: '"Limit the number of selectable answers" locks further boxes once the maximum is reached.',
+        3: '"Shuffle answers" reorders the answers in every attempt.'
       }
     },
     numericInput: {
-      summary: 'Numeric input with tolerance, variables and an auto-generated task.',
+      summary: 'Calculation task with random variables; a formula computes the correct answer.',
       steps: {
-        1: 'Write a question template with placeholders like <code>{a}</code>.',
-        2: 'Add variables with a min/max range.',
-        3: 'Enter the solution formula, e.g. <code>a*b</code> or <code>sqrt(a^2+b^2)</code>.'
+        1: 'Write the question template with placeholders like <code>{a}</code> (KaTeX supported).',
+        2: 'Add variables with a range (from, to, integer or decimal places).',
+        3: 'Enter the solution formula, e.g. <code>a*b</code> or <code>sqrt(a^2+b^2)</code>, and set the tolerance.'
       },
       tips: {
-        1: 'On every "Regenerate" the builder draws new values from the variable ranges.',
-        2: 'Tolerance defines the accepted deviation from the target value.',
-        3: 'With "Simplify term" the answer is expected as a reduced fraction.'
+        1: '"Additional answer fields": several results with their own formula, label (e.g. "x =") and unit; partial credit per field.',
+        2: '"Whole-number solutions only" only draws values with a whole result. "Allow impossible tasks": if the formula has no result, "X" is the correct answer.',
+        3: 'Angles in formulas are in degrees by default (<code>sin(30)</code> = 0.5); switchable to radians.',
+        4: '"Simplify term": fractions must be entered in lowest terms.',
+        5: 'Global variables from the course settings work like the block\'s own.'
       }
     },
-    unitConvert: {
-      summary: 'Unit conversion (length, time, mass, speed, energy, etc.).',
+    textInput: {
+      summary: 'Free text answer; the evaluation mode decides how strictly it is compared.',
       steps: {
-        1: 'Pick a quantity type (e.g. length).',
-        2: 'Set the source and target units.',
-        3: 'Define the value range.'
+        1: 'Write the question.',
+        2: 'Enter the accepted answers.',
+        3: 'Choose the evaluation mode.'
       },
       tips: {
-        1: 'With "Fractions allowed", fractional numbers are also accepted as an answer.',
-        2: 'The decimal separator is a comma, but the builder also accepts a dot.'
+        1: '"Exact" (default) ignores upper/lower case. "Manual" chooses the comparison per entry.',
+        2: '"Regular expression" for patterns like <code>\\d{4}</code> (four-digit number).',
+        3: '"Keywords" gives partial credit for each term found.'
       }
     },
-    table: {
-      summary: 'Table with variable columns and input fields. For several calculations in a single task.',
+    cloze: {
+      summary: 'Gap text with input fields or drop-down lists.',
       steps: {
-        1: 'Add columns and pick a type per column: random value, formula or free text input.',
-        2: 'Set the number of rows and the variable range.'
+        1: 'Write the text with gaps.',
+        2: 'Insert gaps: <code>{{answer}}</code> input field, <code>{{a|b}}</code> input field with several correct spellings, <code>{{=right|wrong1|wrong2}}</code> drop-down (first option is correct).'
       },
       tips: {
-        1: 'Formula columns use the values of the preceding columns in the same row.',
-        2: 'Step sizes decide whether values are rolled in steps of 1, 0.5 or other increments.'
+        1: '"Ignore upper/lower case" accepts "berlin" as "Berlin".',
+        2: '"Shuffle drop-down options" changes the order within the drop-downs.',
+        3: 'Points are awarded proportionally per correct gap.'
       }
     },
-    equationSystem: {
-      summary: 'Linear equation system with 2 or 3 variables, either random or with your own variants.',
+    matchPairs: {
+      summary: 'Matching by dragging or tapping: one-to-one or categorisation.',
       steps: {
-        1: 'Pick a mode: randomly generated or your own variants.',
-        2: 'For "Random": set the variables, coefficient range and solution range.',
-        3: 'For "Manual": enter the equations directly, e.g. <code>2x + y = 5</code>.'
+        1: 'Choose the mode.',
+        2: 'One-to-one: enter pairs with a left and a right side (text, image or both).',
+        3: 'Categorisation: add categories with an ID, then assign elements via "Category ID(s)".'
       },
       tips: {
-        1: 'In manual mode the builder checks whether the system has a unique solution.',
-        2: 'Points are awarded per correctly solved variable.'
+        1: 'An element can belong to several categories: separate the IDs with commas. Identical-looking elements are interchangeable.',
+        2: 'Tapping works instead of dragging: first the element, then the target. Handy on tablets and with long lists.',
+        3: '"Number of tasks per attempt" draws a selection; points are proportional (3 of 4 correct = 75 %).'
       }
     },
-    functionQuestion: {
-      summary: 'Function graph with a question on function values, roots, intersections or extrema.',
+    hotzone: {
+      summary: 'Image task: learners click the correct areas of an image.',
       steps: {
-        1: 'Enter a function, e.g. <code>x^2 - 3</code> or <code>sin(x)</code>.',
-        2: 'Pick a question mode: function value, roots, y-intercept, extrema or a custom question.',
-        3: 'Set the visible range (x/y).'
+        1: 'Upload the image.',
+        2: 'Use "Draw hot zones" to drag rectangles over the correct areas.'
       },
       tips: {
-        1: 'When there are several roots, all of them are expected; order does not matter.',
-        2: 'For extrema, the coordinates are entered as (x; y).'
+        1: 'Points per zone found; "Deduct points for wrong answers" counts misclicks.',
+        2: 'Zones are stored relative to the image and still fit at another image size.',
+        3: 'Optionally the check shows zones that were not found.'
+      }
+    },
+    sortList: {
+      summary: 'Sort list: drag elements into the correct order.',
+      steps: {
+        1: 'Enter the task text.',
+        2: 'Add the items in the correct order; they are shown shuffled.'
+      },
+      tips: {
+        1: 'Proportional points: share of items in the correct position × points.',
+        2: 'Formulas (<code>$…$</code>) inside items are supported.'
       }
     },
     complexQuestion: {
-      summary: 'Read a complex number off a plot in the Gaussian plane.',
+      summary: 'Read a complex number from the complex plane.',
       steps: {
-        1: 'Add a pool of points.',
-        2: 'Pick a mode: Cartesian (Re, Im), polar (|z|, φ), both, or conjugate.'
-      }
-    },
-    complexInput: {
-      summary: 'Complex number as the answer. Like numeric input, but with operations on complex numbers.',
-      steps: {
-        1: 'Write a question template, e.g. <code>$(a + bi)(c - di)</code>.',
-        2: 'Add variables with ranges.',
-        3: 'Enter the solution formula, e.g. <code>(a + b*i) * (c - d*i)</code>.'
+        1: 'Add a task pool with real and imaginary parts.',
+        2: 'Choose what is asked (Cartesian, polar, both or conjugate) and set the tolerances.'
       },
       tips: {
-        1: 'Input formats for learners: <code>3+4i</code>, <code>-i</code>, <code>1/2+3/4i</code>.'
+        1: '"Choose at random" picks a number from the pool in every attempt.'
+      }
+    },
+    functionQuestion: {
+      summary: 'Function graph with a question about values, roots, intersections or extrema.',
+      steps: {
+        1: 'Enter the function, e.g. <code>x^2 - 3</code> or <code>sin(x)</code>.',
+        2: 'Choose what is asked: function value, roots, y-intercept, extrema or a custom question.',
+        3: 'Set the visible range (x/y).'
+      },
+      tips: {
+        1: 'With several roots, all are expected; the order does not matter.',
+        2: 'Extrema are entered as (x; y).'
       }
     },
     vectorQuestion: {
-      summary: 'Read a vector off a 2D plot. Ask for components, magnitude or angle.',
+      summary: 'Read a vector from a 2D plot: components, magnitude, angle or unit vector.',
       steps: {
-        1: 'Add a pool of vectors.',
-        2: 'Pick a question mode: components, magnitude, angle, unit vector or all.',
-        3: 'Set the angle unit (degrees or radians).'
-      }
-    },
-    truthTable: {
-      summary: 'Boolean truth table. The learner fills in the column and the builder checks each row value.',
-      steps: {
-        1: 'Enter an expression, e.g. <code>a and b</code>, <code>not (a or b)</code>.',
-        2: 'Separate variable names with commas.'
-      },
-      tips: {
-        1: 'Allowed operators: and, or, not, xor (as well as &&, ||, !).',
-        2: 'Each row is worth one point; 2^N rows for N variables.'
+        1: 'Add a vector pool.',
+        2: 'Choose what is asked.',
+        3: 'Choose the angle unit (degrees or radians) and set the tolerances.'
       }
     },
     numberBase: {
-      summary: 'Number base conversion: binary, octal, decimal and hexadecimal.',
+      summary: 'Conversion between binary, octal, decimal and hexadecimal.',
       steps: {
-        1: 'Pick a direction preset or define your own directions.',
-        2: 'Set the value range (decimal).'
+        1: 'Choose a conversion preset or set your own directions.',
+        2: 'Enter the value range (decimal).'
       },
       tips: {
-        1: 'Hex answers are checked case-insensitively; the <code>0x</code> prefix is allowed.'
+        1: 'Hex answers are checked case-insensitively; the prefix <code>0x</code> is allowed.'
       }
     },
-    composition: {
-      summary: 'Vector editor for custom geometric constructions and labels. Optionally with input gaps.',
+    unitConvert: {
+      summary: 'Convert units: length, time, mass, speed, energy, pressure, temperature and more.',
       steps: {
-        1: 'Insert a template (rectangle, triangle, Pythagoras, circle), or add shapes one by one from the toolbar.',
-        2: 'Add labels with <code>{a}</code> for variables and <code>{1}</code> for answer fields.',
-        3: 'Pick a grading mode: display only, understood button, or with solution.'
+        1: 'Add conversions: direction (from → to) and value range.',
+        2: 'Write the question template with <code>{value}</code>, <code>{fromUnit}</code> and <code>{toUnit}</code>.'
       },
       tips: {
-        1: 'Variables are rolled again on every start; the solution formula uses those values.',
-        2: 'Multiple slots in one label: <code>{1}</code>, <code>{2}</code>, … can reference each other (<code>{1*}</code> as the answer of slot 1 in another formula).'
+        1: 'The tolerance is relative: 0.01 means 1 % deviation.',
+        2: 'Comma and point are both accepted as decimal separator.',
+        3: '"Swap direction at random" also asks the reverse way.'
+      }
+    },
+    truthTable: {
+      summary: 'Boolean truth table: learners fill in the result column.',
+      steps: {
+        1: 'Enter an expression, e.g. <code>a and b</code> or <code>not (a or b)</code>.',
+        2: 'Enter the variable names separated by commas.'
+      },
+      tips: {
+        1: 'Allowed operators: and, or, not, xor (and &&, ||, !).',
+        2: 'Proportional points per correct row; optional deduction for wrong rows. N variables give 2^N rows.'
+      }
+    },
+    table: {
+      summary: 'Table of four kinds: value table, true/false statements, choice matrix or free table.',
+      steps: {
+        1: 'Choose the "Table type".',
+        2: 'Value table: add variables and columns (random value, formula, text or answer column) and set the number of rows.',
+        3: 'True/false: enter statements and choose true or false for each.',
+        4: 'Choice matrix: add rows and columns and set the correct ticks in the grid.',
+        5: 'Free table: add rows and columns freely; each cell is text, a number answer (with formula), a text answer or a drop-down.'
+      },
+      tips: {
+        1: 'Value table: formulas use the values of the same row; every row is drawn anew.',
+        2: 'Free table: "Points" at a cell decides whether it counts; "Set points per cell" gives every cell its own points.',
+        3: 'True/false, matrix and free table can deduct points for wrong answers.'
+      }
+    },
+    equationSystem: {
+      summary: 'Linear system of equations with 2 or 3 variables, generated at random or with own variants.',
+      steps: {
+        1: 'Choose the mode: random values or own variants.',
+        2: 'Random: set the variables and the coefficient and solution ranges.',
+        3: 'Own variants: enter the equations directly, e.g. <code>2x + y = 5</code>.'
+      },
+      tips: {
+        1: 'Own variants are checked live; a system without a unique solution is reported.',
+        2: 'Points are awarded proportionally per correctly solved variable.'
       }
     },
     functionSandbox: {
-      summary: 'Interactive function plot for exploration. Learners change parameters and see the effect instantly.',
+      summary: 'Interactive function plot to explore: learners move sliders and see the effect at once.',
       steps: {
-        1: 'Enter a function with placeholders for parameters.',
-        2: 'Add parameters with min/max/step size.',
+        1: 'Enter the function with parameters.',
+        2: 'Add sliders with range, step and start value.',
         3: 'Set the visible x/y range.'
       },
       tips: {
-        1: 'No grading, purely a learning tool. Pairs well with a function question.'
+        1: 'Not graded, purely a learning tool. Pairs well with a function question.'
+      }
+    },
+    composition: {
+      summary: 'Canvas for own sketches and constructions, optionally with answer fields, yes/no fields, click or hotspot tasks.',
+      steps: {
+        1: 'Insert a template or add shapes via the toolbar.',
+        2: 'Double-click a label to edit it: <code>{a}</code> for variables, <code>{1}</code> for answer fields; formulas and formatting (B, I, x²) are supported.',
+        3: 'Choose the grading mode; with "With solution", set each answer field\'s solution via "Formula ▾".'
+      },
+      tips: {
+        1: 'In the label editor: Enter saves, Shift+Enter adds a line, and a live preview appears below.',
+        2: '<code>{1*}</code> shows the answer from field 1 and can be reused in later formulas.',
+        3: 'A yes/no field is added via the toolbar; set its correct answer and points at the shape.'
+      }
+    },
+    complexInput: {
+      summary: 'Complex number as the answer; built like the numeric input, but with complex numbers.',
+      steps: {
+        1: 'Write the question template, e.g. <code>Compute $({a} + {b}i)({c} - {d}i)$</code>.',
+        2: 'Add real variables with ranges.',
+        3: 'Enter the solution formula, e.g. <code>(a + b*i) * (c - d*i)</code>.'
+      },
+      tips: {
+        1: 'Input formats for learners: <code>3+4i</code>, <code>-i</code>, <code>1/2+3/4i</code>.',
+        2: '"Whole-number solutions only": the real and imaginary part of the solution are whole numbers.'
       }
     }
   },
