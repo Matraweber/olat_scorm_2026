@@ -265,6 +265,8 @@ textarea:focus-visible,
 .list-item-subtitle { font-size: 0.72rem; color: var(--muted); font-family: 'Courier New', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .list-item-controls { display: flex; gap: 0.25rem; margin-left: auto; flex-shrink: 0; }
 .field-section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 0.55rem 0 0.15rem; border-top: 1px solid var(--line); margin-top: 0.25rem; }
+.timer-field-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.timer-field-row > * { flex: 1 1 8rem; }
 .field-section-label:first-child { border-top: none; margin-top: 0; padding-top: 0; }
 .checkbox-field { display:flex; align-items:center; gap: 0.5rem; }
 /* The checkbox label is a <label> directly inside .field, so the generic
@@ -793,6 +795,10 @@ body:has(.modal:not(.hidden)) { overflow: hidden; }
 .builder-tab-title:focus { background: #fff; border-color: var(--line); outline: none; }
 .builder-tab-count { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
 .builder-tab-btn.active .builder-tab-count { color: var(--primary); }
+.builder-tab-close { background: transparent; border: none; font: inherit; font-size: 1rem; line-height: 1; color: var(--muted); cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 4px; }
+.builder-tab-close:hover { background: var(--line); color: var(--danger, #b3261e); }
+.builder-tab-add { background: transparent; border: 1px dashed var(--line); font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; padding: 0.2rem 0.65rem; margin: 0.15rem 0 0.3rem; border-radius: 6px; }
+.builder-tab-add:hover { color: var(--primary); border-color: var(--primary); background: var(--panel-soft); }
 
 /* Zone editor (hotzone block image overlay) */
 .zone-editor { display:flex; flex-direction:column; gap:0.45rem; }
@@ -843,7 +849,12 @@ html.welcome-active {
   padding: 0.4rem 0 0.4rem 1.5rem;
   border-left: 1px solid var(--line);
   max-height: calc(100vh - 80px - 1.2rem);
-  overflow: hidden;
+  /* Scrolls on its own when the chapters don't fit the window height. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 0.4rem;
 }
 .welcome-rail-label {
   font-size: 0.66rem;
@@ -1166,6 +1177,15 @@ html.welcome-active {
 
 /* Keyboard shortcuts */
 .welcome-kbd-table { width: 100%; border-collapse: collapse; }
+/* KaTeX chapter: input | rendered result | note. */
+.welcome-katex-table { width: 100%; border-collapse: collapse; margin: 0.4rem 0 1rem; }
+.welcome-katex-table th { text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); }
+.welcome-katex-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.welcome-katex-src code { font-size: 0.85rem; white-space: nowrap; }
+.welcome-katex-out { font-size: 1.05rem; min-width: 9rem; }
+.welcome-katex-out .katex-display { margin: 0.2rem 0; text-align: left; }
+.welcome-katex-tips { margin: 0 0 0.8rem; padding-left: 1.2rem; line-height: 1.6; }
+@media (max-width: 700px){ .welcome-katex-src code { white-space: normal; word-break: break-all; } }
 .welcome-kbd-table td { padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 .welcome-kbd-table tr:last-child td { border-bottom: 0; }
 .welcome-kbd-table .welcome-kbd-key { width: 220px; }
@@ -1339,6 +1359,12 @@ html.welcome-active {
 }
 .comp-tool-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 .comp-tool-btn:focus-visible { outline: 2px solid rgba(0,59,92,0.25); outline-offset: 1px; }
+/* Label formatting buttons (B / I / U / x² / x₂ / line break) */
+.comp-fmt-group { display: inline-flex; gap: 2px; }
+.comp-fmt-btn { width: 26px; font: 600 0.8rem Verdana, Arial, sans-serif; line-height: 1; }
+.comp-fmt-btn sup, .comp-fmt-btn sub { font-size: 0.65em; line-height: 0; position: relative; vertical-align: baseline; }
+.comp-fmt-btn sup { top: -0.5em; }
+.comp-fmt-btn sub { top: 0.35em; }
 .comp-tool-danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 .comp-tool-label { font-size: 0.72rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 0.1rem; }
 .comp-tool-color {
@@ -1389,6 +1415,8 @@ html.welcome-active {
   height: 28px; padding: 0 0.4rem; font: inherit; font-size: 0.85rem;
   border: 1px solid var(--line); border-radius: 5px; background: #fff;
 }
+/* Small caption in front of a toolbar control (e.g. Ja/Nein field settings). */
+.comp-tool-lbl { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 .comp-canvas-wrap {
   padding: 0.6rem;
   background: repeating-conic-gradient(#f7f9fb 0% 25%, #ffffff 0% 50%) 50% / 16px 16px;
@@ -2451,3 +2479,51 @@ select.comp-formula-btn { font-size: 0.78rem; }
   content: "\2713\00a0";
   color: var(--primary);
 }
+
+/* Table block "Auswahl-Matrix": grid editor (rows x columns, tick = correct). */
+.choice-matrix-editor { display: flex; flex-direction: column; gap: 0.35rem; }
+.choice-matrix-scroll { overflow-x: auto; }
+.choice-matrix-table { border-collapse: collapse; font-size: 0.85rem; }
+.choice-matrix-table th, .choice-matrix-table td { border: 1px solid var(--line); padding: 0.25rem 0.35rem; vertical-align: middle; }
+.choice-matrix-table th { background: var(--panel-soft); font-weight: 600; text-align: left; }
+.choice-matrix-corner { color: var(--muted); font-weight: 500 !important; white-space: nowrap; }
+.choice-matrix-head { display: flex; align-items: center; gap: 0.2rem; }
+.choice-matrix-label { width: 7.5rem; min-width: 4rem; padding: 0.2rem 0.35rem; font: inherit; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.choice-matrix-cell { text-align: center; background: #fff; }
+.choice-matrix-cell input { width: 1rem; height: 1rem; accent-color: var(--primary); cursor: pointer; }
+
+/* Table block "Freie Tabelle": grid editor (type per column, override per row). */
+.grid-table-editor { display: flex; flex-direction: column; gap: 0.35rem; }
+.grid-table-table { border-collapse: collapse; font-size: 0.82rem; }
+.grid-table-table th, .grid-table-table td { border: 1px solid var(--line); padding: 0.25rem 0.3rem; vertical-align: middle; }
+.grid-table-table th { background: var(--panel-soft); font-weight: 600; text-align: left; }
+.grid-table-kind { font: inherit; font-size: 0.78rem; padding: 0.1rem 0.2rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.grid-table-rownum { color: var(--muted); font-size: 0.75rem; min-width: 1rem; }
+.grid-table-input { width: 8.5rem; padding: 0.2rem 0.35rem; font: inherit; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.grid-table-tol { width: 5.5rem; margin-top: 0.2rem; display: block; }
+.grid-table-cell.grid-kind-numeric { background: #fff8e8; }
+.grid-table-cell.grid-kind-textAnswer { background: #eef7ff; }
+.grid-table-cell.grid-kind-choice { background: #f3efff; }
+.grid-table-graded { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.2rem; font-size: 0.72rem; color: var(--muted); cursor: pointer; }
+.grid-table-cell.grid-ungraded { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0,0,0,0.04) 6px 12px); }
+.grid-table-cellpts { margin-bottom: 0.3rem; }
+.grid-table-pts { width: 3.6rem; margin-left: 0.3rem; padding: 0.1rem 0.25rem; font: inherit; font-size: 0.75rem; border: 1px solid var(--line); border-radius: 4px; }
+
+/* Course pane: where each global variable is used. */
+.global-var-usage { margin: 0.4rem 0 1rem; font-size: 0.85rem; }
+.global-var-usage-head { font-weight: 700; color: var(--primary); margin-bottom: 0.25rem; }
+.global-var-usage-row { display: flex; gap: 0.6rem; align-items: baseline; padding: 0.15rem 0; }
+.global-var-usage-row code { min-width: 3.5rem; font-weight: 700; }
+.global-var-usage-row.unused span { color: var(--muted, #6b7785); font-style: italic; }
+
+/* Image field: keep the original instead of the shrunk upload. */
+.image-keep-original { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0.35rem 0 0.2rem; font-size: 0.8rem; color: var(--muted, #6b7785); cursor: pointer; }
+/* Task header: pool assignment next to the title. */
+.task-pool-select { margin-left: 0.6rem; padding: 0.3rem 0.5rem; border: 1px solid var(--line, #d8e0e6); border-radius: 8px; background: #fff; font: inherit; font-size: 0.85rem; color: var(--primary, #003b5c); }
+
+/* Block help box: note shared by all graded blocks. */
+.block-help-common { margin: 0.6rem 0 0; padding-top: 0.5rem; border-top: 1px dashed var(--line); font-size: 0.82rem; color: var(--muted); }
+
+/* Welcome page: worked example below a chapter's cards. */
+.welcome-example { margin: 1rem 0 0.4rem; padding: 0.8rem 1rem; border-left: 4px solid var(--accent, #a1d884); background: var(--panel-soft, #f3f8fa); border-radius: 0 10px 10px 0; line-height: 1.6; font-size: 0.92rem; }
+.welcome-example code { white-space: normal; }

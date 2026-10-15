@@ -11,7 +11,11 @@ import { t } from './i18n.js';
 export const DEFAULT_COURSE_TITLE = 'Neue SCORM-Lerneinheit';
 export function defaultCourse(){
   return { courseTitle: DEFAULT_COURSE_TITLE, courseSubtitle: '', passThreshold: 0.5,
-    regenLockAfterCheck: false, regenNoRegenerate: false, tasks: [] };
+    regenLockAfterCheck: false, regenNoRegenerate: false, lockAnswersAfterCheck: false,
+    courseTimerEnabled: false, courseTimerMinutes: 30, courseTimerSeconds: 0,
+    globalVariables: [], globalVarDecimals: 2, globalVarDisplay: 'auto',
+    globalRegenButton: true, globalRegenLockAfterCheck: false,
+    pools: [], shrinkImages: true, tasks: [] };
 }
 
 // Repair titles written by a buggy earlier build that stored the raw i18n
@@ -132,7 +136,7 @@ export function isCourseDirty(){ return _fileDirty; }
 export function markCourseSavedToFile(){ _fileDirty = false; }
 
 // True if the course has any task or a non-default title.
-function courseHasContent(c){
+export function courseHasContent(c){
   if(!c) return false;
   const def = defaultCourse();
   if(Array.isArray(c.tasks) && c.tasks.length > 0) return true;

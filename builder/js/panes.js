@@ -190,7 +190,40 @@ function moveTask(from, to){
 }
 
 // Active pane dispatcher (welcome / course / theme / task).
+// Course-wide variables into BlockUtils, so block previews and checks in
+// the builder see them. Sample values are redrawn only when the
+// definitions change.
+let globalVarsSig = null;
+export function syncGlobalVars(){
+  const U = window.BlockUtils;
+  if(!U || typeof U.setGlobalVarDefs !== 'function') return;
+  const c = state.course || {};
+  U.setGlobalVarDefs(c.globalVariables, { decimals: c.globalVarDecimals, valueDisplay: c.globalVarDisplay });
+  const sig = JSON.stringify([c.globalVariables || [], c.globalVarDecimals, c.globalVarDisplay]);
+  if(sig !== globalVarsSig){
+    globalVarsSig = sig;
+    U.setGlobalVarValues(U.genGlobalVarValues());
+  }
+}
+// { name: [task titles] } for every global variable.
+export function globalVarUsage(){
+  const U = window.BlockUtils;
+  const defs = (state.course.globalVariables || []).filter(v => v && v.name);
+  const out = {};
+  defs.forEach(v => { out[v.name] = []; });
+  if(!U || !defs.length) return out;
+  (state.course.tasks || []).forEach((task, i) => {
+    const blocks = (task.tabs && task.tabs.length >= 2) ? task.tabs.flatMap(tb => tb.blocks || []) : (task.blocks || []);
+    const used = new Set();
+    blocks.forEach(b => U.globalVarsUsedBy(b.config || {}, defs).forEach(n => used.add(n)));
+    const title = l(task.title) || t('taskList.fallbackTitle', { n: i + 1 });
+    used.forEach(n => out[n].push(title));
+  });
+  return out;
+}
+
 export function renderActivePaneImpl(){
+  syncGlobalVars();
   const host = document.getElementById('formPane');
   if(typeof window._welcomeScrollCleanup === 'function') window._welcomeScrollCleanup();
   host.classList.remove('welcome-pane');
@@ -245,7 +278,115 @@ function renderCoursePane(host){
     { key:'regenLockAfterCheck', label:t('panes.course.questionBlocks.lockAfterCheck.label'), type:'boolean',
       help:t('panes.course.questionBlocks.lockAfterCheck.help') },
     { key:'regenNoRegenerate', label:t('panes.course.questionBlocks.hideRegenerate.label'), type:'boolean',
-      help:t('panes.course.questionBlocks.hideRegenerate.help') }
+      help:t('panes.course.questionBlocks.hideRegenerate.help') },
+    { key:'lockAnswersAfterCheck', label:t('panes.course.questionBlocks.lockAnswers.label'), type:'boolean',
+      help:t('panes.course.questionBlocks.lockAnswers.help') }
+  ].forEach(spec => host.appendChild(renderField(spec, get, set)));
+
+  // Course-wide countdown: runs across all tasks, finishes the course at 0.
+  host.appendChild(el('div', {className:'field-section-label', text:t('panes.course.timer.heading')}));
+  host.appendChild(renderField({ key:'courseTimerEnabled', label:t('panes.course.timer.enabled.label'), type:'boolean',
+    help:t('panes.course.timer.enabled.help') }, get, set));
+  const timeRow = el('div', {className:'timer-field-row'});
+  [
+    { key:'courseTimerMinutes', label:t('panes.course.timer.minutes'), type:'number', step:1, min:0 },
+    { key:'courseTimerSeconds', label:t('panes.course.timer.seconds'), type:'number', step:1, min:0, max:59 }
+  ].forEach(spec => timeRow.appendChild(renderField(spec, get, set)));
+  host.appendChild(timeRow);
+
+  renderGlobalVarsSection(host, get, set);
+  renderPoolsSection(host, get, set);
+
+  // Uploaded images (js/image-shrink.js).
+  host.appendChild(el('div', {className:'field-section-label', text:t('panes.course.images.heading')}));
+  host.appendChild(renderField({ key:'shrinkImages', label:t('panes.course.images.shrink.label'), type:'boolean',
+    help:t('panes.course.images.shrink.help') }, () => ({ shrinkImages: c.shrinkImages !== false }), (k, v) => set(k, !!v)));
+}
+
+// "Aufgabenpools": per attempt N tasks are drawn from each pool (runtime.js
+// applyPools); tasks pick their pool in the task header.
+function renderPoolsSection(host, get, set){
+  host.appendChild(el('div', {className:'field-section-label', text:t('panes.course.pools.heading')}));
+  host.appendChild(el('div', {className:'field-section-note', text:t('panes.course.pools.note')}));
+  const usageHost = el('div', {className:'global-var-usage'});
+  const renderUsage = () => {
+    usageHost.innerHTML = '';
+    const pools = (state.course.pools || []).filter(p => p && p.id);
+    pools.forEach(p => {
+      const n = (state.course.tasks || []).filter(tk => tk.pool === p.id).length;
+      const draw = p.draw === '' || p.draw == null ? n : Math.min(n, Number(p.draw) || 0);
+      const row = el('div', {className:'global-var-usage-row' + (n ? '' : ' unused')});
+      row.appendChild(el('code', {text: p.name || p.id}));
+      row.appendChild(el('span', {text: n ? t('panes.course.pools.usage', { draw, n }) : t('panes.course.pools.empty')}));
+      usageHost.appendChild(row);
+    });
+  };
+  const pset = (k, v) => {
+    // Every pool needs a stable id (tasks reference it, names may change).
+    if(k === 'pools' && Array.isArray(v)) v.forEach(p => { if(p && !p.id) p.id = 'pool_' + Math.random().toString(36).slice(2, 8); });
+    set(k, v);
+    renderUsage();
+    renderTaskList();
+  };
+  host.appendChild(renderField({
+    key:'pools', label:t('panes.course.pools.listLabel'), type:'list', itemLabel:t('panes.course.pools.itemLabel'),
+    itemSchema: [
+      { key:'name', label:t('panes.course.pools.name'), type:'text', placeholder:t('panes.course.pools.namePlaceholder') },
+      { key:'draw', label:t('panes.course.pools.draw'), type:'number', step:1, min:1, placeholder:t('panes.course.pools.drawPlaceholder') }
+    ]
+  }, get, pset));
+  host.appendChild(usageHost);
+  renderUsage();
+}
+
+// "Globale Variablen": same fields as block variables, valid in every task.
+// Blocks use them like their own variables ({F} in texts, F in formulas);
+// a block variable with the same name wins.
+function renderGlobalVarsSection(host, get, set){
+  const U = window.BlockUtils;
+  if(!U || typeof U.varItemFormatFields !== 'function') return;
+  host.appendChild(el('div', {className:'field-section-label', text:t('panes.course.globalVars.heading')}));
+  host.appendChild(el('div', {className:'field-section-note', text:t('panes.course.globalVars.note')}));
+  const usageHost = el('div', {className:'global-var-usage'});
+  const renderUsage = () => {
+    usageHost.innerHTML = '';
+    const usage = globalVarUsage();
+    const names = Object.keys(usage);
+    if(!names.length) return;
+    usageHost.appendChild(el('div', {className:'global-var-usage-head', text:t('panes.course.globalVars.usageHead')}));
+    names.forEach(n => {
+      const row = el('div', {className:'global-var-usage-row' + (usage[n].length ? '' : ' unused')});
+      row.appendChild(el('code', {text: n}));
+      row.appendChild(el('span', {text: usage[n].length ? usage[n].join(', ') : t('panes.course.globalVars.unused')}));
+      usageHost.appendChild(row);
+    });
+  };
+  const gset = (k, v) => { set(k, v); syncGlobalVars(); renderUsage(); };
+  const isInt = item => !!item.integer;
+  host.appendChild(renderField({
+    key:'globalVariables', label:t('panes.course.globalVars.listLabel'), type:'list',
+    itemLabel:t('panes.course.globalVars.itemLabel'),
+    help:t('panes.course.globalVars.listHelp'),
+    itemSchema: [
+      { key:'name', label:t('panes.course.globalVars.name'), type:'text', placeholder:t('panes.course.globalVars.namePlaceholder') },
+      { key:'min', label:t('panes.course.globalVars.min'), type:'number', step:'any', default:1 },
+      { key:'max', label:t('panes.course.globalVars.max'), type:'number', step:'any', default:10 },
+      { key:'integer', label:t('panes.course.globalVars.integer'), type:'boolean', default:true },
+      ...U.varItemFormatFields(isInt)
+    ]
+  }, get, gset));
+  // Course-level decimals / display (the block fields, stored under global* keys).
+  const keyMap = { decimals:'globalVarDecimals', valueDisplay:'globalVarDisplay' };
+  U.varFormatSchemaFields().forEach(f => {
+    host.appendChild(renderField(Object.assign({}, f, { key: keyMap[f.key] || f.key }), get, gset));
+  });
+  host.appendChild(usageHost);
+  renderUsage();
+  [
+    { key:'globalRegenButton', label:t('panes.course.globalVars.button.label'), type:'boolean',
+      help:t('panes.course.globalVars.button.help') },
+    { key:'globalRegenLockAfterCheck', label:t('panes.course.globalVars.lock.label'), type:'boolean',
+      help:t('panes.course.globalVars.lock.help') }
   ].forEach(spec => host.appendChild(renderField(spec, get, set)));
 }
 

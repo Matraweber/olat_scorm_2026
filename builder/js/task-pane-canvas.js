@@ -6,9 +6,9 @@ import { captureBlockAsTemplate, saveUserBlockTemplates } from './tasks.js';
 import {
   CANVAS_WIDTH, ensurePos,
   applySnap, applyResizeSnap, showSnapGuides, hideSnapGuides,
-  autoFitBlock, fitHeightForCard
+  autoFitBlock, fitHeightForCard, RUNTIME_FIT_MARGIN, RUNTIME_FIT_FEEDBACK_MARGIN
 } from './canvas.js';
-import { renderBlockPreview } from './preview.js';
+import { renderBlockPreview, measureRuntimeHeight } from './preview.js';
 import { renderTaskList } from './panes.js';
 import { posLabel } from './task-pane-config.js';
 
@@ -37,11 +37,26 @@ export function renderCanvas(ctx){
     }));
     const ctrls = el('div', {className:'canvas-block-controls'});
     const fitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.canvas.fitHeightTitle')}, text:'↕'});
+    const scormFitBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.canvas.fitScormTitle')}, text:'⇳'});
     const dupBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('common.duplicate')}, text:'⧉'});
     // Block-template button: deep-clones into state.userBlockTemplates.
     const tplBtn = el('button', {className:'icon-btn', attrs:{type:'button', title: t('taskPane.canvas.saveAsTemplateTitle')}, text:'★'});
     const rmBtn  = el('button', {className:'icon-btn danger', attrs:{type:'button', title: t('common.remove')}, text:'✕'});
     fitBtn.addEventListener('click', e => { e.stopPropagation(); autoFitBlock(block); });
+    scormFitBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      scormFitBtn.disabled = true;
+      let h = null;
+      try { h = await measureRuntimeHeight(block); } catch{}
+      scormFitBtn.disabled = false;
+      if(h == null){ toast(t('taskPane.canvas.fitScormFailed'), 'warn'); return; }
+      const newH = Math.max(60, Math.ceil(h + RUNTIME_FIT_MARGIN + (def && def.graded ? RUNTIME_FIT_FEEDBACK_MARGIN : 0)));
+      if(newH === block.pos.h){ toast(t('taskPane.canvas.fitScormUnchanged')); return; }
+      pushHistory();
+      block.pos.h = newH;
+      renderCanvas(ctx); ctx.renderConfigPane(); ctx.adjustCanvasHeight();
+      toast(t('taskPane.canvas.fitScormDone', { h: newH }));
+    });
     dupBtn.addEventListener('click', e => {
       e.stopPropagation();
       pushHistory();
@@ -98,7 +113,7 @@ export function renderCanvas(ctx){
         doRemove();
       }
     });
-    ctrls.appendChild(fitBtn); ctrls.appendChild(dupBtn); ctrls.appendChild(tplBtn); ctrls.appendChild(rmBtn);
+    ctrls.appendChild(fitBtn); ctrls.appendChild(scormFitBtn); ctrls.appendChild(dupBtn); ctrls.appendChild(tplBtn); ctrls.appendChild(rmBtn);
     cardHead.appendChild(ctrls);
     card.appendChild(cardHead);
 

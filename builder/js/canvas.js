@@ -256,6 +256,12 @@ export function fitHeightForCard(card){
   return Math.max(60, Math.round(content + headH + 8));
 }
 
+// "Höhe für SCORM anpassen": height of the block's cell in the exported
+// page, so the block never scrolls inside itself. Graded blocks get extra
+// room for feedback that is longer than the initial placeholder.
+export const RUNTIME_FIT_MARGIN = 12;
+export const RUNTIME_FIT_FEEDBACK_MARGIN = 28;
+
 // Auto-fit block height to its rendered content (button + Enter handler).
 export function autoFitBlock(block){
   const card = document.querySelector('.canvas-block-card[data-block-id="' + cssEscape(block.id) + '"]');

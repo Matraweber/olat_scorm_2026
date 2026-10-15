@@ -1,11 +1,26 @@
 // io.js: JSON config, SCORM-1.2 ZIP packaging, preview iframe.
 import {
-  escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog
+  escapeHtml, escapeXml, sanitizeFilename, withBust, blobToDataUrl, extractBodyInner, toast, confirmDialog, choiceDialog
 } from './util.js';
-import { state, render, defaultTheme, scheduleAutosave, markCourseSavedToFile, repairCourse } from './state.js';
+import { state, render, defaultTheme, scheduleAutosave, markCourseSavedToFile, repairCourse, isCourseDirty, courseHasContent } from './state.js';
 import { migrateTaskIfNeeded, cleanTaskForExport, validateCourse } from './tasks.js';
 import { BLOCK_FILES, usedBlockTypes } from './canvas.js';
 import { t, getLocale, getDefaultLocale, collectContentLocales, l } from './i18n.js';
+
+// Course-wide variables (see panes.js "Globale Variablen"); same shape in
+// tasks.json and the builder state.
+function globalVarExport(c){
+  return {
+    globalVariables: Array.isArray(c.globalVariables) ? JSON.parse(JSON.stringify(c.globalVariables)) : [],
+    globalVarDecimals: c.globalVarDecimals != null && c.globalVarDecimals !== '' ? Number(c.globalVarDecimals) : 2,
+    globalVarDisplay: c.globalVarDisplay || 'auto',
+    globalRegenButton: c.globalRegenButton !== false,
+    globalRegenLockAfterCheck: !!c.globalRegenLockAfterCheck,
+    // Task pools (panes.js "Aufgabenpools"); task.pool holds the pool id.
+    pools: Array.isArray(c.pools) ? c.pools.filter(p => p && p.id).map(p => ({ id: p.id, name: p.name || '', draw: p.draw === '' || p.draw == null ? '' : Number(p.draw) })) : [],
+    shrinkImages: c.shrinkImages !== false
+  };
+}
 
 // *Rel variants prepend 'template/'; plain variants take a path relative to builder/.
 async function fetchTextRel(path){
@@ -34,6 +49,31 @@ async function fetchBinary(absPath){
 let _loadedFileHandle = null;
 export function setLoadedHandle(h){ _loadedFileHandle = h || null; }
 export function getLoadedHandle(){ return _loadedFileHandle; }
+
+// Call before replacing the current course (open ZIP/JSON, folder switch,
+// "Neu"). Resolves true when it is safe to continue, false to abort.
+//  - nothing unsaved (no content, or saved since the last change): continue
+//  - course came from a ZIP file we can write to: save silently, continue
+//  - otherwise ask: save as SCORM-ZIP / discard / cancel
+export async function guardUnsavedCourse(){
+  if(!isCourseDirty() || !courseHasContent(state.course)) return true;
+  if(_loadedFileHandle){
+    if(await saveToLoadedHandle()) return true;
+    // Writing failed (e.g. permission denied): fall through to the dialog.
+  }
+  const choice = await choiceDialog({
+    title: t('io.unsaved.title'),
+    message: t('io.unsaved.message'),
+    choices: [
+      { id: 'cancel',  label: t('io.unsaved.cancel'),  kind: 'secondary' },
+      { id: 'discard', label: t('io.unsaved.discard'), kind: 'danger' },
+      { id: 'save',    label: t('io.unsaved.save'),    kind: 'primary' }
+    ]
+  });
+  if(choice === 'discard') return true;
+  if(choice === 'save') return await downloadZip();
+  return false;   // cancel / Esc / backdrop
+}
 
 // KaTeX bundle: shipped inside the SCORM ZIP for offline math rendering.
 const KATEX_FONTS = [
@@ -90,8 +130,8 @@ function buildIndexHtml(template, blockFiles, themeJson, tasksJson, localeFiles)
 }
 
 // Available runtime locales. Extend by adding new template/i18n/<code>.js
-// files and appending their codes here. Phase 6 will narrow this to the set
-// of locales that actually appear in the course content.
+// files and appending their codes here. The export packs only the ones that
+// appear in the course content (collectContentLocales).
 const RUNTIME_LOCALES = ['de', 'en'];
 function runtimeLocaleFiles(locales){
   return (locales || RUNTIME_LOCALES).map(code => 'i18n/' + code + '.js');
@@ -239,6 +279,11 @@ async function buildZip(){
     passThreshold: state.course.passThreshold,
     regenLockAfterCheck: !!state.course.regenLockAfterCheck,
     regenNoRegenerate: !!state.course.regenNoRegenerate,
+    lockAnswersAfterCheck: !!state.course.lockAnswersAfterCheck,
+    courseTimerEnabled: !!state.course.courseTimerEnabled,
+    courseTimerMinutes: Number(state.course.courseTimerMinutes) || 0,
+    courseTimerSeconds: Number(state.course.courseTimerSeconds) || 0,
+    ...globalVarExport(state.course),
     locales: runtimeLocales,
     defaultLocale,
     tasks: tasksWithPaths
@@ -343,12 +388,14 @@ function confirmExportWithIssues(report){
   });
 }
 
+// Returns true when the package was written (file picker) or handed to the
+// browser download; false when cancelled or failed.
 export async function downloadZip(){
   try {
     const report = validateCourse(state.course);
     if(report.issues.length || report.courseIssues.length){
       const proceed = await confirmExportWithIssues(report);
-      if(!proceed) return;
+      if(!proceed) return false;
     }
 
     const filename = sanitizeFilename(l(state.course.courseTitle, getDefaultLocale()) || 'scorm') + '.zip';
@@ -357,7 +404,7 @@ export async function downloadZip(){
 
     toast(t('io.toast.packageProgress', { percent: 0 }));
     const zip = await buildZip();
-    if(!zip) return;
+    if(!zip) return false;
     let lastPercent = -1;
     const blob = await zip.generateAsync({ type:'blob' }, (metadata) => {
       const p = metadata && typeof metadata.percent === 'number'
@@ -394,10 +441,12 @@ export async function downloadZip(){
         toast(t('io.toast.downloadReady', { filename }));
       }
     }
+    return true;
   } catch(err){
-    if(err && err.name === 'AbortError') return; // user cancelled the picker
+    if(err && err.name === 'AbortError') return false; // user cancelled the picker
     console.error(err);
     toast(t('toast.genericError', { msg: err.message }), 'error');
+    return false;
   }
 }
 
@@ -530,6 +579,11 @@ export async function loadZipFile(file, sourceHandle){
         passThreshold: cfg.passThreshold != null ? cfg.passThreshold : 0.5,
         regenLockAfterCheck: !!cfg.regenLockAfterCheck,
         regenNoRegenerate: !!cfg.regenNoRegenerate,
+        lockAnswersAfterCheck: !!cfg.lockAnswersAfterCheck,
+        courseTimerEnabled: !!cfg.courseTimerEnabled,
+        courseTimerMinutes: cfg.courseTimerMinutes != null ? Number(cfg.courseTimerMinutes) : 30,
+        courseTimerSeconds: Number(cfg.courseTimerSeconds) || 0,
+        ...globalVarExport(cfg),
         tasks
       });
     }
@@ -608,11 +662,16 @@ export async function showPreview(){
       passThreshold: state.course.passThreshold,
       regenLockAfterCheck: !!state.course.regenLockAfterCheck,
       regenNoRegenerate: !!state.course.regenNoRegenerate,
+      lockAnswersAfterCheck: !!state.course.lockAnswersAfterCheck,
+      courseTimerEnabled: !!state.course.courseTimerEnabled,
+      courseTimerMinutes: Number(state.course.courseTimerMinutes) || 0,
+      courseTimerSeconds: Number(state.course.courseTimerSeconds) || 0,
+      ...globalVarExport(state.course),
       locales: runtimeLocales,
       defaultLocale,
       tasks: state.course.tasks.map(t => {
         const clean = cleanTaskForExport(t);
-        return { id:t.id, title:t.title, ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
+        return { id:t.id, title:t.title, ...(t.pool ? { pool: t.pool } : {}), ...(clean.tabs ? { tabs: clean.tabs } : { blocks: clean.blocks }) };
       })
     });
     const previewTheme = Object.assign({}, state.theme);

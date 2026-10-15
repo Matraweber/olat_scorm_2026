@@ -1,5 +1,8 @@
-// welcome-pane.js: Welcome / help page. Hero, 5-step quickstart, layout
-// legend, block-type grid with live preview modal, tips, shortcuts, scrollspy.
+// welcome-pane.js: Welcome / help page. Hero, 5-step quickstart, video,
+// layout legend, block-type grid with live preview modal, canvas tips,
+// feature chapters (variables, grading, course settings, pools, templates,
+// saving, OLAT), languages, KaTeX examples, shortcuts; scrollable chapter
+// rail with scrollspy.
 import { el, escapeHtml, tProp } from './util.js';
 import { state, renderActivePane } from './state.js';
 import { renderTaskList } from './panes.js';
@@ -247,7 +250,63 @@ function renderWelcomePane(host){
   });
   tips.appendChild(tipsGrid);
 
-  // 05 Languages (UI language vs. per-field content language)
+  // Chapters made of tip cards plus an optional example box. Texts live
+  // under welcome.<prefix>: title, lead, <card>.title/.body, example.
+  const svg = d => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const ICONS = {
+    dice:   svg('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/>'),
+    globe:  svg('<circle cx="12" cy="12" r="9"/><path d="M3 12 L21 12 M12 3 C15 7 15 17 12 21 C9 17 9 7 12 3"/>'),
+    refresh: svg('<path d="M20 11 A8 8 0 1 0 18 17"/><path d="M20 5 L20 11 L14 11"/>'),
+    hash:   svg('<path d="M5 9 L19 9 M5 15 L19 15 M10 4 L8 20 M16 4 L14 20"/>'),
+    pie:    svg('<path d="M12 3 A9 9 0 1 0 21 12 L12 12 Z"/><path d="M14 3 A7 7 0 0 1 21 10 L14 10 Z"/>'),
+    minus:  svg('<circle cx="12" cy="12" r="9"/><path d="M8 12 L16 12"/>'),
+    repeat: svg('<path d="M4 9 L17 9 L14 6 M20 15 L7 15 L10 18"/>'),
+    bulb:   svg('<path d="M9 18 L15 18 M10 21 L14 21 M12 3 A6 6 0 0 0 8 13.5 C9 14.5 9 15.5 9 16 L15 16 C15 15.5 15 14.5 16 13.5 A6 6 0 0 0 12 3"/>'),
+    lock:   svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11 L8 7 A4 4 0 0 1 16 7 L16 11"/>'),
+    clock:  svg('<circle cx="12" cy="12" r="9"/><path d="M12 7 L12 12 L15 14"/>'),
+    sliders: svg('<path d="M4 6 L20 6 M4 12 L20 12 M4 18 L20 18"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="18" r="2"/>'),
+    flag:   svg('<path d="M5 21 L5 4 M5 4 L18 4 L15 8 L18 12 L5 12"/>'),
+    shuffle: svg('<path d="M3 7 L7 7 L15 17 L21 17 M3 17 L7 17 L9.5 14 M13 10 L15 7 L21 7 M18 4 L21 7 L18 10 M18 14 L21 17 L18 20"/>'),
+    play:   svg('<circle cx="12" cy="12" r="9"/><path d="M10 8 L16 12 L10 16 Z"/>'),
+    star:   svg('<path d="M12 3 L14.6 8.6 L20.6 9.2 L16 13.2 L17.4 19.2 L12 16 L6.6 19.2 L8 13.2 L3.4 9.2 L9.4 8.6 Z"/>'),
+    box:    svg('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9 L20 9 M9 4 L9 20"/>'),
+    browser: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9 L21 9"/>'),
+    file:   svg('<path d="M6 3 L14 3 L19 8 L19 21 L6 21 Z M14 3 L14 8 L19 8"/>'),
+    save:   svg('<path d="M5 3 L16 3 L20 7 L20 21 L5 21 Z M8 3 L8 9 L15 9 L15 3 M8 21 L8 14 L17 14 L17 21"/>'),
+    alert:  svg('<path d="M12 3 L22 20 L2 20 Z M12 10 L12 14 M12 17 L12 17.5"/>'),
+    image:  svg('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16 L15 11 L5 19"/>'),
+    bar:    svg('<rect x="3" y="10" width="18" height="4" rx="2"/><path d="M3 12 L12 12"/>'),
+    pause:  svg('<circle cx="12" cy="12" r="9"/><path d="M10 9 L10 15 M14 9 L14 15"/>'),
+    send:   svg('<path d="M3 11 L21 3 L14 21 L11 13 Z"/>'),
+    check:  svg('<circle cx="12" cy="12" r="9"/><path d="M8 12 L11 15 L16 9"/>')
+  };
+  function cardChapter(prefix, cards, opts){
+    const body = chapter(t('welcome.' + prefix + '.title'));
+    body.appendChild(el('p', {className:'welcome-lead', html: t('welcome.' + prefix + '.lead')}));
+    const grid = el('div', {className:'welcome-tips-grid'});
+    cards.forEach(([key, icon]) => {
+      const card = el('div', {className:'welcome-tip-card'});
+      card.innerHTML =
+        '<div class="welcome-tip-icon">' + ICONS[icon] + '</div>' +
+        '<div class="welcome-tip-title">' + t('welcome.' + prefix + '.' + key + '.title') + '</div>' +
+        '<div class="welcome-tip-body">' + t('welcome.' + prefix + '.' + key + '.body') + '</div>';
+      grid.appendChild(card);
+    });
+    body.appendChild(grid);
+    if(opts && opts.example) body.appendChild(el('div', {className:'welcome-example', html: t('welcome.' + prefix + '.example')}));
+    return body;
+  }
+
+  // 05–11 Didactic features and working with the finished unit
+  cardChapter('variables', [['local', 'dice'], ['global', 'globe'], ['regen', 'refresh'], ['format', 'hash']], { example: true });
+  cardChapter('scoring', [['partial', 'pie'], ['deduct', 'minus'], ['attempts', 'repeat'], ['help', 'bulb'], ['locks', 'lock'], ['timer', 'clock']], { example: true });
+  cardChapter('courseSettings', [['inherit', 'sliders'], ['threshold', 'flag']]);
+  cardChapter('pools', [['setup', 'shuffle'], ['run', 'play']], { example: true });
+  cardChapter('templates', [['task', 'star'], ['block', 'box'], ['storage', 'browser']]);
+  cardChapter('saving', [['zip', 'file'], ['autosave', 'save'], ['guard', 'alert'], ['images', 'image']]);
+  cardChapter('lms', [['progress', 'bar'], ['resume', 'pause'], ['report', 'send'], ['finish', 'check']]);
+
+  // Languages (UI language vs. per-field content language)
   const langs = chapter(t('welcome.languages.title'));
   langs.appendChild(el('p', {className:'welcome-lead', text: t('welcome.languages.lead')}));
   const langGrid = el('div', {className:'welcome-tips-grid'});
@@ -282,7 +341,50 @@ function renderWelcomePane(host){
   });
   langs.appendChild(langGrid);
 
-  // 06 Keyboard shortcuts
+  // Formulas with KaTeX: input next to the rendered result, tips, and a
+  // link to KaTeX's list of supported commands.
+  const katexCh = chapter(t('welcome.katex.title'));
+  katexCh.appendChild(el('p', {className:'welcome-lead', html: t('welcome.katex.lead')}));
+  const bs = String.fromCharCode(92);
+  const katexTable = el('table', {className:'welcome-katex-table'});
+  const kHead = el('tr');
+  [t('welcome.katex.colInput'), t('welcome.katex.colResult'), t('welcome.katex.colNote')]
+    .forEach(h => kHead.appendChild(el('th', {text: h})));
+  katexTable.appendChild(kHead);
+  // Only the variables row shows sample values for {a}/{b}; elsewhere the
+  // letters stay letters (with real variables a, b in a block, {a} inside
+  // \frac{a}{b} would be replaced too, see the tip below).
+  const sampleVars = { a: 3, b: 4 };
+  [
+    ['$' + bs + 'frac{a}{b}$',                          t('welcome.katex.ex.fraction')],
+    ['$x^2 + F_{x}$',                                    t('welcome.katex.ex.scripts')],
+    ['$' + bs + 'sqrt{a^2 + b^2}$',                     t('welcome.katex.ex.sqrt')],
+    ['$' + bs + 'alpha = 30^' + bs + 'circ$',           t('welcome.katex.ex.greek')],
+    ['$M = F ' + bs + 'cdot l$',                         t('welcome.katex.ex.cdot')],
+    ['$' + bs + 'vec{F}_{' + bs + 'text{Lager}}$',      t('welcome.katex.ex.text')],
+    ['$A = {a} ' + bs + 'cdot {b}$',                     t('welcome.katex.ex.variables'), true],
+    ['$$' + bs + 'sum_{i=1}^{n} F_i = 0$$',              t('welcome.katex.ex.display')]
+  ].forEach(([src, note, withVars]) => {
+    const tr = el('tr');
+    tr.appendChild(el('td', {className:'welcome-katex-src', html: '<code>' + escapeHtml(src) + '</code>'}));
+    const out = el('td', {className:'welcome-katex-out',
+      text: withVars && window.BlockUtils ? window.BlockUtils.fillMathTemplate(src, sampleVars) : src});
+    tr.appendChild(out);
+    tr.appendChild(el('td', {text: note}));
+    katexTable.appendChild(tr);
+  });
+  katexCh.appendChild(katexTable);
+  if(window.BlockUtils && typeof window.BlockUtils.renderMath === 'function') window.BlockUtils.renderMath(katexTable);
+  const katexTips = el('ul', {className:'welcome-katex-tips'});
+  ['umlauts', 'varsInMath', 'dollar', 'check'].forEach(k => katexTips.appendChild(el('li', {html: t('welcome.katex.tip.' + k)})));
+  katexCh.appendChild(katexTips);
+  const katexLink = el('p', {className:'welcome-hint'});
+  katexLink.appendChild(document.createTextNode(t('welcome.katex.linkIntro') + ' '));
+  katexLink.appendChild(el('a', {text: t('welcome.katex.linkText'),
+    attrs:{href:'https://katex.org/docs/supported', target:'_blank', rel:'noopener noreferrer'}}));
+  katexCh.appendChild(katexLink);
+
+  // Keyboard shortcuts
   const shortcuts = chapter(t('welcome.shortcuts.title'));
   shortcuts.appendChild(el('p', {className:'welcome-lead', text: t('welcome.shortcuts.lead')}));
   const kbdTable = el('table', {className:'welcome-kbd-table'});
@@ -297,6 +399,8 @@ function renderWelcomePane(host){
     ['Esc',                                        t('welcome.shortcuts.deselect')],
     [t('welcome.shortcuts.keyCtrl') + ' + Z',      t('welcome.shortcuts.undo')],
     [t('welcome.shortcuts.keyCtrl') + ' + Shift+Z',t('welcome.shortcuts.redo')],
+    [t('welcome.shortcuts.keyCtrl') + ' + S',      t('welcome.shortcuts.save')],
+    [t('welcome.shortcuts.keyCtrl') + ' + Shift+S',t('welcome.shortcuts.saveAs')],
     [t('welcome.shortcuts.keyCtrl') + ' + ' + t('welcome.shortcuts.keyWheel'), t('welcome.shortcuts.zoom')]
   ].forEach(([k, d]) => {
     const tr = el('tr');
@@ -351,6 +455,15 @@ function setupWelcomeScrollSpy(chapters, railList){
       const ci = parseInt(li.dataset.chapterIdx, 10);
       li.querySelector('.welcome-rail-link')?.classList.toggle('is-active', ci === idx);
     });
+    // Keep the active entry visible when the rail itself scrolls (only the
+    // rail moves; scrollIntoView would scroll the page as well).
+    const railEl = railList.closest('.welcome-rail');
+    const active = railEl && railEl.querySelector('.welcome-rail-link.is-active');
+    if(active && railEl.scrollHeight > railEl.clientHeight){
+      const a = active.getBoundingClientRect(), r = railEl.getBoundingClientRect();
+      if(a.top < r.top + 24) railEl.scrollTop -= (r.top + 24 - a.top);
+      else if(a.bottom > r.bottom - 24) railEl.scrollTop += (a.bottom - r.bottom + 24);
+    }
   }
 
   const progressBar = document.querySelector('.welcome-progress-bar');

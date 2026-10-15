@@ -1,8 +1,7 @@
 // folder-browser.js: Header dropdown listing .zip files in a picked folder.
 // Chromium uses FS Access API; Firefox/Safari fall back to <input webkitdirectory>.
 import { el, toast } from './util.js';
-import { loadZipFile, getLoadedHandle, saveToLoadedHandle } from './io.js';
-import { isCourseDirty } from './state.js';
+import { loadZipFile, guardUnsavedCourse } from './io.js';
 import { t, getLocale } from './i18n.js';
 
 // Tree node: { name, kind:'dir'|'file', handle?, file?, path, parent, children?, expanded? }
@@ -258,13 +257,10 @@ async function openFileEntry(entry){
       toast(t('folder.toast.fileReadFailed'), 'error');
       return;
     }
-    // Before switching units, write the currently-loaded unit back to its own
-    // file so unsaved edits are not lost when a different one is loaded over
-    // them. Only when something actually changed and it is a different file.
-    const current = getLoadedHandle();
-    if(current && current !== handle && isCourseDirty()){
-      await saveToLoadedHandle();
-    }
+    // Before switching units, protect unsaved edits: a unit loaded from a ZIP
+    // is written back to its file; a never-exported unit asks save/discard/
+    // cancel (it would otherwise be lost, autosave has only one slot).
+    if(!(await guardUnsavedCourse())) return;
     // Pass the handle along so Ctrl+S can overwrite this file later.
     await loadZipFile(file, handle);
     // Re-scan so renames/deletions in the folder are reflected on open.

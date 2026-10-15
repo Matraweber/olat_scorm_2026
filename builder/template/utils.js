@@ -1,6 +1,8 @@
 // utils.js: Helpers passed into every block's mount() as `api.utils`.
 // DOM/SVG builders, number/angle parsing, safe expression evaluator,
-// question-card layouts, renderPlane, feedbackBox, KaTeX renderMath.
+// question-card layouts, renderPlane, feedbackBox, KaTeX renderMath,
+// variable display (fillMathTemplate, varFormats), global variables,
+// deduction helpers, i18n (t/l, locale bundles).
 (function(){
   'use strict';
   if(window.BlockUtils) return;
@@ -146,13 +148,46 @@
       const m = Math.pow(10, decimals);
       return Math.round(value * m) / m;
     },
-    // LaTeX -> ASCII conversion for formula derivation. Handles \frac, \sqrt,
-    // \cdot, \times, \div, \pi, \left/\right. \frac wraps in outer parens so
-    // fraction-division compositions evaluate correctly.
+    // LaTeX -> ASCII conversion for formula derivation. Handles \frac (also
+    // \dfrac, \tfrac), \sqrt, \cdot, \times, \div, \pi, \left/\right. \frac
+    // wraps in outer parens so fraction-division compositions evaluate
+    // correctly. Arguments are read brace-balanced, so nested groups work:
+    // \frac{{a}}{{b}}, \frac{\frac{a}{b}}{c}, \sqrt{\frac{a}{b}}.
     latexToAscii(str){
-      return String(str || '')
-        .replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))')
-        .replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)')
+      function conv(s){
+        let out = '', i = 0;
+        while(i < s.length){
+          const rest = s.slice(i);
+          const mf = rest.match(/^\\[dt]?frac\s*/);
+          if(mf){
+            const j = i + mf[0].length;
+            const g1 = s[j] === '{' ? _readBraceGroup(s, j) : null;
+            if(g1){
+              let k = g1.end + 1;
+              while(s[k] === ' ') k++;
+              const g2 = s[k] === '{' ? _readBraceGroup(s, k) : null;
+              if(g2){
+                out += '((' + conv(g1.content) + ')/(' + conv(g2.content) + '))';
+                i = g2.end + 1;
+                continue;
+              }
+            }
+          }
+          const ms = rest.match(/^\\sqrt\s*/);
+          if(ms){
+            const j = i + ms[0].length;
+            const g = s[j] === '{' ? _readBraceGroup(s, j) : null;
+            if(g){
+              out += 'sqrt(' + conv(g.content) + ')';
+              i = g.end + 1;
+              continue;
+            }
+          }
+          out += s[i++];
+        }
+        return out;
+      }
+      return conv(String(str || ''))
         .replace(/\\cdot/g, '*')
         .replace(/\\times/g, '*')
         .replace(/\\div/g, '/')
@@ -189,9 +224,46 @@
       const source = candidates.length ? candidates : arr;
       return source[Math.floor(Math.random() * source.length)];
     },
+    // Angle unit for a formula: unless angleUnit === 'rad', sin/cos/tan and
+    // asin/acos/atan become their degree variants (sind, …) so sin(30) = 0.5.
+    // Explicit sind()/sin() spellings elsewhere are left alone.
+    applyAngleUnit(expr, angleUnit){
+      // arcsin/arccos/arctan are aliases of asin/acos/atan.
+      const s = utils.normalizeArcFns(expr);
+      return angleUnit === 'rad' ? s : s.replace(/\b(asin|acos|atan|sin|cos|tan)(\s*\()/g, '$1d$2');
+    },
+    normalizeArcFns(expr){
+      return String(expr || '').replace(/\barc(sin|cos|tan)(d?)\b/g, 'a$1$2');
+    },
+    // "Nur ganzzahlige Lösungen": blocks redraw their random values until
+    // every computed solution is a whole number. opts: { showIf, helpKey }
+    // (the help text says which solutions count in that block).
+    integerAnswersSchemaField(opts){
+      opts = opts || {};
+      const spec = { key:'integerAnswers', label:'Nur ganzzahlige Lösungen', labelKey:'utils.integerAnswers.label', type:'boolean',
+        help:'Es werden nur Aufgaben gestellt, deren Lösungen ganze Zahlen sind.', helpKey: opts.helpKey || 'utils.integerAnswers.help' };
+      if(opts.showIf) spec.showIf = opts.showIf;
+      return spec;
+    },
+    isWholeNumber(v){
+      return typeof v === 'number' && Number.isFinite(v) && Math.abs(v - Math.round(v)) < 1e-9;
+    },
+    // Shared builder field for blocks with formulas (default: degrees).
+    angleUnitSchemaField(showIf){
+      const spec = { key:'angleUnit', label:'Winkel in Formeln', labelKey:'utils.angleUnit.label', type:'select',
+        help:'Gilt für sin, cos, tan, arcsin, arccos, arctan (= asin, acos, atan). sind(), cosd() … rechnen immer in Grad.', helpKey:'utils.angleUnit.help',
+        options:[
+          { value:'deg', label:'Grad (°), z. B. sin(30) = 0,5',        labelKey:'utils.angleUnit.deg' },
+          { value:'rad', label:'Bogenmaß (rad), z. B. sin(pi/6) = 0,5', labelKey:'utils.angleUnit.rad' }
+        ] };
+      if(showIf) spec.showIf = showIf;
+      return spec;
+    },
     safeMathExpr(expr, vars){
       const allowedFns = ['sin','cos','tan','asin','acos','atan','atan2','sinh','cosh','tanh','exp','log','log2','log10','sqrt','abs','floor','ceil','round','pow','min','max','sign'];
-      let s = String(expr || '').replace(/,/g, '.');
+      // Degree variants (sind(30) = 0.5, asind(0.5) = 30), passed in as __deg.
+      const degFns = ['sind','cosd','tand','asind','acosd','atand'];
+      let s = utils.normalizeArcFns(expr).replace(/,/g, '.');
       if(!s.trim()) return null;
       // Implicit "*": "2pi" -> "2*pi", but leave "sin(x)" alone.
       // Iterate until stable so neighbouring patterns chain ("2 pi r" -> "2*pi*r").
@@ -207,17 +279,32 @@
       const varNames = Object.keys(vars || {});
       const tokens = s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
       for(const t of tokens){
-        if(!(allowedFns.includes(t) || varNames.includes(t) || t === 'pi' || t === 'e' || t === 'PI' || t === 'E')) return null;
+        if(!(allowedFns.includes(t) || degFns.includes(t) || varNames.includes(t) || t === 'pi' || t === 'e' || t === 'PI' || t === 'E')) return null;
       }
       // Constants via placeholders so we don't re-match "PI" inside "(Math.PI)".
-      let body = s.replace(/\b(?:pi|PI)\b/g, '__PI__')
-                  .replace(/\b(?:e|E)\b/g, '__E__')
-                  .replace(/__PI__/g, '(Math.PI)')
-                  .replace(/__E__/g, '(Math.E)');
+      // A variable with the same name wins: with a variable e, "6/e" divides
+      // by that variable, not by Euler's number (likewise E, pi, PI).
+      const constRe = names => {
+        const free = names.filter(n => !varNames.includes(n));
+        return free.length ? new RegExp('\\b(?:' + free.join('|') + ')\\b', 'g') : null;
+      };
+      const piRe = constRe(['pi', 'PI']), eRe = constRe(['e', 'E']);
+      let body = s;
+      if(piRe) body = body.replace(piRe, '__PI__');
+      if(eRe)  body = body.replace(eRe, '__E__');
+      body = body.replace(/__PI__/g, '(Math.PI)').replace(/__E__/g, '(Math.E)');
       allowedFns.forEach(fn => { body = body.replace(new RegExp('\\b' + fn + '\\b', 'g'), 'Math.' + fn); });
+      degFns.forEach(fn => { body = body.replace(new RegExp('\\b' + fn + '\\b', 'g'), '__deg.' + fn); });
+      const R = Math.PI / 180;
+      // Snap tiny float noise so e.g. cosd(90) is exactly 0, not 6e-17.
+      const clean = v => Math.abs(v) < 1e-12 ? 0 : v;
+      const __deg = {
+        sind: x => clean(Math.sin(x * R)), cosd: x => clean(Math.cos(x * R)), tand: x => clean(Math.tan(x * R)),
+        asind: x => Math.asin(x) / R, acosd: x => Math.acos(x) / R, atand: x => Math.atan(x) / R
+      };
       try {
-        const fn = new Function(...varNames, '"use strict"; return (' + body + ');');
-        const r = fn(...varNames.map(v => vars[v]));
+        const fn = new Function('__deg', ...varNames, '"use strict"; return (' + body + ');');
+        const r = fn(__deg, ...varNames.map(v => vars[v]));
         return Number.isFinite(r) ? r : null;
       } catch { return null; }
     },
@@ -227,10 +314,16 @@
       const text = utils.el('div', {className: 'formula-text', text: utils.t('feedback.initial')});
       box.appendChild(title); box.appendChild(text);
       host.appendChild(box);
+      // Messages may quote labels/solutions containing $…$ (e.g. an answer
+      // prefix "$x_1 =$"), so typeset them like the rest of the block.
+      const setMsg = msg => {
+        text.textContent = msg;
+        if(/\$|\\\(|\\\[/.test(String(msg))) utils.renderMath(text);
+      };
       return {
-        ok(msg){ box.classList.remove('feedback-bad'); box.classList.add('feedback-good'); text.textContent = msg; },
-        bad(msg){ box.classList.remove('feedback-good'); box.classList.add('feedback-bad'); text.textContent = msg; },
-        neutral(msg){ box.classList.remove('feedback-good','feedback-bad'); text.textContent = msg; }
+        ok(msg){ box.classList.remove('feedback-bad'); box.classList.add('feedback-good'); setMsg(msg); },
+        bad(msg){ box.classList.remove('feedback-good'); box.classList.add('feedback-bad'); setMsg(msg); },
+        neutral(msg){ box.classList.remove('feedback-good','feedback-bad'); setMsg(msg); }
       };
     },
     // Standard card: text input + check/regenerate. Returns { card, qText, inp, checkBtn, newBtn, fb }.
@@ -522,6 +615,331 @@
       const queue = _mathRetryQueue.splice(0);
       queue.forEach(el => { if(el.isConnected) _runMathRenderOn(el); });
     }, 100);
+  };
+
+  // ---- Variable placeholders in display text ------------------------------
+  // fillMathTemplate("Seite $a = {a}$", {a: 3}) -> "Seite $a = {3}$".
+  // Shared by blocks that show random variables in text (numeric input,
+  // composition). Rules:
+  //  - Inside $…$ the braces are kept ({a} -> {12}), so LaTeX arguments stay
+  //    intact: \frac{a}{b} -> \frac{12}{16}, x^{a} -> x^{12}.
+  //  - Clean fractions with a small denominator show as "3/7", otherwise a
+  //    value is rounded to 2 decimals.
+  //  - After an operator a negative value is wrapped: a · (-3), and inside
+  //    \frac the minus is moved in front of the bar (see fracMinusOut).
+  //  - Names without a variable ({x} for an unknown x) and numbered slots
+  //    ({1}) are left untouched.
+  function _readBraceGroup(s, i){
+    let depth = 0;
+    for(let k = i; k < s.length; k++){
+      if(s[k] === '{') depth++;
+      else if(s[k] === '}'){ depth--; if(depth === 0) return { content: s.slice(i + 1, k), end: k }; }
+    }
+    return null;
+  }
+  // Normalize the sign of a fraction so it sits in front of the bar:
+  //   \frac{-3}{7} -> -\frac{3}{7}      (negative numerator)
+  //   \frac{3}{-7} -> -\frac{3}{7}      (negative denominator)
+  //   \frac{-3}{-7} -> \frac{3}{7}      (both negative cancel; never "--")
+  // Only plain negative numbers/fractions are pulled; compound parts like
+  // \frac{a-b}{c} are left untouched (the sign is not just a unary minus).
+  utils.fracMinusOut = function(tex){
+    let out = '', i = 0;
+    while(i < tex.length){
+      if(tex.startsWith('\\frac', i)){
+        let j = i + 5;
+        while(j < tex.length && tex[j] === ' ') j++;
+        if(tex[j] === '{'){
+          const num = _readBraceGroup(tex, j);
+          if(num){
+            let k = num.end + 1;
+            while(k < tex.length && tex[k] === ' ') k++;
+            if(tex[k] === '{'){
+              const den = _readBraceGroup(tex, k);
+              if(den){
+                const NUMRE = /^-?(\d+(\.\d+)?|\d+\/\d+)$/; // signed plain number/fraction
+                const numBare = num.content.replace(/[{}\s]/g, '');
+                const denBare = den.content.replace(/[{}\s]/g, '');
+                const numIsNum = NUMRE.test(numBare);
+                const denIsNum = NUMRE.test(denBare);
+                const numNeg = numIsNum && numBare[0] === '-';
+                const denNeg = denIsNum && denBare[0] === '-';
+                if(numNeg || denNeg){
+                  const newNum = numIsNum ? numBare.replace('-', '') : num.content;
+                  const newDen = denIsNum ? denBare.replace('-', '') : den.content;
+                  // One side negative -> minus in front; both negative cancel
+                  // to a positive fraction (avoids a leading "--").
+                  const sign = (numNeg !== denNeg) ? '-' : '';
+                  const frac = '\\frac{' + newNum + '}{' + newDen + '}';
+                  // Wrap a negative fraction in parens when it sits next to a
+                  // binary operator on EITHER side ("a + (-3/7)", "(-3/7) + a").
+                  const before = out.replace(/\s+$/, '');
+                  const rest = tex.slice(den.end + 1).replace(/^\s+/, '');
+                  const precededByOp = /[+\-*/:·×÷^]$/.test(before) || /\\(cdot|times|div)$/.test(before);
+                  const followedByOp = /^[+\-*/:·×÷^]/.test(rest) || /^\\(cdot|times|div)\b/.test(rest);
+                  if(sign === '-' && (precededByOp || followedByOp)){
+                    out += '\\left(-' + frac + '\\right)';
+                  } else {
+                    out += sign + frac;
+                  }
+                  i = den.end + 1;
+                  continue;
+                }
+              }
+            }
+          }
+        }
+      }
+      out += tex[i++];
+    }
+    return out;
+  };
+  // ---- Deduction for wrong answers (shared by several graded blocks) --------
+  // cfg.penalizeWrong: on/off (unset -> defaultOn). cfg.penaltyPoints: points
+  // per wrong answer; '' / unset = the value of one correct answer
+  // (perCorrect). The total never drops below 0; unanswered items cost 0.
+  utils.penaltyOn = function(cfg, defaultOn){
+    return (cfg && cfg.penalizeWrong != null) ? !!cfg.penalizeWrong : !!defaultOn;
+  };
+  utils.penaltyPerWrong = function(cfg, perCorrect, defaultOn){
+    if(!utils.penaltyOn(cfg, defaultOn)) return 0;
+    const raw = cfg && cfg.penaltyPoints;
+    const p = Number(raw);
+    return (raw === '' || raw == null || !Number.isFinite(p)) ? perCorrect : Math.max(0, p);
+  };
+  // earned - wrong * penalty, clamped to [0, maxPts], rounded to 2 decimals.
+  utils.scoreWithPenalty = function(earned, wrongCount, penalty, maxPts){
+    const v = Math.min(maxPts, Math.max(0, earned - (wrongCount || 0) * (penalty || 0)));
+    return Math.round(v * 100) / 100;
+  };
+  // Builder fields: on/off + amount. opts: { showIf, helpKey, help } (the
+  // help text says what counts as a wrong answer in that block).
+  utils.penaltySchemaFields = function(opts){
+    opts = opts || {};
+    const base = opts.showIf || (() => true);
+    return [
+      { key:'penalizeWrong', label:'Punkte für falsche Antworten abziehen', labelKey:'utils.penalty.label', type:'boolean', showIf: base,
+        help: opts.help || 'Jede falsche Antwort zieht Punkte ab; die Gesamtpunktzahl fällt nie unter 0. Offen Gelassenes zählt 0.',
+        helpKey: opts.helpKey || 'utils.penalty.help' },
+      { key:'penaltyPoints', label:'Abzug pro falscher Antwort (Punkte)', labelKey:'utils.penalty.pointsLabel', type:'number', step:0.25, min:0,
+        placeholder:'leer = so viel wie eine richtige Antwort bringt', placeholderKey:'utils.penalty.pointsPlaceholder',
+        showIf: c => base(c) && utils.penaltyOn(c, opts.defaultOn),
+        help:'Leer lassen: Abzug entspricht dem Wert einer richtigen Antwort.', helpKey:'utils.penalty.pointsHelp' }
+    ];
+  };
+
+  // ---- Random variables: decimals + display --------------------------------
+  // Block config: decimals (default 2), valueDisplay ('auto' | 'decimal' |
+  // 'fraction', default 'auto'). Each variable may override both with its own
+  // decimals / display ('' or missing = like the block).
+  //   auto     -> clean fraction if the denominator is small (1/2, 3/7), else decimal
+  //   decimal  -> always a decimal number (rounded to the variable's decimals)
+  //   fraction -> always a reduced fraction (0.35 -> 7/20)
+  utils.VAR_DISPLAYS = ['auto', 'decimal', 'fraction'];
+  utils.varDecimals = function(v, cfg){
+    const pick = x => (x === '' || x == null || !Number.isFinite(Number(x))) ? null : Number(x);
+    const d = pick(v && v.decimals) ?? pick(cfg && cfg.decimals) ?? 2;
+    return Math.max(0, Math.min(6, Math.round(d)));
+  };
+  // defaultDisplay: what "unset" means for a block (blocks that never showed
+  // fractions use 'decimal' so their existing tasks stay unchanged).
+  utils.varDisplay = function(v, cfg, defaultDisplay){
+    const d = (v && v.display) || (cfg && cfg.valueDisplay) || defaultDisplay || 'auto';
+    return utils.VAR_DISPLAYS.includes(d) ? d : 'auto';
+  };
+  // Round a freshly drawn value: whole number, or the variable's decimals.
+  utils.roundVarValue = function(val, isInteger, v, cfg){
+    if(isInteger) return Math.round(val);
+    const f = Math.pow(10, utils.varDecimals(v, cfg));
+    return Math.round(val * f) / f;
+  };
+  // { name: { decimals, display } } for fillMathTemplate.
+  // Global variables not shadowed by a block variable are included.
+  utils.varFormats = function(variables, cfg, defaultDisplay){
+    const out = {};
+    (variables || []).forEach(v => {
+      if(v && v.name) out[v.name] = { decimals: utils.varDecimals(v, cfg), display: utils.varDisplay(v, cfg, defaultDisplay) };
+    });
+    globalVarDefs.forEach(v => {
+      if(!(v.name in out)) out[v.name] = { decimals: utils.varDecimals(v, globalVarCfg), display: utils.varDisplay(v, globalVarCfg, defaultDisplay) };
+    });
+    return out;
+  };
+
+  // ---- Global (course-wide) variables --------------------------------------
+  // Defined in the course settings with the same fields as block variables
+  // (name, min, max, integer, decimals, display); course-level defaults in
+  // { decimals, valueDisplay }. The runtime draws one set of values per
+  // attempt and hands it in via setGlobalVarValues; every block with
+  // variables sees them as extra variables. A block variable with the same
+  // name wins over the global one.
+  let globalVarDefs = [];
+  let globalVarCfg = {};
+  let globalVarValues = {};
+  const VAR_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  utils.setGlobalVarDefs = function(defs, cfg){
+    globalVarDefs = (Array.isArray(defs) ? defs : []).filter(v => v && VAR_NAME_RE.test(String(v.name || '')));
+    globalVarCfg = cfg || {};
+  };
+  utils.globalVarDefs = function(){ return globalVarDefs.slice(); };
+  utils.globalVarNames = function(){ return globalVarDefs.map(v => v.name); };
+  // One random set of values (uses Math.random, so the runtime can seed it).
+  utils.genGlobalVarValues = function(){
+    const out = {};
+    globalVarDefs.forEach(v => {
+      const lo = Number(v.min), hi = Number(v.max);
+      const a = Number.isFinite(lo) ? lo : 1, b = Number.isFinite(hi) ? hi : 10;
+      out[v.name] = utils.roundVarValue(a + Math.random() * (b - a), !!v.integer, v, globalVarCfg);
+    });
+    return out;
+  };
+  utils.setGlobalVarValues = function(values){ globalVarValues = Object.assign({}, values || {}); };
+  utils.globalVarValues = function(){ return Object.assign({}, globalVarValues); };
+  // A block's variables plus the global ones it does not define itself.
+  // globals: optional explicit values (builder checks draw their own samples).
+  utils.withGlobalVars = function(vars, localDefs, globals){
+    const g = globals || globalVarValues;
+    const local = new Set((localDefs || []).map(v => v && v.name).filter(Boolean));
+    const out = {};
+    Object.keys(g).forEach(k => { if(!local.has(k)) out[k] = g[k]; });
+    return Object.assign(out, vars || {});
+  };
+  // Names of the global variables a block config uses: a {name} placeholder
+  // in any text, or the bare name in a formula (keys containing "formula" /
+  // "expr"). Variables the block defines itself shadow the global ones.
+  utils.globalVarsUsedBy = function(config, defs){
+    const names = (defs || globalVarDefs).map(v => v && v.name).filter(n => n && VAR_NAME_RE.test(n));
+    if(!names.length || !config || typeof config !== 'object') return [];
+    const local = new Set((config.variables || []).map(v => v && v.name).filter(Boolean));
+    const texts = [], formulas = [];
+    (function walk(o, key){
+      if(typeof o === 'string'){
+        texts.push(o);
+        if(/formula|expr/i.test(key)) formulas.push(o);
+      } else if(Array.isArray(o)){
+        o.forEach(x => walk(x, key));
+      } else if(o && typeof o === 'object'){
+        // Localized wrappers ({de, en}) keep the key of their field.
+        const isI18n = o.__i18n === true;
+        Object.keys(o).forEach(k => { if(k !== 'variables') walk(o[k], isI18n ? key : k); });
+      }
+    })(config, '');
+    const textAll = texts.join('\n'), formulaAll = formulas.join('\n');
+    return names.filter(n => {
+      if(local.has(n)) return false;
+      if(new RegExp('\\{\\s*' + n + '\\s*\\}').test(textAll)) return true;
+      return new RegExp('(^|[^A-Za-z0-9_\\\\])' + n + '(?![A-Za-z0-9_])').test(formulaAll);
+    });
+  };
+  // A number as text per { decimals, display } (see VAR_DISPLAYS above).
+  utils.formatVarValue = function(v, fmt){
+    fmt = fmt || {};
+    const dec = fmt.decimals != null ? fmt.decimals : 2;
+    const display = fmt.display || 'auto';
+    const asDecimal = x => { const f = Math.pow(10, dec); return String(Math.round(x * f) / f); };
+    // Exact fraction of a value with `dec` decimals: 0.35 -> 7/20.
+    const exactFraction = x => {
+      const p = Math.pow(10, Math.max(dec, 1));
+      const n = Math.round(x * p);
+      const g = utils.gcd(Math.abs(n), p);
+      return { num: n / g, den: p / g };
+    };
+    if(Number.isInteger(v)) return String(v);
+    if(display === 'decimal') return asDecimal(v);
+    // 'fraction': always; 'auto': only clean small denominators (1/2, 3/7),
+    // which avoids artefacts like 43/100 from 2-decimal rounding.
+    const frac = display === 'fraction' ? (utils.asFraction(v, 20) || exactFraction(v)) : utils.asFraction(v);
+    if(frac && Math.abs(frac.den) > 1 && (display === 'fraction' || Math.abs(frac.den) <= 20)){
+      return (frac.num < 0 ? '-' : '') + Math.abs(frac.num) + '/' + frac.den;
+    }
+    return asDecimal(v);
+  };
+  // Builder fields for the block-level defaults (shared by all blocks with
+  // random variables). Variables override them via varItemFormatFields().
+  // opts: { showIf, defaultDisplay, noDisplay } (noDisplay: decimals only).
+  utils.varFormatSchemaFields = function(opts){
+    opts = typeof opts === 'function' ? { showIf: opts } : (opts || {});
+    const displayOpts = [
+      { value:'auto',     label:'Automatisch (einfacher Bruch, sonst Kommazahl)', labelKey:'utils.varFormat.display.auto' },
+      { value:'decimal',  label:'Immer als Kommazahl (z. B. 0.75)',              labelKey:'utils.varFormat.display.decimal' },
+      { value:'fraction', label:'Immer als Bruch (z. B. 3/4)',                   labelKey:'utils.varFormat.display.fraction' }
+    ];
+    // The select shows its first option while the value is unset, so the
+    // block's default goes first.
+    const def = opts.defaultDisplay || 'auto';
+    displayOpts.sort((a, b) => (b.value === def) - (a.value === def));
+    const f = [
+      { key:'decimals', label:'Nachkommastellen (Zufallszahlen)', labelKey:'utils.varFormat.decimals.label', type:'number', step:1, min:0, max:6,
+        placeholder:'2', help:'Wie viele Nachkommastellen nicht-ganzzahlige Variablen erhalten (0–6). Einzelne Variablen können abweichen.', helpKey:'utils.varFormat.decimals.help' }
+    ];
+    if(!opts.noDisplay) f.push(
+      { key:'valueDisplay', label:'Darstellung von Kommazahlen', labelKey:'utils.varFormat.display.label', type:'select',
+        help:'Wie nicht-ganzzahlige Variablen im Text erscheinen. Einzelne Variablen können abweichen.', helpKey:'utils.varFormat.display.help',
+        options: displayOpts });
+    if(opts.showIf) f.forEach(x => { x.showIf = opts.showIf; });
+    return f;
+  };
+  // Per-variable overrides (list itemSchema). isInt(item) hides them for
+  // whole-number variables. opts.noDisplay: decimals only.
+  utils.varItemFormatFields = function(isInt, opts){
+    const notInt = item => !isInt(item);
+    const f = [
+      { key:'decimals', label:'Nachkommastellen (leer = wie Aufgabe)', labelKey:'utils.varFormat.item.decimals.label', type:'number', step:1, min:0, max:6, default:'', showIf: notInt }
+    ];
+    if(!(opts && opts.noDisplay)) f.push(
+      { key:'display', label:'Darstellung', labelKey:'utils.varFormat.item.display.label', type:'select', showIf: notInt,
+        options: [
+          { value:'',         label:'Wie Aufgabe',        labelKey:'utils.varFormat.item.display.inherit' },
+          { value:'auto',     label:'Automatisch',        labelKey:'utils.varFormat.item.display.auto' },
+          { value:'decimal',  label:'Kommazahl',          labelKey:'utils.varFormat.item.display.decimal' },
+          { value:'fraction', label:'Bruch',              labelKey:'utils.varFormat.item.display.fraction' }
+        ] });
+    return f;
+  };
+
+  // formats: optional { name: { decimals, display } } from varFormats().
+  // Without it the previous behaviour applies (auto, 2 decimals).
+  utils.fillMathTemplate = function(tpl, vars, formats){
+    vars = vars || {};
+    formats = formats || {};
+    function formatValue(v, wrapNeg, name){
+      let s = utils.formatVarValue(v, formats[name]);
+      // After a multiplicative, divisive or power operator a negative value
+      // is wrapped so the sign stays glued to the number: a · (-3/7).
+      if(wrapNeg && v < 0) s = '(' + s + ')';
+      return s;
+    }
+    // True when the placeholder follows a binary operator.
+    function shouldWrap(fullStr, placeholderOffset){
+      let i = placeholderOffset - 1;
+      while(i >= 0 && /\s/.test(fullStr[i])) i--;
+      if(i < 0) return false;
+      const c = fullStr[i];
+      if(/[+\-*/:·×÷^]/.test(c)) return true;
+      // LaTeX multiplicative ops: \cdot \times \div end in t/s/v.
+      if(/[tsv]/.test(c) && /\\(cdot|times|div)$/.test(fullStr.slice(0, i + 1))) return true;
+      return false;
+    }
+    const tplStr = String(tpl || '');
+    return tplStr.replace(/\$[^$]*\$|\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (match, plainName, offset) => {
+      if(match.startsWith('$')){
+        // Inside $...$ keep {} as LaTeX argument grouping. innerOffset is
+        // relative to `match`, which starts at `offset` in the template.
+        const filled = match.replace(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g, (m, name, innerOffset) => {
+          if(name in vars){
+            const wrap = shouldWrap(tplStr, offset + innerOffset);
+            return '{' + formatValue(vars[name], wrap, name) + '}';
+          }
+          return m;
+        });
+        // \frac{-3}{7} -> -\frac{3}{7}.
+        return utils.fracMinusOut(filled);
+      }
+      if(plainName && plainName in vars){
+        return formatValue(vars[plainName], shouldWrap(tplStr, offset), plainName);
+      }
+      return match;
+    });
   };
 
   // Fisher-Yates in-place shuffle, returns same array.

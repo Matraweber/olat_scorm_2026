@@ -2,6 +2,8 @@
 //   * zone-editor    drag rectangles onto an image (hotzone block)
 //   * unit-pair      paired unit selectors (unit-convert block)
 //   * unit-from-to   from/to unit selectors with category switcher
+//   * choice-matrix  rows × columns grid with the correct ticks (table, matrix mode)
+//   * grid-table     free table: rows/columns, cell kinds, points (table, grid mode)
 
 import { el } from './util.js';
 import { t } from './i18n.js';
@@ -131,6 +133,264 @@ export function renderZoneEditor(spec, getObj, setObj, wrap){
   ze.appendChild(stage);
   ze.appendChild(list);
   wrap.appendChild(ze);
+  return wrap;
+}
+
+// choice-matrix: grid editor for the table block's "Auswahl-Matrix".
+// Value: { rows:[{id,label}], cols:[{id,label}], correct:['rowId|colId', …] }.
+// Rows/columns are named and added/removed in place; a ticked cell is a
+// correct answer. Label edits and ticks save without re-rendering (keeps
+// focus); structural changes (add/remove) re-render the grid.
+export function renderChoiceMatrix(spec, getObj, setObj, wrap){
+  const box = el('div', {className:'choice-matrix-editor'});
+  const newId = p => p + Math.random().toString(36).slice(2, 8);
+  function read(){
+    const m = (getObj() || {})[spec.key] || {};
+    const fix = (arr, p) => (Array.isArray(arr) ? arr : []).map(x => ({ id: (x && x.id) || newId(p), label: (x && x.label) || '' }));
+    return { rows: fix(m.rows, 'r'), cols: fix(m.cols, 'c'), correct: Array.isArray(m.correct) ? m.correct.slice() : [] };
+  }
+  let m = read();
+  if(!m.rows.length && !m.cols.length){
+    // Fresh block: start with a 3 × 3 grid so the editor is usable at once.
+    m.rows = [1, 2, 3].map(() => ({ id: newId('r'), label: '' }));
+    m.cols = [1, 2, 3].map(() => ({ id: newId('c'), label: '' }));
+    setObj(spec.key, m);
+  }
+  const save = () => setObj(spec.key, { rows: m.rows.map(r => ({...r})), cols: m.cols.map(c => ({...c})), correct: m.correct.slice() });
+  const key = (r, c) => r.id + '|' + c.id;
+
+  function iconBtn(text, title, onClick){
+    const b = el('button', {className:'icon-btn', attrs:{type:'button', title}, text});
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function labelInput(item, placeholder){
+    const inp = el('input', {className:'choice-matrix-label', attrs:{type:'text', placeholder}});
+    inp.value = item.label || '';
+    inp.addEventListener('input', () => { item.label = inp.value; save(); });
+    return inp;
+  }
+  function render(){
+    box.innerHTML = '';
+    const scroller = el('div', {className:'choice-matrix-scroll'});
+    const tbl = el('table', {className:'choice-matrix-table'});
+    const head = el('tr');
+    head.appendChild(el('th', {className:'choice-matrix-corner', text: t('form.choiceMatrix.corner')}));
+    m.cols.forEach((c, ci) => {
+      const th = el('th');
+      const cell = el('div', {className:'choice-matrix-head'});
+      cell.appendChild(labelInput(c, t('form.choiceMatrix.colPlaceholder', { n: ci + 1 })));
+      cell.appendChild(iconBtn('✕', t('form.choiceMatrix.removeCol'), () => {
+        m.cols.splice(ci, 1);
+        m.correct = m.correct.filter(k => !k.endsWith('|' + c.id));
+        save(); render();
+      }));
+      th.appendChild(cell);
+      head.appendChild(th);
+    });
+    const addColTh = el('th');
+    addColTh.appendChild(iconBtn('+', t('form.choiceMatrix.addCol'), () => {
+      m.cols.push({ id: newId('c'), label: '' }); save(); render();
+    }));
+    head.appendChild(addColTh);
+    tbl.appendChild(head);
+
+    m.rows.forEach((r, ri) => {
+      const tr = el('tr');
+      const th = el('th');
+      const cell = el('div', {className:'choice-matrix-head'});
+      cell.appendChild(labelInput(r, t('form.choiceMatrix.rowPlaceholder', { n: ri + 1 })));
+      cell.appendChild(iconBtn('✕', t('form.choiceMatrix.removeRow'), () => {
+        m.rows.splice(ri, 1);
+        m.correct = m.correct.filter(k => !k.startsWith(r.id + '|'));
+        save(); render();
+      }));
+      th.appendChild(cell);
+      tr.appendChild(th);
+      m.cols.forEach(c => {
+        const td = el('td', {className:'choice-matrix-cell'});
+        const cb = el('input', {attrs:{type:'checkbox', title: t('form.choiceMatrix.cellTitle')}});
+        cb.checked = m.correct.includes(key(r, c));
+        cb.addEventListener('change', () => {
+          const k = key(r, c);
+          m.correct = m.correct.filter(x => x !== k);
+          if(cb.checked) m.correct.push(k);
+          save();
+        });
+        td.appendChild(cb);
+        tr.appendChild(td);
+      });
+      tr.appendChild(el('td'));
+      tbl.appendChild(tr);
+    });
+    const addRowTr = el('tr');
+    const addRowTh = el('th');
+    addRowTh.appendChild(iconBtn('+', t('form.choiceMatrix.addRow'), () => {
+      m.rows.push({ id: newId('r'), label: '' }); save(); render();
+    }));
+    addRowTr.appendChild(addRowTh);
+    tbl.appendChild(addRowTr);
+    scroller.appendChild(tbl);
+    box.appendChild(scroller);
+    box.appendChild(el('div', {className:'field-help', text: t('form.choiceMatrix.hint')}));
+  }
+  render();
+  wrap.appendChild(box);
+  return wrap;
+}
+
+// grid-table: editor for the table block's "Freie Tabelle".
+// Value: { rows:[{id,kind}], cols:[{id,kind}], cells:{ 'rowId|colId': {text, formula, tolerance, answers, options} } }.
+// Column kind: 'text' | 'numeric' | 'textAnswer' | 'choice'. Row kind: '' (= like the
+// column) or one of those, overriding the column. Each cell shows the inputs
+// its resolved kind needs. Kind changes and add/remove re-render the grid;
+// typing saves without re-rendering (keeps focus).
+export function renderGridTable(spec, getObj, setObj, wrap){
+  const box = el('div', {className:'grid-table-editor'});
+  const newId = p => p + Math.random().toString(36).slice(2, 8);
+  const KINDS = ['text', 'numeric', 'textAnswer', 'choice'];
+  function read(){
+    const g = (getObj() || {})[spec.key] || {};
+    const fix = (arr, p, def) => (Array.isArray(arr) ? arr : []).map(x => ({
+      id: (x && x.id) || newId(p), kind: (x && (KINDS.includes(x.kind) || x.kind === '')) ? x.kind : def
+    }));
+    return { rows: fix(g.rows, 'r', ''), cols: fix(g.cols, 'c', 'text'),
+             cells: (g.cells && typeof g.cells === 'object') ? JSON.parse(JSON.stringify(g.cells)) : {} };
+  }
+  let g = read();
+  if(!g.rows.length && !g.cols.length){
+    // Fresh grid: label column + answer column, three rows.
+    g.cols = [{ id: newId('c'), kind: 'text' }, { id: newId('c'), kind: 'numeric' }];
+    g.rows = [1, 2, 3].map(() => ({ id: newId('r'), kind: '' }));
+    setObj(spec.key, g);
+  }
+  const save = () => setObj(spec.key, JSON.parse(JSON.stringify(g)));
+  const cellOf = (r, c) => (g.cells[r.id + '|' + c.id] = g.cells[r.id + '|' + c.id] || {});
+  const kindOf = (r, c) => r.kind || c.kind || 'text';
+
+  function kindSelect(value, withInherit, onChange){
+    const sel = el('select', {className:'grid-table-kind'});
+    const opts = (withInherit ? [['', t('form.gridTable.kindInherit')]] : [])
+      .concat(KINDS.map(k => [k, t('form.gridTable.kind.' + k)]));
+    opts.forEach(([v, label]) => sel.appendChild(el('option', {attrs:{value:v}, text:label})));
+    sel.value = value;
+    sel.addEventListener('change', () => onChange(sel.value));
+    return sel;
+  }
+  function iconBtn(text, title, onClick){
+    const b = el('button', {className:'icon-btn', attrs:{type:'button', title}, text});
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function field(cell, key, placeholder, cls){
+    const inp = el('input', {className:'grid-table-input' + (cls ? ' ' + cls : ''), attrs:{type:'text', placeholder}});
+    inp.value = cell[key] != null ? String(cell[key]) : '';
+    inp.addEventListener('input', () => { cell[key] = inp.value; save(); });
+    return inp;
+  }
+  function cellEditor(r, c){
+    const td = el('td');
+    const kind = kindOf(r, c);
+    const cell = cellOf(r, c);
+    td.className = 'grid-table-cell grid-kind-' + kind;
+    if(kind === 'text'){
+      td.appendChild(field(cell, 'text', t('form.gridTable.textPlaceholder')));
+    } else if(kind === 'numeric'){
+      td.appendChild(field(cell, 'formula', t('form.gridTable.formulaPlaceholder')));
+      td.appendChild(field(cell, 'tolerance', t('form.gridTable.tolPlaceholder'), 'grid-table-tol'));
+    } else if(kind === 'choice'){
+      // Dropdown: options separated by |, the first one is the correct answer.
+      td.appendChild(field(cell, 'options', t('form.gridTable.optionsPlaceholder')));
+    } else {
+      td.appendChild(field(cell, 'answers', t('form.gridTable.answersPlaceholder')));
+    }
+    if(kind !== 'text'){
+      // Does this answer cell count towards the points? (unset = yes)
+      const lbl = el('label', {className:'grid-table-graded', attrs:{title: t('form.gridTable.gradedTitle')}});
+      const cb = el('input', {attrs:{type:'checkbox'}});
+      cb.checked = cell.graded !== false;
+      // Per-cell points (only with "Punkte je Zelle" on and the cell graded).
+      const pts = el('input', {className:'grid-table-pts', attrs:{type:'number', min:'0', step:'0.5', title: t('form.gridTable.pointsTitle')}});
+      pts.value = cell.points != null && cell.points !== '' ? String(cell.points) : '1';
+      pts.addEventListener('input', () => { cell.points = pts.value === '' ? '' : Number(pts.value); save(); });
+      const showPts = () => { pts.style.display = (cellPointsOn() && cb.checked) ? '' : 'none'; };
+      cb.addEventListener('change', () => {
+        cell.graded = cb.checked;
+        td.classList.toggle('grid-ungraded', !cb.checked);
+        showPts();
+        save();
+      });
+      lbl.appendChild(cb);
+      lbl.appendChild(el('span', {text: t('form.gridTable.graded')}));
+      lbl.appendChild(pts);
+      showPts();
+      td.appendChild(lbl);
+      td.classList.toggle('grid-ungraded', cell.graded === false);
+    }
+    return td;
+  }
+  // Block-level switch "points per cell", stored in config.gridCellPoints.
+  const cellPointsOn = () => !!(getObj() || {}).gridCellPoints;
+  function render(){
+    box.innerHTML = '';
+    // Switch: points per graded cell instead of an equal share of the total.
+    // Lives in the editor so the point inputs appear right away.
+    const togLbl = el('label', {className:'checkbox-field grid-table-cellpts', attrs:{title: t('form.gridTable.cellPointsTitle')}});
+    const tog = el('input', {attrs:{type:'checkbox'}});
+    tog.checked = cellPointsOn();
+    tog.addEventListener('change', () => { setObj('gridCellPoints', tog.checked); render(); });
+    togLbl.appendChild(tog);
+    togLbl.appendChild(el('span', {text: t('form.gridTable.cellPoints')}));
+    box.appendChild(togLbl);
+    const scroller = el('div', {className:'choice-matrix-scroll'});
+    const tbl = el('table', {className:'grid-table-table'});
+    const head = el('tr');
+    head.appendChild(el('th', {className:'choice-matrix-corner', text: t('form.gridTable.corner')}));
+    g.cols.forEach((c, ci) => {
+      const th = el('th');
+      const wrapH = el('div', {className:'choice-matrix-head'});
+      wrapH.appendChild(kindSelect(c.kind, false, v => { c.kind = v; save(); render(); }));
+      wrapH.appendChild(iconBtn('✕', t('form.gridTable.removeCol'), () => {
+        g.cols.splice(ci, 1);
+        Object.keys(g.cells).forEach(k => { if(k.endsWith('|' + c.id)) delete g.cells[k]; });
+        save(); render();
+      }));
+      th.appendChild(wrapH);
+      head.appendChild(th);
+    });
+    const addColTh = el('th');
+    addColTh.appendChild(iconBtn('+', t('form.gridTable.addCol'), () => { g.cols.push({ id: newId('c'), kind: 'text' }); save(); render(); }));
+    head.appendChild(addColTh);
+    tbl.appendChild(head);
+
+    g.rows.forEach((r, ri) => {
+      const tr = el('tr');
+      const th = el('th');
+      const wrapH = el('div', {className:'choice-matrix-head'});
+      wrapH.appendChild(el('span', {className:'grid-table-rownum', text: String(ri + 1)}));
+      wrapH.appendChild(kindSelect(r.kind, true, v => { r.kind = v; save(); render(); }));
+      wrapH.appendChild(iconBtn('✕', t('form.gridTable.removeRow'), () => {
+        g.rows.splice(ri, 1);
+        Object.keys(g.cells).forEach(k => { if(k.startsWith(r.id + '|')) delete g.cells[k]; });
+        save(); render();
+      }));
+      th.appendChild(wrapH);
+      tr.appendChild(th);
+      g.cols.forEach(c => tr.appendChild(cellEditor(r, c)));
+      tr.appendChild(el('td'));
+      tbl.appendChild(tr);
+    });
+    const addRowTr = el('tr');
+    const addRowTh = el('th');
+    addRowTh.appendChild(iconBtn('+', t('form.gridTable.addRow'), () => { g.rows.push({ id: newId('r'), kind: '' }); save(); render(); }));
+    addRowTr.appendChild(addRowTh);
+    tbl.appendChild(addRowTr);
+    scroller.appendChild(tbl);
+    box.appendChild(scroller);
+    box.appendChild(el('div', {className:'field-help', text: t('form.gridTable.hint')}));
+  }
+  render();
+  wrap.appendChild(box);
   return wrap;
 }
 

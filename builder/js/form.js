@@ -23,7 +23,7 @@ import {
 } from './form-media.js';
 import { renderMathTextarea, renderFormulaText } from './form-math.js';
 import {
-  renderZoneEditor, renderUnitPairField, renderUnitFromToField
+  renderZoneEditor, renderUnitPairField, renderUnitFromToField, renderChoiceMatrix, renderGridTable
 } from './form-specialized.js';
 
 // WARN prompts the user; SIZE is the hard FileReader cap.
@@ -405,6 +405,10 @@ export function renderField(spec, getObj, setObj){
     return renderMathTextarea(spec, getObj, setObj, wrap);
   } else if(spec.type === 'formula-text') {
     return renderFormulaText(spec, getObj, setObj, wrap);
+  } else if(spec.type === 'grid-table') {
+    return renderGridTable(spec, getObj, setObj, wrap);
+  } else if(spec.type === 'choice-matrix') {
+    return renderChoiceMatrix(spec, getObj, setObj, wrap);
   } else if(spec.type === 'zone-editor') {
     return renderZoneEditor(spec, getObj, setObj, wrap);
   } else {

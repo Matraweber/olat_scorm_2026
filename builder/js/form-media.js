@@ -1,10 +1,12 @@
 // form-media.js: file-upload field renderers (image, audio, video,
 // generic file). Pulled out of form.js so the four similar flows
 // (MIME validation → toast → embed as data-URL) share a focused file.
+// Images are shrunk first (image-shrink.js) unless "Original behalten".
 
 import { el } from './util.js';
 import { validateUpload, makeUploadStatus } from './form.js';
 import { t } from './i18n.js';
+import { shrinkImageDataUrl, shrinkEnabled } from './image-shrink.js';
 
 // image field: file upload or URL.
 export function renderImageField(spec, getObj, setObj, wrap){
@@ -14,6 +16,12 @@ export function renderImageField(spec, getObj, setObj, wrap){
   const fileInp = el('input', {attrs:{type:'file', accept:'image/*'}});
   const clearBtn = el('button', {className:'btn btn-secondary btn-sm', attrs:{type:'button'}, text:t('form.media.image.clear')});
   const status = makeUploadStatus();
+  // Per upload: keep the original instead of the shrunk version (only
+  // shown while shrinking is on in the course settings).
+  const keepLbl = el('label', {className:'image-keep-original', attrs:{title: t('form.media.image.keepOriginalHelp')}});
+  const keepCb = el('input', {attrs:{type:'checkbox'}});
+  keepLbl.appendChild(keepCb);
+  keepLbl.appendChild(document.createTextNode(' ' + t('form.media.image.keepOriginal')));
   fileInp.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
     const v = validateUpload(f, 'image');
@@ -23,8 +31,9 @@ export function renderImageField(spec, getObj, setObj, wrap){
       return;
     }
     const r = new FileReader();
-    r.onload = () => {
-      setObj(spec.key, r.result);
+    r.onload = async () => {
+      const url = await shrinkImageDataUrl(r.result, { keepOriginal: keepCb.checked });
+      setObj(spec.key, url);
       status.showSuccess(t('form.media.image.embedded', { size: v.sizeHuman }));
       rerenderImagePreview();
     };
@@ -38,6 +47,7 @@ export function renderImageField(spec, getObj, setObj, wrap){
   });
   fileRow.appendChild(fileInp); fileRow.appendChild(clearBtn);
   inner.appendChild(fileRow);
+  if(shrinkEnabled()) inner.appendChild(keepLbl);
   inner.appendChild(status.el);
   const urlInp = el('input', {attrs:{type:'text', placeholder:t('form.media.urlPlaceholder')}});
   urlInp.value = (obj[spec.key] && !String(obj[spec.key]).startsWith('data:')) ? String(obj[spec.key]) : '';

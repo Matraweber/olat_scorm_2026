@@ -1,5 +1,6 @@
 // preview.js: Mount each block in a shadow DOM so the canvas matches the SCORM preview.
 // Falls back to def.preview() or a text summary when mount() isn't usable.
+// measureRuntimeHeight(): block height in the exported page ("Höhe für SCORM anpassen").
 import { state } from './state.js';
 import { blockSummary } from './canvas.js';
 import { t } from './i18n.js';
@@ -64,6 +65,73 @@ function makeBuilderApi(block, host){
       }));
     }
   };
+}
+
+// Height a block needs in the exported SCORM page so its cell doesn't
+// scroll. Mounts it the way the runtime does (cell exactly pos.w wide,
+// runtime styles, no builder head/padding) in a hidden shadow root and
+// measures the content. Blocks with random values are mounted several
+// times and the tallest draw counts. Returns px or null.
+const RUNTIME_FIT_DRAWS = 4;
+export async function measureRuntimeHeight(block){
+  const def = window.Blocks && window.Blocks.get(block.type);
+  if(!def || typeof def.mount !== 'function' || !window.BlockUtils) return null;
+  const css = await loadRuntimeStyles();
+  const width = Math.max(40, Number(block.pos && block.pos.w) || 500);
+  const font = (state.theme && state.theme.fontFamily) || 'Verdana, Arial, sans-serif';
+  const outer = document.createElement('div');
+  outer.style.cssText = 'position:fixed; left:-20000px; top:0; width:' + (width + 40) + 'px; visibility:hidden; pointer-events:none;';
+  document.body.appendChild(outer);
+  try {
+    const shadow = outer.attachShadow({ mode: 'open' });
+    const styleEl = document.createElement('style');
+    styleEl.textContent = (css || '') +
+      '\n:host { display:block; font-family:' + font + '; color:#1d2a33; font-size:16px; line-height:normal; }\n' +
+      // flow-root: like the runtime cell (overflow:auto), child margins
+      // stay inside the cell instead of collapsing out of it.
+      '.fit-cell { position:relative !important; height:auto !important; overflow:visible !important; display:flow-root !important; }\n';
+    shadow.appendChild(styleEl);
+    // KaTeX metrics change line heights, so wait for its stylesheet.
+    const links = [];
+    document.querySelectorAll('link[rel="stylesheet"][href*="katex"]').forEach(l => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet'; link.href = l.href;
+      links.push(new Promise(res => { link.onload = link.onerror = res; }));
+      shadow.appendChild(link);
+    });
+    await Promise.race([Promise.all(links), new Promise(r => setTimeout(r, 2000))]);
+    const draws = def.graded ? RUNTIME_FIT_DRAWS : 1;
+    let max = 0;
+    for(let i = 0; i < draws; i++){
+      const canvas = document.createElement('div');
+      canvas.className = 'task-canvas';
+      canvas.style.cssText = 'position:relative; width:1100px;';
+      const cell = document.createElement('div');
+      cell.className = 'canvas-block fit-cell';
+      cell.style.width = width + 'px';
+      canvas.appendChild(cell);
+      shadow.appendChild(canvas);
+      let inst = null;
+      try {
+        inst = def.mount(cell, JSON.parse(JSON.stringify(block.config || {})), makeStubApi(block));
+        window.BlockUtils.renderMath(cell);
+      } catch{ canvas.remove(); continue; }
+      const imgs = Array.from(cell.querySelectorAll('img')).filter(img => !img.complete);
+      if(imgs.length){
+        await Promise.race([
+          Promise.all(imgs.map(img => new Promise(res => { img.onload = img.onerror = res; }))),
+          new Promise(r => setTimeout(r, 3000))
+        ]);
+      }
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      max = Math.max(max, cell.scrollHeight, Math.ceil(cell.getBoundingClientRect().height));
+      try { inst && inst.destroy && inst.destroy(); } catch{}
+      canvas.remove();
+    }
+    return max > 0 ? max : null;
+  } finally {
+    outer.remove();
+  }
 }
 
 export function renderBlockPreview(host, block){

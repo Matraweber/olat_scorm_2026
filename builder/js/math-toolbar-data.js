@@ -76,7 +76,9 @@ export const MATH_CATS = [
 export const FORMULA_FN_BTNS = [
   { s:'sqrt()',  i:'sqrt()',  c:5 }, { s:'abs()',   i:'abs()',   c:4 },
   { s:'sin()',   i:'sin()',   c:4 }, { s:'cos()',   i:'cos()',   c:4 },
-  { s:'tan()',   i:'tan()',   c:4 }, { s:'atan2(,)',i:'atan2(,)',c:6 },
+  { s:'tan()',   i:'tan()',   c:4 },
+  { s:'arcsin()', i:'arcsin()', c:7 }, { s:'arccos()', i:'arccos()', c:7 },
+  { s:'arctan()', i:'arctan()', c:7 }, { s:'atan2(,)',i:'atan2(,)',c:6 },
   { s:'log()',   i:'log()',   c:4 }, { s:'ln()',    i:'log()',   c:4 },
   { s:'exp()',   i:'exp()',   c:4 }, { s:'floor()', i:'floor()', c:6 },
   { s:'ceil()',  i:'ceil()',  c:5 }, { s:'round()', i:'round()', c:6 },

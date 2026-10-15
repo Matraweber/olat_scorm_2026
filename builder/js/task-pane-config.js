@@ -1,11 +1,11 @@
 // task-pane-config.js: Right-hand config pane: empty | multi-select | single-block form.
 import { el, tProp } from './util.js';
-import { pushHistoryDebounced, takeHistorySnap, commitHistorySnap, discardHistorySnap, getEditorLocale, setEditorLocale, renderActivePane } from './state.js';
+import { state, pushHistoryDebounced, takeHistorySnap, commitHistorySnap, discardHistorySnap, getEditorLocale, setEditorLocale, renderActivePane } from './state.js';
 import { renderField } from './form.js';
 import { validateBlock } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { bulkAlign, bulkDistribute, bulkDuplicate, bulkDelete } from './task-pane-bulk.js';
-import { BLOCK_HELP } from './block-help.js';
+import { BLOCK_HELP, commonGradedHelp } from './block-help.js';
 import { t, availableLocales, localeMeta } from './i18n.js';
 
 // Small toggle at the top of the block-config pane so the author can switch
@@ -93,6 +93,9 @@ function renderBlockHelp(blockType){
     });
     body.appendChild(ul);
   }
+  // Graded blocks share the sections below the block's own fields.
+  const def = window.Blocks && window.Blocks.get(blockType);
+  if(def && def.graded) body.appendChild(el('p', { className: 'block-help-common', text: commonGradedHelp() }));
   box.appendChild(body);
 
   toggle.addEventListener('click', () => {
@@ -245,7 +248,51 @@ function renderSingleBlockPane(ctx, sel){
   configHost._blockActionHandler = actionHandler;
   configHost.addEventListener('block-field-action', actionHandler);
 
-  const schema = def.builderSchema ? def.builderSchema() : [];
+  const schema = (def.builderSchema ? def.builderSchema() : []).slice();
+  // Every graded block gets the shared fields: the "lock answer after check"
+  // override (tri-state like the regenerate fields: "" inherits the course
+  // default from Kopfdaten), a block timer, and attempts / hint / worked
+  // solution (read by runtime.js helpConfig).
+  if(def.graded){
+    const u = window.BlockUtils;
+    const courseOn = !!(state.course && state.course.lockAnswersAfterCheck);
+    schema.push({ key:'lockAnswers', label:t('taskPane.config.single.lockAnswersLabel'), type:'select',
+      help:t('taskPane.config.single.lockAnswersHelp'),
+      options: [
+        { value:'',    label:u.t('utils.regen.inherit', { state: courseOn ? u.t('utils.regen.on') : u.t('utils.regen.off') }) },
+        { value:'on',  label:u.t('utils.regen.on') },
+        { value:'off', label:u.t('utils.regen.off') }
+      ] });
+    // Per-block countdown; runs only while the block's task/tab is shown and
+    // locks the block's answers at 0.
+    const timerOn = c => !!c.timerEnabled;
+    schema.push(
+      { key:'timerEnabled', label:t('taskPane.config.single.timerEnabledLabel'), type:'boolean',
+        help:t('taskPane.config.single.timerEnabledHelp') },
+      { key:'timerMinutes', label:t('taskPane.config.single.timerMinutes'), type:'number', step:1, min:0, showIf: timerOn },
+      { key:'timerSeconds', label:t('taskPane.config.single.timerSeconds'), type:'number', step:1, min:0, max:59, showIf: timerOn }
+    );
+    // Attempts, hint and worked solution (runtime.js: helpConfig).
+    const attemptsOn = c => !!c.attemptsLimit;
+    const hintOn = c => !!c.hintEnabled;
+    const solOn = c => !!c.solutionEnabled;
+    schema.push(
+      { type:'section', key:'_sec_help', label:t('taskPane.config.support.section') },
+      { key:'attemptsLimit', label:t('taskPane.config.support.attemptsLimit'), type:'boolean', help:t('taskPane.config.support.attemptsLimitHelp') },
+      { key:'maxAttempts', label:t('taskPane.config.support.maxAttempts'), type:'number', step:1, min:1, placeholder:'3', showIf: attemptsOn },
+      { key:'attemptPenalty', label:t('taskPane.config.support.attemptPenalty'), type:'number', step:5, min:0, max:100, placeholder:'0',
+        help:t('taskPane.config.support.attemptPenaltyHelp'), showIf: attemptsOn },
+      { key:'hintEnabled', label:t('taskPane.config.support.hintEnabled'), type:'boolean', help:t('taskPane.config.support.hintEnabledHelp') },
+      { key:'hintText', label:t('taskPane.config.support.hintText'), type:'math-textarea', rows:3, showIf: hintOn },
+      { key:'hintAfter', label:t('taskPane.config.support.hintAfter'), type:'number', step:1, min:0, placeholder:'1', showIf: hintOn },
+      { key:'hintPenalty', label:t('taskPane.config.support.hintPenalty'), type:'number', step:0.25, min:0, placeholder:'0', showIf: hintOn },
+      { key:'solutionEnabled', label:t('taskPane.config.support.solutionEnabled'), type:'boolean', help:t('taskPane.config.support.solutionEnabledHelp') },
+      { key:'solutionText', label:t('taskPane.config.support.solutionText'), type:'math-textarea', rows:4, showIf: solOn },
+      { key:'solutionAfter', label:t('taskPane.config.support.solutionAfter'), type:'number', step:1, min:1,
+        placeholder:t('taskPane.config.support.solutionAfterPlaceholder'), showIf: solOn },
+      { key:'solutionWhenCorrect', label:t('taskPane.config.support.solutionWhenCorrect'), type:'boolean', showIf: solOn }
+    );
+  }
   if(schema.length === 0){
     configHost.appendChild(el('div', {className:'field-help', text: t('taskPane.config.single.noSchema')}));
   } else {

@@ -80,17 +80,37 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
                 remaining -= len(chunk)
 
 
+def server_class():
+    """Multi-threaded server, so one slow request (e.g. a video stream on the
+    welcome page) can't block the many parallel fetches of a ZIP export.
+    Falls back to the classic single-threaded server where Python has no
+    thread support."""
+    try:
+        import threading  # noqa: F401  (only to confirm threads are available)
+    except ImportError:
+        return socketserver.TCPServer, False
+
+    class ThreadedServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+        # Don't let an open stream keep the process alive on Ctrl+C.
+        daemon_threads = True
+
+    return ThreadedServer, True
+
+
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     # SO_REUSEADDR avoids TIME_WAIT trouble on quick restarts, but on Windows
     # it also allows binding a port that another process is already listening
     # on, silently hiding a stale server. Only enable it off Windows.
     socketserver.TCPServer.allow_reuse_address = (os.name != 'nt')
+    ServerClass, threaded = server_class()
     try:
-        httpd = socketserver.TCPServer(('127.0.0.1', PORT), NoCacheHandler)
+        httpd = ServerClass(('127.0.0.1', PORT), NoCacheHandler)
     except OSError:
         print(f'Port {PORT} ist bereits belegt. Laeuft der Server schon?')
         sys.exit(1)
+    if not threaded:
+        print('Hinweis: Threads nicht verfuegbar, Server bearbeitet Anfragen nacheinander.')
     with httpd:
         print(f'SCORM Builder: http://localhost:{PORT}/builder/')
         try:

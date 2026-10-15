@@ -1,4 +1,5 @@
-// modals.js: Block-type picker, task-create, save-template, preview modal.
+// modals.js: Block-type picker (incl. own block and task templates),
+// task-create, save-template, preview modal.
 import { el, uid, toast, confirmDialog, tProp } from './util.js';
 import { state, pushHistory, render } from './state.js';
 import { instantiateTemplate, captureTaskAsTemplateData, saveUserTemplates } from './tasks.js';
@@ -155,7 +156,10 @@ export function openBlockTypeModal(onPick){
   });
 
   // User block-templates: synthesize a def with isTemplate=true; renderRow routes onPick.
+  // The category is always listed (an empty one explains how to add a
+  // template), so it doesn't silently vanish when nothing is saved here.
   const userBlockTemplates = Array.isArray(state.userBlockTemplates) ? state.userBlockTemplates : [];
+  byCat[t('modals.userTemplatesHead')] = [];
   if(userBlockTemplates.length > 0){
     byCat[t('modals.userTemplatesHead')] = userBlockTemplates.map(tpl => {
       const baseDef = window.Blocks.get(tpl.blockType);
@@ -170,6 +174,25 @@ export function openBlockTypeModal(onPick){
       };
     });
   }
+  // Saved task templates (from "+ Aufgabe") too: picking one inserts all of
+  // its blocks into the current task instead of creating a new task.
+  const userTaskTemplates = Array.isArray(state.userTemplates) ? state.userTemplates : [];
+  userTaskTemplates.forEach(tpl => {
+    const data = tpl.task || {};
+    const n = (data.tabs && data.tabs.length)
+      ? data.tabs.reduce((sum, tab) => sum + (tab.blocks || []).length, 0)
+      : (data.blocks || []).length;
+    if(!n) return;
+    byCat[t('modals.userTemplatesHead')].push({
+      id: tpl.id,
+      label: tpl.label,
+      description: tpl.description || t('modals.taskTemplateBlocks', { n }),
+      icon: '▦',
+      category: t('modals.userTemplatesHead'),
+      isTaskTemplate: true,
+      tpl: tpl
+    });
+  });
 
   // Stable category order; unknown categories sort alphabetically at the end.
   // Categories are resolved via t('block.category.*'), so CAT_ORDER holds the
@@ -195,7 +218,7 @@ export function openBlockTypeModal(onPick){
     const row = el('button', { className: 'block-type-row', attrs: { type: 'button' } });
     if(def.isTemplate) row.classList.add('block-type-row-template');
     const ico = el('span', { className: 'block-type-ico' });
-    const iconKey = def.isTemplate
+    const iconKey = def.isTaskTemplate ? null : def.isTemplate
       ? (window.Blocks.get(def.tpl.blockType)?.id || def.tpl.blockType)
       : def.id;
     const svgIcon = window.BlockIcons && window.BlockIcons.get(iconKey);
@@ -204,7 +227,9 @@ export function openBlockTypeModal(onPick){
     row.appendChild(ico);
     const body = el('div', { className: 'block-type-body' });
     const labelEl = el('span', { className: 'block-type-label', text: tProp(def, 'label') });
-    if(def.isTemplate){
+    if(def.isTaskTemplate){
+      labelEl.appendChild(el('span', { className: 'block-type-badge block-type-badge-template', text: t('modals.taskTemplateBadge') }));
+    } else if(def.isTemplate){
       labelEl.appendChild(el('span', { className: 'block-type-badge block-type-badge-template', text: t('modals.templateBadge') }));
     } else if(def.graded){
       labelEl.appendChild(el('span', { className: 'block-type-badge', text: t('modals.gradedBadge') }));
@@ -240,7 +265,7 @@ export function openBlockTypeModal(onPick){
 
     row.addEventListener('click', () => {
       document.getElementById('blockTypeModal').classList.add('hidden');
-      onPick(def.isTemplate ? def.tpl : def.id);
+      onPick(def.isTaskTemplate ? { taskTemplate: def.tpl } : def.isTemplate ? def.tpl : def.id);
     });
     return row;
   }
@@ -252,6 +277,9 @@ export function openBlockTypeModal(onPick){
     });
     list.innerHTML = '';
     (byCat[cat] || []).forEach(def => list.appendChild(renderRow(def)));
+    if(cat === t('modals.userTemplatesHead') && !(byCat[cat] || []).length){
+      list.appendChild(el('div', { className: 'block-picker-empty', text: t('modals.noBlockTemplatesHint') }));
+    }
   }
 
   // Live search; empty query restores the category view.

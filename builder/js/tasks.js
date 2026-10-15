@@ -29,6 +29,29 @@ export function disableTabsOn(task){
   delete task.tabs;
   delete task._uiActiveTab;
 }
+// Append an empty tab and make it active.
+export function addTabOn(task){
+  if(!hasTabs(task)) return;
+  task.tabs.push({ title: t('taskPane.tabFallbackTitle', { n: task.tabs.length + 1 }), blocks: [] });
+  task._uiActiveTab = task.tabs.length - 1;
+  syncTaskBlocksAlias(task);
+}
+// Remove tab i. Closing down to a single tab turns tabs off and keeps that
+// remaining tab's blocks as the task's blocks.
+export function removeTabOn(task, i){
+  if(!hasTabs(task) || i < 0 || i >= task.tabs.length) return;
+  const active = task._uiActiveTab || 0;
+  task.tabs.splice(i, 1);
+  if(task.tabs.length < 2){
+    task.blocks = (task.tabs[0] && task.tabs[0].blocks) || [];
+    delete task.tabs;
+    delete task._uiActiveTab;
+    return;
+  }
+  // Keep the same tab active if it still exists; otherwise step left.
+  task._uiActiveTab = active > i ? active - 1 : Math.min(active, task.tabs.length - 1);
+  syncTaskBlocksAlias(task);
+}
 export function cleanTaskForExport(task){
   // Strip UI-only fields and the blocks alias.
   const copy = JSON.parse(JSON.stringify(task));
@@ -74,6 +97,11 @@ export function migrateTaskIfNeeded(task){
 export function validateBlock(block){
   const warnings = [];
   const cfg = block.config || {};
+  // A block variable named like a global one hides the global value here.
+  const globalNames = new Set((state.course && state.course.globalVariables || []).map(v => v && v.name).filter(Boolean));
+  (Array.isArray(cfg.variables) ? cfg.variables : []).forEach(v => {
+    if(v && v.name && globalNames.has(v.name)) warnings.push(t('tasks.validation.shadowsGlobalVar', { name: v.name }));
+  });
   // Blocks may declare validate(cfg) => string[]; missing = always-valid.
   const def = window.Blocks.get(block.type);
   if(def && typeof def.validate === 'function'){
@@ -110,12 +138,54 @@ export function validateCourse(course){
   if(!courseTitleText || !courseTitleText.trim()){
     courseIssues.push({ message: t('tasks.validation.emptyCourseTitle') });
   }
+  validateGlobalVars(course).forEach(message => courseIssues.push({ message }));
+  validatePools(course).forEach(message => courseIssues.push({ message }));
   tasks.forEach((task, idx) => {
     const taskTitle = l(task.title) || t('taskList.fallbackTitle', { n: idx + 1 });
     const taskIssues = validateTask(task);
     taskIssues.forEach(w => issues.push(Object.assign({ taskIdx: idx, taskTitle }, w)));
   });
   return { issues, courseIssues };
+}
+
+// Course-wide variables: valid names, no duplicates, sane range, in use.
+function validateGlobalVars(course){
+  const out = [];
+  const defs = Array.isArray(course.globalVariables) ? course.globalVariables : [];
+  const U = window.BlockUtils;
+  const seen = new Set();
+  defs.forEach((v, i) => {
+    const name = v && String(v.name || '').trim();
+    if(!name){ out.push(t('tasks.validation.globalVarNoName', { n: i + 1 })); return; }
+    if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) out.push(t('tasks.validation.globalVarBadName', { name }));
+    if(seen.has(name)) out.push(t('tasks.validation.globalVarDuplicate', { name }));
+    seen.add(name);
+    const lo = Number(v.min), hi = Number(v.max);
+    if(Number.isFinite(lo) && Number.isFinite(hi) && lo > hi) out.push(t('tasks.validation.globalVarRange', { name, min: lo, max: hi }));
+  });
+  if(U && typeof U.globalVarsUsedBy === 'function' && seen.size){
+    const used = new Set();
+    (course.tasks || []).forEach(task => {
+      const blocks = (task.tabs && task.tabs.length >= 2) ? task.tabs.flatMap(tb => tb.blocks || []) : (task.blocks || []);
+      blocks.forEach(b => U.globalVarsUsedBy(b.config || {}, defs).forEach(n => used.add(n)));
+    });
+    seen.forEach(name => { if(!used.has(name)) out.push(t('tasks.validation.globalVarUnused', { name })); });
+  }
+  return out;
+}
+
+// Task pools: each needs a name and members; draw must not exceed them.
+function validatePools(course){
+  const out = [];
+  (Array.isArray(course.pools) ? course.pools : []).forEach((p, i) => {
+    if(!p) return;
+    const name = String(p.name || '').trim() || t('tasks.validation.poolUnnamed', { n: i + 1 });
+    const n = (course.tasks || []).filter(tk => tk.pool === p.id).length;
+    if(!n) out.push(t('tasks.validation.poolEmpty', { name }));
+    const draw = Number(p.draw);
+    if(p.draw !== '' && p.draw != null && Number.isFinite(draw) && n && draw > n) out.push(t('tasks.validation.poolDrawTooBig', { name, draw, n }));
+  });
+  return out;
 }
 
 // Templates (built-in & user)

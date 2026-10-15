@@ -3,12 +3,13 @@ import {
   state, setRenderer, defaultCourse, loadPersistentTheme, applyThemeToBuilder,
   undo, redo, copySelectedBlocks, pasteBlocks,
   isAutosaveAvailable, loadAutosave, loadAutosaveMeta, clearAutosave,
-  flushAutosave, setAutosaveListener, setAutosavePendingListener, scheduleAutosave
+  flushAutosave, setAutosaveListener, setAutosavePendingListener, scheduleAutosave,
+  isCourseDirty, courseHasContent
 } from './state.js';
 import { renderTaskList, renderActivePaneImpl } from './panes.js';
 import { loadUserTemplates, loadUserBlockTemplates, loadBlockUsage } from './tasks.js';
 import { openTaskCreateModal } from './modals.js';
-import { downloadZip, exportJson, loadJsonFile, loadZipFile, showPreview, syncJsonEditor, applyJsonEditor } from './io.js';
+import { downloadZip, exportJson, loadJsonFile, loadZipFile, showPreview, syncJsonEditor, applyJsonEditor, guardUnsavedCourse } from './io.js';
 import { toast, confirmDialog, escapeHtml } from './util.js';
 import { getActiveTaskCtx } from './task-pane.js';
 import * as i18n from './i18n.js';
@@ -47,12 +48,18 @@ function init(){
   // Apply persisted theme synchronously to avoid a flash of default styles.
   applyThemeToBuilder(state.theme);
   document.getElementById('btnNew').addEventListener('click', async () => {
-    if(!await confirmDialog({
+    // Unsaved work: save / discard / cancel. Otherwise still confirm, so a
+    // stray click doesn't throw away a course that only lives in a file.
+    if(isCourseDirty() && courseHasContent(state.course)){
+      if(!await guardUnsavedCourse()) return;
+    } else if(courseHasContent(state.course) && !await confirmDialog({
       title: tI18n('main.newCourseConfirm.title'),
       message: tI18n('main.newCourseConfirm.message'),
       confirmLabel: tI18n('main.newCourseConfirm.confirm'),
       danger: true
     })) return;
+    // Only now (not on the raw click) drop the recovery copy.
+    clearAutosave();
     state.course = defaultCourse();
     state.theme = loadPersistentTheme();
     applyThemeToBuilder(state.theme);
@@ -79,8 +86,9 @@ function init(){
   });
   document.getElementById('btnPreview').addEventListener('click', showPreview);
   document.getElementById('btnExportJson').addEventListener('click', exportJson);
-  document.getElementById('fileLoadZip').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if(f) loadZipFile(f); e.target.value = ''; });
-  document.getElementById('fileLoadJson').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if(f) loadJsonFile(f); e.target.value = ''; });
+  // Opening another file replaces the course: protect unsaved work first.
+  document.getElementById('fileLoadZip').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if(f && await guardUnsavedCourse()) loadZipFile(f); });
+  document.getElementById('fileLoadJson').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if(f && await guardUnsavedCourse()) loadJsonFile(f); });
   document.querySelectorAll('.sidebar-link').forEach(b => {
     b.addEventListener('click', () => { state.selected = {kind: b.dataset.target}; render(); });
   });
@@ -253,8 +261,6 @@ function init(){
   i18n.applyDataI18n(document);
 
   setupAutosaveIndicator();
-  // After "Neu", clear autosave too so the next reload doesn't offer recovery.
-  document.getElementById('btnNew').addEventListener('click', clearAutosave);
 
   window.addEventListener('beforeunload', flushAutosave);
   // beforeunload isn't reliable on mobile; visibilitychange is a backup.

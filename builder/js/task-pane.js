@@ -4,7 +4,7 @@ import { el, uid, cssEscape, confirmDialog, toast } from './util.js';
 import { t, readForEdit, writeFromEdit, getDefaultLocale } from './i18n.js';
 import { state, pushHistory, renderActivePane, getEditorLocale } from './state.js';
 import { CANVAS_WIDTH, ensurePos, ensureAllPos, fitHeightForCard } from './canvas.js';
-import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn, bumpBlockUsage } from './tasks.js';
+import { hasTabs, syncTaskBlocksAlias, enableTabsOn, disableTabsOn, addTabOn, removeTabOn, bumpBlockUsage, instantiateTemplate } from './tasks.js';
 import { renderTaskList } from './panes.js';
 import { openBlockTypeModal, openSaveTemplateModal } from './modals.js';
 import { renderBlockPreview } from './preview.js';
@@ -12,6 +12,7 @@ import { renderCanvas } from './task-pane-canvas.js';
 import { renderConfigPane, posLabel } from './task-pane-config.js';
 import { bulkDelete, bulkDuplicate } from './task-pane-bulk.js';
 import { validateUpload } from './form.js';
+import { shrinkImageDataUrl } from './image-shrink.js';
 
 // Exposed for the global keyboard handler.
 export let activeTaskCtx = null;
@@ -44,6 +45,19 @@ export function renderTaskPane(host, idx){
     renderTaskList();
   });
   head.appendChild(titleInput);
+  const pools = (state.course.pools || []).filter(p => p && p.id);
+  if(pools.length){
+    const poolSel = el('select', {className:'task-pool-select', attrs:{title: t('taskPane.poolTitle')}});
+    poolSel.appendChild(el('option', {text: t('taskPane.poolNone'), attrs:{value:''}}));
+    pools.forEach(p => poolSel.appendChild(el('option', {text: t('taskPane.poolOption', { name: p.name || p.id }), attrs:{value: p.id}})));
+    poolSel.value = pools.some(p => p.id === task.pool) ? task.pool : '';
+    poolSel.addEventListener('change', () => {
+      pushHistory();
+      if(poolSel.value) task.pool = poolSel.value; else delete task.pool;
+      renderTaskList();
+    });
+    head.appendChild(poolSel);
+  }
 
   const toolbar = el('div', {className:'canvas-toolbar'});
   const addBtn = el('button', {className:'btn btn-primary', attrs:{type:'button'}, text: t('taskPane.addBlock')});
@@ -62,7 +76,8 @@ export function renderTaskPane(host, idx){
   refreshTabsBtn();
   tabsBtn.addEventListener('click', async () => {
     if(hasTabs(task)){
-      const tab2Count = (task.tabs[1] && task.tabs[1].blocks ? task.tabs[1].blocks.length : 0);
+      // Everything outside tab 1 is discarded.
+      const tab2Count = task.tabs.slice(1).reduce((n, tb) => n + (tb.blocks || []).length, 0);
       if(tab2Count > 0){
         const ok = await confirmDialog({
           title: t('taskPane.tabsDisableConfirmTitle'),
@@ -98,15 +113,42 @@ export function renderTaskPane(host, idx){
   // Optional tab nav bar
   if(hasTabs(task)){
     const tabBar = el('div', {className:'builder-tab-bar'});
+    const tabEditorLoc = getEditorLocale();
+    const tabSourceLoc = getDefaultLocale();
     task.tabs.forEach((tab, ti) => {
       const isActive = ti === (task._uiActiveTab || 0);
-      const btn = el('button', { className: 'builder-tab-btn' + (isActive ? ' active' : ''), attrs:{type:'button', title: t('taskPane.tabSwitchTitle')} });
-      const titleSpan = el('input', {className:'builder-tab-title', attrs:{type:'text'}});
-      titleSpan.value = tab.title || t('taskPane.tabFallbackTitle', { n: ti+1 });
+      // div (not button): it holds an <input> and the close control.
+      const btn = el('div', { className: 'builder-tab-btn' + (isActive ? ' active' : ''), attrs:{role:'tab', title: t('taskPane.tabSwitchTitle')} });
+      const titleSpan = el('input', {className:'builder-tab-title', attrs:{type:'text', title: t('taskPane.tabRenameTitle')}});
+      // Locale-aware like the task title, so translated tab names survive.
+      titleSpan.value = readForEdit(tab.title, tabEditorLoc, tabSourceLoc) || t('taskPane.tabFallbackTitle', { n: ti+1 });
       titleSpan.addEventListener('click', e => e.stopPropagation());
-      titleSpan.addEventListener('input', () => { tab.title = titleSpan.value; });
+      titleSpan.addEventListener('input', () => {
+        tab.title = writeFromEdit(tab.title, tabEditorLoc, titleSpan.value, tabSourceLoc);
+      });
       btn.appendChild(titleSpan);
       btn.appendChild(el('span', {className:'builder-tab-count', text: '(' + ((tab.blocks||[]).length) + ')'}));
+      const closeBtn = el('button', {className:'builder-tab-close', attrs:{type:'button', title: t('taskPane.tabCloseTitle')}, text:'×'});
+      closeBtn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const n = (tab.blocks || []).length;
+        if(n > 0){
+          const ok = await confirmDialog({
+            title: t('taskPane.tabCloseConfirmTitle'),
+            message: n === 1
+              ? t('taskPane.tabCloseConfirmMessageSingular', { n })
+              : t('taskPane.tabCloseConfirmMessagePlural', { n }),
+            confirmLabel: t('taskPane.tabCloseConfirmLabel'),
+            danger: true
+          });
+          if(!ok) return;
+        }
+        pushHistory();
+        removeTabOn(task, ti);
+        renderTaskList();
+        renderActivePane();
+      });
+      btn.appendChild(closeBtn);
       btn.addEventListener('click', () => {
         if(ti === (task._uiActiveTab || 0)) return;
         task._uiActiveTab = ti;
@@ -115,6 +157,14 @@ export function renderTaskPane(host, idx){
       });
       tabBar.appendChild(btn);
     });
+    const addTabBtn = el('button', {className:'builder-tab-add', attrs:{type:'button', title: t('taskPane.tabAddTitle')}, text:'+'});
+    addTabBtn.addEventListener('click', () => {
+      pushHistory();
+      addTabOn(task);
+      renderTaskList();
+      renderActivePane();
+    });
+    tabBar.appendChild(addTabBtn);
     host.appendChild(tabBar);
   }
 
@@ -235,7 +285,39 @@ export function renderTaskPane(host, idx){
   };
 
   // Picker callback: accepts a block-type id (string) or a saved template object.
+  // Task template picked in the block dialog: append all of its blocks below
+  // the existing ones, keeping their relative layout (tabs stacked in order).
+  function addBlocksFromTaskTemplate(tpl){
+    const src = instantiateTemplate(tpl);
+    const groups = (src.tabs && src.tabs.length) ? src.tabs.map(tab => tab.blocks || []) : [src.blocks || []];
+    let top = 20;
+    task.blocks.forEach(b => { if(b.pos && b.pos.y + b.pos.h + 16 > top) top = b.pos.y + b.pos.h + 16; });
+    const added = [];
+    groups.forEach(blocks => {
+      if(!blocks.length) return;
+      ensureAllPos(blocks);
+      const minY = Math.min(...blocks.map(b => b.pos.y));
+      let bottom = top;
+      blocks.forEach(b => {
+        b.pos = Object.assign({}, b.pos, { y: b.pos.y - minY + top });
+        bottom = Math.max(bottom, b.pos.y + b.pos.h + 16);
+        added.push(b);
+      });
+      top = bottom;
+    });
+    if(!added.length) return;
+    pushHistory();
+    added.forEach(b => { task.blocks.push(b); bumpBlockUsage(b.type); });
+    selectedBlockIds.clear(); added.forEach(b => selectedBlockIds.add(b.id)); persistSelection();
+    ctx.renderCanvas(); ctx.renderConfigPane(); adjustCanvasHeight(); renderTaskList(); refreshTabCounts();
+    toast(t('modals.templateInserted', { name: tpl.label }));
+  }
+
   function addBlockOfType(blockTypeOrTemplate){
+    if(blockTypeOrTemplate && typeof blockTypeOrTemplate === 'object' && blockTypeOrTemplate.taskTemplate){
+      addBlocksFromTaskTemplate(blockTypeOrTemplate.taskTemplate);
+      return;
+    }
     pushHistory();
     let block;
     if(blockTypeOrTemplate && typeof blockTypeOrTemplate === 'object' && blockTypeOrTemplate.blockType){
@@ -339,8 +421,8 @@ export function renderTaskPane(host, idx){
       bumpBlockUsage('image');
       newIds.push(id);
       const r = new FileReader();
-      r.onload = () => {
-        block.config.src = r.result;
+      r.onload = async () => {
+        block.config.src = await shrinkImageDataUrl(r.result);
         const card = canvas.querySelector('[data-block-id="' + cssEscape(id) + '"]');
         if(card){
           const body = card.querySelector('.canvas-block-body');

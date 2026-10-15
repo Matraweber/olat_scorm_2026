@@ -155,6 +155,53 @@ export function confirmDialog(opts){
   });
 }
 
+// Dialog with several buttons. choices: [{ id, label, kind:'primary'|'secondary'|'danger' }],
+// shown left to right. Resolves with the chosen id, or null on Esc/backdrop.
+// The first 'primary' choice gets focus.
+export function choiceDialog(opts){
+  const { title = '', message = '', choices = [] } = opts || {};
+  return new Promise(resolve => {
+    const prevFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal confirm-dialog';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    const titleHtml = title ? '<h2 class="confirm-dialog-title">' + escapeHtml(title) + '</h2>' : '';
+    overlay.innerHTML =
+      '<div class="modal-card confirm-dialog-card">' +
+        titleHtml +
+        '<p class="confirm-dialog-message">' + escapeHtml(message) + '</p>' +
+        '<div class="modal-actions"></div>' +
+      '</div>';
+    const actions = overlay.querySelector('.modal-actions');
+    let focusBtn = null;
+    choices.forEach(c => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn ' + (c.kind === 'danger' ? 'btn-danger' : c.kind === 'primary' ? 'btn-primary' : 'btn-secondary');
+      b.textContent = c.label;
+      b.addEventListener('click', () => cleanup(c.id));
+      actions.appendChild(b);
+      if(!focusBtn && c.kind === 'primary') focusBtn = b;
+    });
+    document.body.appendChild(overlay);
+    function cleanup(result){
+      document.removeEventListener('keydown', onKey, true);
+      overlay.removeEventListener('mousedown', onBackdrop);
+      overlay.remove();
+      if(prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus({ preventScroll: true });
+      resolve(result);
+    }
+    function onKey(e){
+      if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); cleanup(null); }
+    }
+    function onBackdrop(e){ if(e.target === overlay) cleanup(null); }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', onBackdrop);
+    setTimeout(() => (focusBtn || actions.firstChild) && (focusBtn || actions.firstChild).focus({ preventScroll: true }), 0);
+  });
+}
+
 // Multi-field input dialog. Returns Promise<{key:value} | null>.
 export function formDialog(opts){
   const {
