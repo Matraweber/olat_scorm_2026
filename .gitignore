@@ -12,18 +12,17 @@
 # Screenshots from ad-hoc debugging sessions.
 screenshots/
 
-# Node tooling + local dev dependencies.
+# Node dependencies (reinstalled from package.json / package-lock.json,
+# which are committed so everyone gets the same versions).
 node_modules/
-package.json
-package-lock.json
 npm-debug.log*
 yarn-debug.log*
 
-# Local linter config.
-eslint.config.mjs
-
-# Browser-based regression tests (kept local).
-test/
-tests/
+# Test output. The test code itself (test/), package.json and
+# eslint.config.mjs are committed so the suite can't get lost again.
 test-results/
+test/visual/diffs/
+# Visual baselines are machine-specific (font antialiasing), so each
+# machine keeps its own (npm run test:visual:update).
+test/visual/baselines/
 
